@@ -78,7 +78,7 @@ fn main() -> anyhow::Result<()> {
 
     if args.lang == Lang::Rust {
         info!(
-            "Generating Rust code in {} format to {}",
+            "Generating Rust code in '{}' format to {}",
             args.format.as_str(),
             args.output
         );
@@ -88,12 +88,15 @@ fn main() -> anyhow::Result<()> {
         let enums = convert_enum_rust_types(&fd);
         let rust_name = format!("{}/{}.rs", args.output, &fd.package);
         let rendered = render(&package, &enums, &messages, tera_file.as_str())?;
-        fs::write(&rust_name, rendered)?;
+        fs::write(&rust_name, rendered).map_err(|e| {
+            error!("Error writing Rust code to file: {} cause {}", rust_name, e);
+            e
+        })?;
 
         info!("Generated Rust code written to {}", rust_name);
     } else if args.lang == Lang::Cpp {
         info!(
-            "Generating C++ code in {} format to {}",
+            "Generating C++ code in '{}' format to '{}'",
             args.format.as_str(),
             args.output
         );
@@ -105,17 +108,23 @@ fn main() -> anyhow::Result<()> {
         let cpp_name = format!("{}/{}.cpp", args.output, &fd.package);
         let inc_name = format!("{}/{}.h", args.output, &fd.package);
         let rendered = render(&package, &enums, &messages, tera_file_src.as_str())?;
-        fs::write(&cpp_name, rendered)?;
+        fs::write(&cpp_name, rendered).map_err(|e| {
+            error!("Error writing C++ code to file: {} cause {}", cpp_name, e);
+            e
+        })?;
         info!(
-            "Generating Rust code from {} format to {}",
+            "Generating C++ code from '{}' format to '{}'",
             tera_file_src,
             cpp_name
         );
 
         let header_rendered = render(&package, &enums, &messages, tera_file_inc.as_str())?;
-        fs::write(&inc_name, header_rendered)?;
+        fs::write(&inc_name, header_rendered).map_err(|e| {
+            error!("Error writing C++ header to file: {} cause {}", inc_name, e);
+            e
+        })?;
         info!(
-            "Generating C++ code from {} format to {}",
+            "Generating C++ code from '{}' format to '{}'",
             tera_file_inc,
             inc_name
         );

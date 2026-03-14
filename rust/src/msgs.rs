@@ -103,6 +103,32 @@ pub enum LawnmowerMode {
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default,Encode, Decode)]
 #[cbor(map)]
+pub struct BrokerAnnounce {
+    #[n(1)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ip: Option<String>,
+    #[n(2)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub port: Option<u32>,
+}
+
+impl TypedMessage for BrokerAnnounce {
+    const ID: u32 = 524;
+    const MSG_TYPE: &'static str = "BrokerAnnounce";
+}
+
+impl Msg for BrokerAnnounce {
+    fn type_name(&self) -> &'static str {<Self as TypedMessage>::MSG_TYPE}
+    fn type_id(&self) -> u32 {<Self as TypedMessage>::ID}
+    fn cbor_serialize(&self) -> Result<Vec<u8>> {Ok(minicbor::to_vec(self)?)}
+    fn cbor_deserialize(v:&Vec<u8>) -> Result<Self> where Self : Sized {Ok(minicbor::decode::<Self>(v.as_slice())?)}
+    fn json_serialize(&self) -> Result<Vec<u8>> {Ok(serde_json::to_vec(self) ?)}
+    fn json_deserialize(v:& Vec<u8>) -> Result<Self> where Self : Sized {Ok(serde_json::from_slice(v.as_slice()) ?)}
+}
+    
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default,Encode, Decode)]
+#[cbor(map)]
 pub struct Alive {
     #[n(3)]
     #[serde(skip_serializing_if = "Option::is_none")]

@@ -4,6 +4,11 @@ syntax = "proto3";
 package msgs;
 
 
+message BrokerAnnounce {
+  string ip = 1;
+  uint32 port = 2;
+}
+
 message Alive {
   // repeated string message_types = 1;
  // repeated string endpoints = 2;

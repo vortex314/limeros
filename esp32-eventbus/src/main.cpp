@@ -47,7 +47,7 @@ extern "C" void app_main()
 #ifdef ENABLE_HOVERBOARD
   eventbus.register_actor(new HoverboardActor("hb")); // hoverboard interface
 #endif
-
+// debugging handler to log all eventbus traffic, comment for beauty
   /*eventbus.register_handler([](const Envelope &env) // just log eventbus traffic
                             {
                               const char *src = env.src ? env.src->name() : "";

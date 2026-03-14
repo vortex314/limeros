@@ -1,4 +1,4 @@
-sudo apt install libgtk-3-dev libwebkit2gtk-4.0-dev libayatana-appindicator3-dev build-essential
+# sudo apt install libgtk-3-dev libwebkit2gtk-4.0-dev libayatana-appindicator3-dev build-essential
  1948  sudo apt install libgtk-3-dev libwebkit2gtk-4.0-dev libayatana-appindicator3-dev build-essential
  1949  sudo apt install libgtk-3-dev libwebkit2gtk-dev libayatana-appindicator3-dev build-essential
  1950  apt search webkitgtk
