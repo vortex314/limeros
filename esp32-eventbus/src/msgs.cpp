@@ -1,18 +1,18 @@
 #include "msgs.h"
 
 
-Result<Bytes> Alive::json_serialize(const Alive& msg)  {
+Result<Bytes> AliveEvent::json_serialize(const AliveEvent& msg)  {
         JsonDocument doc;
         doc.to<JsonObject>();
-        if (msg.subscribe.size()) {
-                    JsonArray arr = doc["subscribe"].to<JsonArray>();
-                    for (const auto& item : msg.subscribe) {
+        if (msg.subscribes.size()) {
+                    JsonArray arr = doc["subscribes"].to<JsonArray>();
+                    for (const auto& item : msg.subscribes) {
                         arr.add(item);
                     }
                 }
-        if (msg.publish.size()) {
-                    JsonArray arr = doc["publish"].to<JsonArray>();
-                    for (const auto& item : msg.publish) {
+        if (msg.publishes.size()) {
+                    JsonArray arr = doc["publishes"].to<JsonArray>();
+                    for (const auto& item : msg.publishes) {
                         arr.add(item);
                     }
                 }
@@ -27,26 +27,26 @@ Result<Bytes> Alive::json_serialize(const Alive& msg)  {
         return Result<Bytes>::Ok(Bytes(str.begin(),str.end()));
     }
 
-    Result<Alive*> Alive::json_deserialize(const Bytes& bytes) {
+    Result<AliveEvent*> AliveEvent::json_deserialize(const Bytes& bytes) {
         JsonDocument doc;
-        Alive* msg = new Alive();
+        AliveEvent* msg = new AliveEvent();
         auto err = deserializeJson(doc,bytes);
         if ( err != DeserializationError::Ok || doc.is<JsonObject>() == false ) {
             delete msg;
-            return Result<Alive*>::Err(-1,"Cannot deserialize as object") ;
+            return Result<AliveEvent*>::Err(-1,"Cannot deserialize as object") ;
         };        
-        if (doc["subscribe"].is<JsonArray>()) {
-                    JsonArray arr = doc["subscribe"].as<JsonArray>();
-                    msg->subscribe.clear();
+        if (doc["subscribes"].is<JsonArray>()) {
+                    JsonArray arr = doc["subscribes"].as<JsonArray>();
+                    msg->subscribes.clear();
                     for (JsonVariant v : arr) {
-                        msg->subscribe.push_back(v.as<std::string>());
+                        msg->subscribes.push_back(v.as<std::string>());
                     }
                 }
-        if (doc["publish"].is<JsonArray>()) {
-                    JsonArray arr = doc["publish"].as<JsonArray>();
-                    msg->publish.clear();
+        if (doc["publishes"].is<JsonArray>()) {
+                    JsonArray arr = doc["publishes"].as<JsonArray>();
+                    msg->publishes.clear();
                     for (JsonVariant v : arr) {
-                        msg->publish.push_back(v.as<std::string>());
+                        msg->publishes.push_back(v.as<std::string>());
                     }
                 }
         if (doc["services"].is<JsonArray>()) {
@@ -56,7 +56,7 @@ Result<Bytes> Alive::json_serialize(const Alive& msg)  {
                         msg->services.push_back(v.as<std::string>());
                     }
                 }
-        return Result<Alive*>::Ok(msg);
+        return Result<AliveEvent*>::Ok(msg);
     }
 
 
@@ -126,67 +126,6 @@ Result<Bytes> UdpMessageCbor::json_serialize(const UdpMessageCbor& msg)  {
     }
 
 
-Result<Bytes> ZenohEvent::json_serialize(const ZenohEvent& msg)  {
-        JsonDocument doc;
-        doc.to<JsonObject>();
-        if (msg.zid)doc["zid"] = *msg.zid;
-        if (msg.what_am_i)doc["what_am_i"] = *msg.what_am_i;
-        if (msg.peers.size()) {
-                    JsonArray arr = doc["peers"].to<JsonArray>();
-                    for (const auto& item : msg.peers) {
-                        arr.add(item);
-                    }
-                }
-        if (msg.prefix)doc["prefix"] = *msg.prefix;
-        if (msg.routers.size()) {
-                    JsonArray arr = doc["routers"].to<JsonArray>();
-                    for (const auto& item : msg.routers) {
-                        arr.add(item);
-                    }
-                }
-        if (msg.connect)doc["connect"] = *msg.connect;
-        if (msg.listen)doc["listen"] = *msg.listen;
-        std::string str;
-        ArduinoJson::serializeJson(doc,str);
-        return Result<Bytes>::Ok(Bytes(str.begin(),str.end()));
-    }
-
-    Result<ZenohEvent*> ZenohEvent::json_deserialize(const Bytes& bytes) {
-        JsonDocument doc;
-        ZenohEvent* msg = new ZenohEvent();
-        auto err = deserializeJson(doc,bytes);
-        if ( err != DeserializationError::Ok || doc.is<JsonObject>() == false ) {
-            delete msg;
-            return Result<ZenohEvent*>::Err(-1,"Cannot deserialize as object") ;
-        };        
-        if (doc["zid"].is<std::string>() )  
-                        msg->zid = doc["zid"].as<std::string>();
-        if (doc["what_am_i"].is<std::string>() )  
-                        msg->what_am_i = doc["what_am_i"].as<std::string>();
-        if (doc["peers"].is<JsonArray>()) {
-                    JsonArray arr = doc["peers"].as<JsonArray>();
-                    msg->peers.clear();
-                    for (JsonVariant v : arr) {
-                        msg->peers.push_back(v.as<std::string>());
-                    }
-                }
-        if (doc["prefix"].is<std::string>() )  
-                        msg->prefix = doc["prefix"].as<std::string>();
-        if (doc["routers"].is<JsonArray>()) {
-                    JsonArray arr = doc["routers"].as<JsonArray>();
-                    msg->routers.clear();
-                    for (JsonVariant v : arr) {
-                        msg->routers.push_back(v.as<std::string>());
-                    }
-                }
-        if (doc["connect"].is<std::string>() )  
-                        msg->connect = doc["connect"].as<std::string>();
-        if (doc["listen"].is<std::string>() )  
-                        msg->listen = doc["listen"].as<std::string>();
-        return Result<ZenohEvent*>::Ok(msg);
-    }
-
-
 Result<Bytes> LogEvent::json_serialize(const LogEvent& msg)  {
         JsonDocument doc;
         doc.to<JsonObject>();
@@ -225,10 +164,9 @@ Result<Bytes> LogEvent::json_serialize(const LogEvent& msg)  {
     }
 
 
-Result<Bytes> SysCmd::json_serialize(const SysCmd& msg)  {
+Result<Bytes> SysRequest::json_serialize(const SysRequest& msg)  {
         JsonDocument doc;
         doc.to<JsonObject>();
-        doc["src"] = msg.src;
         if (msg.set_time)doc["set_time"] = *msg.set_time;
         if (msg.reboot)doc["reboot"] = *msg.reboot;
         if (msg.console)doc["console"] = *msg.console;
@@ -237,23 +175,47 @@ Result<Bytes> SysCmd::json_serialize(const SysCmd& msg)  {
         return Result<Bytes>::Ok(Bytes(str.begin(),str.end()));
     }
 
-    Result<SysCmd*> SysCmd::json_deserialize(const Bytes& bytes) {
+    Result<SysRequest*> SysRequest::json_deserialize(const Bytes& bytes) {
         JsonDocument doc;
-        SysCmd* msg = new SysCmd();
+        SysRequest* msg = new SysRequest();
         auto err = deserializeJson(doc,bytes);
         if ( err != DeserializationError::Ok || doc.is<JsonObject>() == false ) {
             delete msg;
-            return Result<SysCmd*>::Err(-1,"Cannot deserialize as object") ;
+            return Result<SysRequest*>::Err(-1,"Cannot deserialize as object") ;
         };        
-        if (doc["src"].is<std::string>() )
-                    msg->src = doc["src"].as<std::string>();
         if (doc["set_time"].is<uint64_t>() )  
                         msg->set_time = doc["set_time"].as<uint64_t>();
         if (doc["reboot"].is<bool>() )  
                         msg->reboot = doc["reboot"].as<bool>();
         if (doc["console"].is<std::string>() )  
                         msg->console = doc["console"].as<std::string>();
-        return Result<SysCmd*>::Ok(msg);
+        return Result<SysRequest*>::Ok(msg);
+    }
+
+
+Result<Bytes> SysReply::json_serialize(const SysReply& msg)  {
+        JsonDocument doc;
+        doc.to<JsonObject>();
+        if (msg.rc)doc["rc"] = *msg.rc;
+        if (msg.message)doc["message"] = *msg.message;
+        std::string str;
+        ArduinoJson::serializeJson(doc,str);
+        return Result<Bytes>::Ok(Bytes(str.begin(),str.end()));
+    }
+
+    Result<SysReply*> SysReply::json_deserialize(const Bytes& bytes) {
+        JsonDocument doc;
+        SysReply* msg = new SysReply();
+        auto err = deserializeJson(doc,bytes);
+        if ( err != DeserializationError::Ok || doc.is<JsonObject>() == false ) {
+            delete msg;
+            return Result<SysReply*>::Err(-1,"Cannot deserialize as object") ;
+        };        
+        if (doc["rc"].is<int32_t>() )  
+                        msg->rc = doc["rc"].as<int32_t>();
+        if (doc["message"].is<std::string>() )  
+                        msg->message = doc["message"].as<std::string>();
+        return Result<SysReply*>::Ok(msg);
     }
 
 
@@ -368,7 +330,7 @@ Result<Bytes> MulticastEvent::json_serialize(const MulticastEvent& msg)  {
     }
 
 
-Result<Bytes> PingReq::json_serialize(const PingReq& msg)  {
+Result<Bytes> PingRequest::json_serialize(const PingRequest& msg)  {
         JsonDocument doc;
         doc.to<JsonObject>();
         if (msg.number)doc["number"] = *msg.number;
@@ -377,21 +339,21 @@ Result<Bytes> PingReq::json_serialize(const PingReq& msg)  {
         return Result<Bytes>::Ok(Bytes(str.begin(),str.end()));
     }
 
-    Result<PingReq*> PingReq::json_deserialize(const Bytes& bytes) {
+    Result<PingRequest*> PingRequest::json_deserialize(const Bytes& bytes) {
         JsonDocument doc;
-        PingReq* msg = new PingReq();
+        PingRequest* msg = new PingRequest();
         auto err = deserializeJson(doc,bytes);
         if ( err != DeserializationError::Ok || doc.is<JsonObject>() == false ) {
             delete msg;
-            return Result<PingReq*>::Err(-1,"Cannot deserialize as object") ;
+            return Result<PingRequest*>::Err(-1,"Cannot deserialize as object") ;
         };        
         if (doc["number"].is<uint32_t>() )  
                         msg->number = doc["number"].as<uint32_t>();
-        return Result<PingReq*>::Ok(msg);
+        return Result<PingRequest*>::Ok(msg);
     }
 
 
-Result<Bytes> PingRep::json_serialize(const PingRep& msg)  {
+Result<Bytes> PingReply::json_serialize(const PingReply& msg)  {
         JsonDocument doc;
         doc.to<JsonObject>();
         if (msg.number)doc["number"] = *msg.number;
@@ -400,17 +362,17 @@ Result<Bytes> PingRep::json_serialize(const PingRep& msg)  {
         return Result<Bytes>::Ok(Bytes(str.begin(),str.end()));
     }
 
-    Result<PingRep*> PingRep::json_deserialize(const Bytes& bytes) {
+    Result<PingReply*> PingReply::json_deserialize(const Bytes& bytes) {
         JsonDocument doc;
-        PingRep* msg = new PingRep();
+        PingReply* msg = new PingReply();
         auto err = deserializeJson(doc,bytes);
         if ( err != DeserializationError::Ok || doc.is<JsonObject>() == false ) {
             delete msg;
-            return Result<PingRep*>::Err(-1,"Cannot deserialize as object") ;
+            return Result<PingReply*>::Err(-1,"Cannot deserialize as object") ;
         };        
         if (doc["number"].is<uint32_t>() )  
                         msg->number = doc["number"].as<uint32_t>();
-        return Result<PingRep*>::Ok(msg);
+        return Result<PingReply*>::Ok(msg);
     }
 
 
@@ -730,7 +692,7 @@ Result<Bytes> HoverboardEvent::json_serialize(const HoverboardEvent& msg)  {
     }
 
 
-Result<Bytes> HoverboardCmd::json_serialize(const HoverboardCmd& msg)  {
+Result<Bytes> HoverboardRequest::json_serialize(const HoverboardRequest& msg)  {
         JsonDocument doc;
         doc.to<JsonObject>();
         if (msg.speed)doc["speed"] = *msg.speed;
@@ -740,19 +702,19 @@ Result<Bytes> HoverboardCmd::json_serialize(const HoverboardCmd& msg)  {
         return Result<Bytes>::Ok(Bytes(str.begin(),str.end()));
     }
 
-    Result<HoverboardCmd*> HoverboardCmd::json_deserialize(const Bytes& bytes) {
+    Result<HoverboardRequest*> HoverboardRequest::json_deserialize(const Bytes& bytes) {
         JsonDocument doc;
-        HoverboardCmd* msg = new HoverboardCmd();
+        HoverboardRequest* msg = new HoverboardRequest();
         auto err = deserializeJson(doc,bytes);
         if ( err != DeserializationError::Ok || doc.is<JsonObject>() == false ) {
             delete msg;
-            return Result<HoverboardCmd*>::Err(-1,"Cannot deserialize as object") ;
+            return Result<HoverboardRequest*>::Err(-1,"Cannot deserialize as object") ;
         };        
         if (doc["speed"].is<int32_t>() )  
                         msg->speed = doc["speed"].as<int32_t>();
         if (doc["steer"].is<int32_t>() )  
                         msg->steer = doc["steer"].as<int32_t>();
-        return Result<HoverboardCmd*>::Ok(msg);
+        return Result<HoverboardRequest*>::Ok(msg);
     }
 
 
@@ -933,7 +895,7 @@ Result<Bytes> Ps4Event::json_serialize(const Ps4Event& msg)  {
     }
 
 
-Result<Bytes> Ps4Cmd::json_serialize(const Ps4Cmd& msg)  {
+Result<Bytes> Ps4Request::json_serialize(const Ps4Request& msg)  {
         JsonDocument doc;
         doc.to<JsonObject>();
         if (msg.rumble_small)doc["rumble_small"] = *msg.rumble_small;
@@ -948,13 +910,13 @@ Result<Bytes> Ps4Cmd::json_serialize(const Ps4Cmd& msg)  {
         return Result<Bytes>::Ok(Bytes(str.begin(),str.end()));
     }
 
-    Result<Ps4Cmd*> Ps4Cmd::json_deserialize(const Bytes& bytes) {
+    Result<Ps4Request*> Ps4Request::json_deserialize(const Bytes& bytes) {
         JsonDocument doc;
-        Ps4Cmd* msg = new Ps4Cmd();
+        Ps4Request* msg = new Ps4Request();
         auto err = deserializeJson(doc,bytes);
         if ( err != DeserializationError::Ok || doc.is<JsonObject>() == false ) {
             delete msg;
-            return Result<Ps4Cmd*>::Err(-1,"Cannot deserialize as object") ;
+            return Result<Ps4Request*>::Err(-1,"Cannot deserialize as object") ;
         };        
         if (doc["rumble_small"].is<int32_t>() )  
                         msg->rumble_small = doc["rumble_small"].as<int32_t>();
@@ -970,7 +932,7 @@ Result<Bytes> Ps4Cmd::json_serialize(const Ps4Cmd& msg)  {
                         msg->led_flash_on = doc["led_flash_on"].as<int32_t>();
         if (doc["led_flash_off"].is<int32_t>() )  
                         msg->led_flash_off = doc["led_flash_off"].as<int32_t>();
-        return Result<Ps4Cmd*>::Ok(msg);
+        return Result<Ps4Request*>::Ok(msg);
     }
 
 
@@ -1013,7 +975,7 @@ Result<Bytes> CameraEvent::json_serialize(const CameraEvent& msg)  {
     }
 
 
-Result<Bytes> CameraCmd::json_serialize(const CameraCmd& msg)  {
+Result<Bytes> CameraRequest::json_serialize(const CameraRequest& msg)  {
         JsonDocument doc;
         doc.to<JsonObject>();
         if (msg.led)doc["led"] = *msg.led;
@@ -1024,13 +986,13 @@ Result<Bytes> CameraCmd::json_serialize(const CameraCmd& msg)  {
         return Result<Bytes>::Ok(Bytes(str.begin(),str.end()));
     }
 
-    Result<CameraCmd*> CameraCmd::json_deserialize(const Bytes& bytes) {
+    Result<CameraRequest*> CameraRequest::json_deserialize(const Bytes& bytes) {
         JsonDocument doc;
-        CameraCmd* msg = new CameraCmd();
+        CameraRequest* msg = new CameraRequest();
         auto err = deserializeJson(doc,bytes);
         if ( err != DeserializationError::Ok || doc.is<JsonObject>() == false ) {
             delete msg;
-            return Result<CameraCmd*>::Err(-1,"Cannot deserialize as object") ;
+            return Result<CameraRequest*>::Err(-1,"Cannot deserialize as object") ;
         };        
         if (doc["led"].is<bool>() )  
                         msg->led = doc["led"].as<bool>();
@@ -1038,7 +1000,7 @@ Result<Bytes> CameraCmd::json_serialize(const CameraCmd& msg)  {
                         msg->capture_tcp_destination = doc["capture_tcp_destination"].as<std::string>();
         if (doc["quality"].is<int32_t>() )  
                         msg->quality = doc["quality"].as<int32_t>();
-        return Result<CameraCmd*>::Ok(msg);
+        return Result<CameraRequest*>::Ok(msg);
     }
 
 
@@ -1101,7 +1063,7 @@ Result<Bytes> LawnmowerManualEvent::json_serialize(const LawnmowerManualEvent& m
     }
 
 
-Result<Bytes> LawnmowerManualCmd::json_serialize(const LawnmowerManualCmd& msg)  {
+Result<Bytes> LawnmowerManualRequest::json_serialize(const LawnmowerManualRequest& msg)  {
         JsonDocument doc;
         doc.to<JsonObject>();
         if (msg.speed)doc["speed"] = *msg.speed;
@@ -1117,13 +1079,13 @@ Result<Bytes> LawnmowerManualCmd::json_serialize(const LawnmowerManualCmd& msg) 
         return Result<Bytes>::Ok(Bytes(str.begin(),str.end()));
     }
 
-    Result<LawnmowerManualCmd*> LawnmowerManualCmd::json_deserialize(const Bytes& bytes) {
+    Result<LawnmowerManualRequest*> LawnmowerManualRequest::json_deserialize(const Bytes& bytes) {
         JsonDocument doc;
-        LawnmowerManualCmd* msg = new LawnmowerManualCmd();
+        LawnmowerManualRequest* msg = new LawnmowerManualRequest();
         auto err = deserializeJson(doc,bytes);
         if ( err != DeserializationError::Ok || doc.is<JsonObject>() == false ) {
             delete msg;
-            return Result<LawnmowerManualCmd*>::Err(-1,"Cannot deserialize as object") ;
+            return Result<LawnmowerManualRequest*>::Err(-1,"Cannot deserialize as object") ;
         };        
         if (doc["speed"].is<float>() )  
                         msg->speed = doc["speed"].as<float>();
@@ -1141,7 +1103,7 @@ Result<Bytes> LawnmowerManualCmd::json_serialize(const LawnmowerManualCmd& msg) 
                         msg->start_auto_mode = doc["start_auto_mode"].as<bool>();
         if (doc["stop_auto_mode"].is<bool>() )  
                         msg->stop_auto_mode = doc["stop_auto_mode"].as<bool>();
-        return Result<LawnmowerManualCmd*>::Ok(msg);
+        return Result<LawnmowerManualRequest*>::Ok(msg);
     }
 
 
@@ -1209,7 +1171,7 @@ Result<Bytes> LawnmowerAutoEvent::json_serialize(const LawnmowerAutoEvent& msg) 
     }
 
 
-Result<Bytes> LawnmowerAutoCmd::json_serialize(const LawnmowerAutoCmd& msg)  {
+Result<Bytes> LawnmowerAutoRequest::json_serialize(const LawnmowerAutoRequest& msg)  {
         JsonDocument doc;
         doc.to<JsonObject>();
         if (msg.start)doc["start"] = *msg.start;
@@ -1223,13 +1185,13 @@ Result<Bytes> LawnmowerAutoCmd::json_serialize(const LawnmowerAutoCmd& msg)  {
         return Result<Bytes>::Ok(Bytes(str.begin(),str.end()));
     }
 
-    Result<LawnmowerAutoCmd*> LawnmowerAutoCmd::json_deserialize(const Bytes& bytes) {
+    Result<LawnmowerAutoRequest*> LawnmowerAutoRequest::json_deserialize(const Bytes& bytes) {
         JsonDocument doc;
-        LawnmowerAutoCmd* msg = new LawnmowerAutoCmd();
+        LawnmowerAutoRequest* msg = new LawnmowerAutoRequest();
         auto err = deserializeJson(doc,bytes);
         if ( err != DeserializationError::Ok || doc.is<JsonObject>() == false ) {
             delete msg;
-            return Result<LawnmowerAutoCmd*>::Err(-1,"Cannot deserialize as object") ;
+            return Result<LawnmowerAutoRequest*>::Err(-1,"Cannot deserialize as object") ;
         };        
         if (doc["start"].is<bool>() )  
                         msg->start = doc["start"].as<bool>();
@@ -1243,7 +1205,7 @@ Result<Bytes> LawnmowerAutoCmd::json_serialize(const LawnmowerAutoCmd& msg)  {
                         msg->mode = doc["mode"].as<std::string>();
         if (doc["path"].is<std::string>() )  
                         msg->path = doc["path"].as<std::string>();
-        return Result<LawnmowerAutoCmd*>::Ok(msg);
+        return Result<LawnmowerAutoRequest*>::Ok(msg);
     }
 
 
@@ -1327,7 +1289,7 @@ Result<Bytes> MotorEvent::json_serialize(const MotorEvent& msg)  {
 #define RC_OK(rc) if ( (rc) != CborNoError ) { return Result<Bytes>::Err(-1,"CBOR serialization error"); }
 
 
-Result<Bytes> Alive::cbor_serialize(const Alive& msg)  {
+Result<Bytes> AliveEvent::cbor_serialize(const AliveEvent& msg)  {
     // buffer: grow if needed by changing initial size
     std::vector<uint8_t> buffer(1024);
     CborEncoder encoder, mapEncoder;
@@ -1338,25 +1300,25 @@ Result<Bytes> Alive::cbor_serialize(const Alive& msg)  {
 
     {
             CborEncoder arrayEncoder;
-            RC_OK(cbor_encode_int(&mapEncoder, Alive::Field::SUBSCRIBE_INDEX ));
-            RC_OK(cbor_encoder_create_array(&mapEncoder, &arrayEncoder, msg.subscribe.size()));
-            for (const auto & item : msg.subscribe) {
+            RC_OK(cbor_encode_int(&mapEncoder, AliveEvent::Field::SUBSCRIBES_INDEX ));
+            RC_OK(cbor_encoder_create_array(&mapEncoder, &arrayEncoder, msg.subscribes.size()));
+            for (const auto & item : msg.subscribes) {
                 RC_OK(cbor_encode_text_stringz(&arrayEncoder, item.c_str()));
             }
             RC_OK(cbor_encoder_close_container(&mapEncoder, &arrayEncoder));
             }
     {
             CborEncoder arrayEncoder;
-            RC_OK(cbor_encode_int(&mapEncoder, Alive::Field::PUBLISH_INDEX ));
-            RC_OK(cbor_encoder_create_array(&mapEncoder, &arrayEncoder, msg.publish.size()));
-            for (const auto & item : msg.publish) {
+            RC_OK(cbor_encode_int(&mapEncoder, AliveEvent::Field::PUBLISHES_INDEX ));
+            RC_OK(cbor_encoder_create_array(&mapEncoder, &arrayEncoder, msg.publishes.size()));
+            for (const auto & item : msg.publishes) {
                 RC_OK(cbor_encode_text_stringz(&arrayEncoder, item.c_str()));
             }
             RC_OK(cbor_encoder_close_container(&mapEncoder, &arrayEncoder));
             }
     {
             CborEncoder arrayEncoder;
-            RC_OK(cbor_encode_int(&mapEncoder, Alive::Field::SERVICES_INDEX ));
+            RC_OK(cbor_encode_int(&mapEncoder, AliveEvent::Field::SERVICES_INDEX ));
             RC_OK(cbor_encoder_create_array(&mapEncoder, &arrayEncoder, msg.services.size()));
             for (const auto & item : msg.services) {
                 RC_OK(cbor_encode_text_stringz(&arrayEncoder, item.c_str()));
@@ -1369,21 +1331,21 @@ Result<Bytes> Alive::cbor_serialize(const Alive& msg)  {
     return Result<Bytes>::Ok(Bytes(buffer.begin(), buffer.begin() + used));
 }
 
- Result<Alive*> Alive::cbor_deserialize(const Bytes& bytes) {
+ Result<AliveEvent*> AliveEvent::cbor_deserialize(const Bytes& bytes) {
     CborParser parser;
     CborValue it, mapIt;
-    Alive* msg = new Alive();
+    AliveEvent* msg = new AliveEvent();
 
     CborError err = cbor_parser_init(bytes.data(), bytes.size(), 0, &parser, &it);
     if (err != CborNoError) {
         delete msg;
-        return Result<Alive*>::Err(-1,"CBOR parse error");
+        return Result<AliveEvent*>::Err(-1,"CBOR parse error");
     }
 
     if (!cbor_value_is_map(&it)) {
         delete msg;
         INFO("CBOR deserialization error: not a map");
-        return Result<Alive*>::Err(-2,"CBOR deserialization error: not a map");
+        return Result<AliveEvent*>::Err(-2,"CBOR deserialization error: not a map");
     }
 
     // enter map
@@ -1391,7 +1353,7 @@ Result<Bytes> Alive::cbor_serialize(const Alive& msg)  {
     if (err != CborNoError) {
         delete msg;
         INFO("CBOR deserialization error: failed to enter container");
-        return Result<Alive*>::Err(-3,"CBOR deserialization error: failed to enter container");
+        return Result<AliveEvent*>::Err(-3,"CBOR deserialization error: failed to enter container");
     }
 
     // iterate key/value pairs
@@ -1404,11 +1366,11 @@ Result<Bytes> Alive::cbor_serialize(const Alive& msg)  {
             // invalid key type
             INFO("CBOR deserialization error: invalid key type");
             delete msg;
-            return Result<Alive*>::Err(-4,"CBOR deserialization error: invalid key type");
+            return Result<AliveEvent*>::Err(-4,"CBOR deserialization error: invalid key type");
         }
         switch (key) {
             
-            case Alive::Field::SUBSCRIBE_INDEX:{CborValue tmp;
+            case AliveEvent::Field::SUBSCRIBES_INDEX:{CborValue tmp;
                 cbor_value_enter_container(&mapIt,&tmp);
                 while (!cbor_value_at_end(&tmp)) {
                     std::string v;
@@ -1424,13 +1386,13 @@ Result<Bytes> Alive::cbor_serialize(const Alive& msg)  {
 };
     cbor_value_advance(&tmp);
 
-                    msg->subscribe.push_back(v);
+                    msg->subscribes.push_back(v);
                 };
                 cbor_value_leave_container(&mapIt,&tmp);
                 break;
             }
             
-            case Alive::Field::PUBLISH_INDEX:{CborValue tmp;
+            case AliveEvent::Field::PUBLISHES_INDEX:{CborValue tmp;
                 cbor_value_enter_container(&mapIt,&tmp);
                 while (!cbor_value_at_end(&tmp)) {
                     std::string v;
@@ -1446,13 +1408,13 @@ Result<Bytes> Alive::cbor_serialize(const Alive& msg)  {
 };
     cbor_value_advance(&tmp);
 
-                    msg->publish.push_back(v);
+                    msg->publishes.push_back(v);
                 };
                 cbor_value_leave_container(&mapIt,&tmp);
                 break;
             }
             
-            case Alive::Field::SERVICES_INDEX:{CborValue tmp;
+            case AliveEvent::Field::SERVICES_INDEX:{CborValue tmp;
                 cbor_value_enter_container(&mapIt,&tmp);
                 while (!cbor_value_at_end(&tmp)) {
                     std::string v;
@@ -1485,7 +1447,7 @@ Result<Bytes> Alive::cbor_serialize(const Alive& msg)  {
     // leave container
     cbor_value_leave_container(&it, &mapIt);
 
-    return Result<Alive*>::Ok(msg);
+    return Result<AliveEvent*>::Ok(msg);
 }
 
 Result<Bytes> UdpMessage::cbor_serialize(const UdpMessage& msg)  {
@@ -1759,231 +1721,6 @@ Result<Bytes> UdpMessageCbor::cbor_serialize(const UdpMessageCbor& msg)  {
     return Result<UdpMessageCbor*>::Ok(msg);
 }
 
-Result<Bytes> ZenohEvent::cbor_serialize(const ZenohEvent& msg)  {
-    // buffer: grow if needed by changing initial size
-    std::vector<uint8_t> buffer(1024);
-    CborEncoder encoder, mapEncoder;
-     cbor_encoder_init(&encoder, buffer.data(), buffer.size(), 0);
-
-    // Start top-level map
-    RC_OK(cbor_encoder_create_map(&encoder, &mapEncoder, CborIndefiniteLength));
-
-    if (msg.zid) {
-            RC_OK(cbor_encode_int(&mapEncoder, ZenohEvent::Field::ZID_INDEX));
-            RC_OK(cbor_encode_text_stringz(&mapEncoder, msg.zid.value().c_str()));
-            }
-    if (msg.what_am_i) {
-            RC_OK(cbor_encode_int(&mapEncoder, ZenohEvent::Field::WHAT_AM_I_INDEX));
-            RC_OK(cbor_encode_text_stringz(&mapEncoder, msg.what_am_i.value().c_str()));
-            }
-    {
-            CborEncoder arrayEncoder;
-            RC_OK(cbor_encode_int(&mapEncoder, ZenohEvent::Field::PEERS_INDEX ));
-            RC_OK(cbor_encoder_create_array(&mapEncoder, &arrayEncoder, msg.peers.size()));
-            for (const auto & item : msg.peers) {
-                RC_OK(cbor_encode_text_stringz(&arrayEncoder, item.c_str()));
-            }
-            RC_OK(cbor_encoder_close_container(&mapEncoder, &arrayEncoder));
-            }
-    if (msg.prefix) {
-            RC_OK(cbor_encode_int(&mapEncoder, ZenohEvent::Field::PREFIX_INDEX));
-            RC_OK(cbor_encode_text_stringz(&mapEncoder, msg.prefix.value().c_str()));
-            }
-    {
-            CborEncoder arrayEncoder;
-            RC_OK(cbor_encode_int(&mapEncoder, ZenohEvent::Field::ROUTERS_INDEX ));
-            RC_OK(cbor_encoder_create_array(&mapEncoder, &arrayEncoder, msg.routers.size()));
-            for (const auto & item : msg.routers) {
-                RC_OK(cbor_encode_text_stringz(&arrayEncoder, item.c_str()));
-            }
-            RC_OK(cbor_encoder_close_container(&mapEncoder, &arrayEncoder));
-            }
-    if (msg.connect) {
-            RC_OK(cbor_encode_int(&mapEncoder, ZenohEvent::Field::CONNECT_INDEX));
-            RC_OK(cbor_encode_text_stringz(&mapEncoder, msg.connect.value().c_str()));
-            }
-    if (msg.listen) {
-            RC_OK(cbor_encode_int(&mapEncoder, ZenohEvent::Field::LISTEN_INDEX));
-            RC_OK(cbor_encode_text_stringz(&mapEncoder, msg.listen.value().c_str()));
-            }
-    RC_OK(cbor_encoder_close_container(&encoder, &mapEncoder));
-    // get used size
-    size_t used = cbor_encoder_get_buffer_size(&encoder, buffer.data());
-    return Result<Bytes>::Ok(Bytes(buffer.begin(), buffer.begin() + used));
-}
-
- Result<ZenohEvent*> ZenohEvent::cbor_deserialize(const Bytes& bytes) {
-    CborParser parser;
-    CborValue it, mapIt;
-    ZenohEvent* msg = new ZenohEvent();
-
-    CborError err = cbor_parser_init(bytes.data(), bytes.size(), 0, &parser, &it);
-    if (err != CborNoError) {
-        delete msg;
-        return Result<ZenohEvent*>::Err(-1,"CBOR parse error");
-    }
-
-    if (!cbor_value_is_map(&it)) {
-        delete msg;
-        INFO("CBOR deserialization error: not a map");
-        return Result<ZenohEvent*>::Err(-2,"CBOR deserialization error: not a map");
-    }
-
-    // enter map
-    err = cbor_value_enter_container(&it, &mapIt);
-    if (err != CborNoError) {
-        delete msg;
-        INFO("CBOR deserialization error: failed to enter container");
-        return Result<ZenohEvent*>::Err(-3,"CBOR deserialization error: failed to enter container");
-    }
-
-    // iterate key/value pairs
-    while (!cbor_value_at_end(&mapIt)) {
-        uint64_t key = 0;
-        if (cbor_value_is_unsigned_integer(&mapIt)) {
-            cbor_value_get_uint64(&mapIt, &key);
-            cbor_value_advance(&mapIt);
-        } else {
-            // invalid key type
-            INFO("CBOR deserialization error: invalid key type");
-            delete msg;
-            return Result<ZenohEvent*>::Err(-4,"CBOR deserialization error: invalid key type");
-        }
-        switch (key) {
-            
-            case ZenohEvent::Field::ZID_INDEX:{{
-
-    if (cbor_value_is_text_string(&mapIt)) {
-        char valbuf[256];
-        size_t vallen ;
-        cbor_value_calculate_string_length(&mapIt, &vallen);        
-        cbor_value_copy_text_string(&mapIt, valbuf, &vallen, NULL);
-        msg->zid = std::string(valbuf, vallen);
-    }
-};
-    cbor_value_advance(&mapIt);
-
-                break;
-            }
-            
-            case ZenohEvent::Field::WHAT_AM_I_INDEX:{{
-
-    if (cbor_value_is_text_string(&mapIt)) {
-        char valbuf[256];
-        size_t vallen ;
-        cbor_value_calculate_string_length(&mapIt, &vallen);        
-        cbor_value_copy_text_string(&mapIt, valbuf, &vallen, NULL);
-        msg->what_am_i = std::string(valbuf, vallen);
-    }
-};
-    cbor_value_advance(&mapIt);
-
-                break;
-            }
-            
-            case ZenohEvent::Field::PEERS_INDEX:{CborValue tmp;
-                cbor_value_enter_container(&mapIt,&tmp);
-                while (!cbor_value_at_end(&tmp)) {
-                    std::string v;
-                    {
-
-    if (cbor_value_is_text_string(&tmp)) {
-        char valbuf[256];
-        size_t vallen ;
-        cbor_value_calculate_string_length(&tmp, &vallen);        
-        cbor_value_copy_text_string(&tmp, valbuf, &vallen, NULL);
-        v = std::string(valbuf, vallen);
-    }
-};
-    cbor_value_advance(&tmp);
-
-                    msg->peers.push_back(v);
-                };
-                cbor_value_leave_container(&mapIt,&tmp);
-                break;
-            }
-            
-            case ZenohEvent::Field::PREFIX_INDEX:{{
-
-    if (cbor_value_is_text_string(&mapIt)) {
-        char valbuf[256];
-        size_t vallen ;
-        cbor_value_calculate_string_length(&mapIt, &vallen);        
-        cbor_value_copy_text_string(&mapIt, valbuf, &vallen, NULL);
-        msg->prefix = std::string(valbuf, vallen);
-    }
-};
-    cbor_value_advance(&mapIt);
-
-                break;
-            }
-            
-            case ZenohEvent::Field::ROUTERS_INDEX:{CborValue tmp;
-                cbor_value_enter_container(&mapIt,&tmp);
-                while (!cbor_value_at_end(&tmp)) {
-                    std::string v;
-                    {
-
-    if (cbor_value_is_text_string(&tmp)) {
-        char valbuf[256];
-        size_t vallen ;
-        cbor_value_calculate_string_length(&tmp, &vallen);        
-        cbor_value_copy_text_string(&tmp, valbuf, &vallen, NULL);
-        v = std::string(valbuf, vallen);
-    }
-};
-    cbor_value_advance(&tmp);
-
-                    msg->routers.push_back(v);
-                };
-                cbor_value_leave_container(&mapIt,&tmp);
-                break;
-            }
-            
-            case ZenohEvent::Field::CONNECT_INDEX:{{
-
-    if (cbor_value_is_text_string(&mapIt)) {
-        char valbuf[256];
-        size_t vallen ;
-        cbor_value_calculate_string_length(&mapIt, &vallen);        
-        cbor_value_copy_text_string(&mapIt, valbuf, &vallen, NULL);
-        msg->connect = std::string(valbuf, vallen);
-    }
-};
-    cbor_value_advance(&mapIt);
-
-                break;
-            }
-            
-            case ZenohEvent::Field::LISTEN_INDEX:{{
-
-    if (cbor_value_is_text_string(&mapIt)) {
-        char valbuf[256];
-        size_t vallen ;
-        cbor_value_calculate_string_length(&mapIt, &vallen);        
-        cbor_value_copy_text_string(&mapIt, valbuf, &vallen, NULL);
-        msg->listen = std::string(valbuf, vallen);
-    }
-};
-    cbor_value_advance(&mapIt);
-
-                break;
-            }
-            
-            default:
-                // skip unknown key
-                cbor_value_advance(&mapIt);
-                break;
-        }
-
-    }
-
-    // leave container
-    cbor_value_leave_container(&it, &mapIt);
-
-    return Result<ZenohEvent*>::Ok(msg);
-}
-
 Result<Bytes> LogEvent::cbor_serialize(const LogEvent& msg)  {
     // buffer: grow if needed by changing initial size
     std::vector<uint8_t> buffer(1024);
@@ -2140,7 +1877,7 @@ Result<Bytes> LogEvent::cbor_serialize(const LogEvent& msg)  {
     return Result<LogEvent*>::Ok(msg);
 }
 
-Result<Bytes> SysCmd::cbor_serialize(const SysCmd& msg)  {
+Result<Bytes> SysRequest::cbor_serialize(const SysRequest& msg)  {
     // buffer: grow if needed by changing initial size
     std::vector<uint8_t> buffer(1024);
     CborEncoder encoder, mapEncoder;
@@ -2149,19 +1886,16 @@ Result<Bytes> SysCmd::cbor_serialize(const SysCmd& msg)  {
     // Start top-level map
     RC_OK(cbor_encoder_create_map(&encoder, &mapEncoder, CborIndefiniteLength));
 
-    // field: src
-            RC_OK(cbor_encode_int(&mapEncoder, SysCmd::Field::SRC_INDEX));
-            RC_OK(cbor_encode_text_stringz(&mapEncoder, msg.src.c_str()));
     if (msg.set_time) {
-            RC_OK(cbor_encode_int(&mapEncoder, SysCmd::Field::SET_TIME_INDEX));
+            RC_OK(cbor_encode_int(&mapEncoder, SysRequest::Field::SET_TIME_INDEX));
             RC_OK(cbor_encode_int(&mapEncoder, msg.set_time.value()));
             }
     if (msg.reboot) {
-            RC_OK(cbor_encode_int(&mapEncoder, SysCmd::Field::REBOOT_INDEX));
+            RC_OK(cbor_encode_int(&mapEncoder, SysRequest::Field::REBOOT_INDEX));
             RC_OK(cbor_encode_boolean(&mapEncoder, msg.reboot.value()));
             }
     if (msg.console) {
-            RC_OK(cbor_encode_int(&mapEncoder, SysCmd::Field::CONSOLE_INDEX));
+            RC_OK(cbor_encode_int(&mapEncoder, SysRequest::Field::CONSOLE_INDEX));
             RC_OK(cbor_encode_text_stringz(&mapEncoder, msg.console.value().c_str()));
             }
     RC_OK(cbor_encoder_close_container(&encoder, &mapEncoder));
@@ -2170,21 +1904,21 @@ Result<Bytes> SysCmd::cbor_serialize(const SysCmd& msg)  {
     return Result<Bytes>::Ok(Bytes(buffer.begin(), buffer.begin() + used));
 }
 
- Result<SysCmd*> SysCmd::cbor_deserialize(const Bytes& bytes) {
+ Result<SysRequest*> SysRequest::cbor_deserialize(const Bytes& bytes) {
     CborParser parser;
     CborValue it, mapIt;
-    SysCmd* msg = new SysCmd();
+    SysRequest* msg = new SysRequest();
 
     CborError err = cbor_parser_init(bytes.data(), bytes.size(), 0, &parser, &it);
     if (err != CborNoError) {
         delete msg;
-        return Result<SysCmd*>::Err(-1,"CBOR parse error");
+        return Result<SysRequest*>::Err(-1,"CBOR parse error");
     }
 
     if (!cbor_value_is_map(&it)) {
         delete msg;
         INFO("CBOR deserialization error: not a map");
-        return Result<SysCmd*>::Err(-2,"CBOR deserialization error: not a map");
+        return Result<SysRequest*>::Err(-2,"CBOR deserialization error: not a map");
     }
 
     // enter map
@@ -2192,7 +1926,7 @@ Result<Bytes> SysCmd::cbor_serialize(const SysCmd& msg)  {
     if (err != CborNoError) {
         delete msg;
         INFO("CBOR deserialization error: failed to enter container");
-        return Result<SysCmd*>::Err(-3,"CBOR deserialization error: failed to enter container");
+        return Result<SysRequest*>::Err(-3,"CBOR deserialization error: failed to enter container");
     }
 
     // iterate key/value pairs
@@ -2205,26 +1939,11 @@ Result<Bytes> SysCmd::cbor_serialize(const SysCmd& msg)  {
             // invalid key type
             INFO("CBOR deserialization error: invalid key type");
             delete msg;
-            return Result<SysCmd*>::Err(-4,"CBOR deserialization error: invalid key type");
+            return Result<SysRequest*>::Err(-4,"CBOR deserialization error: invalid key type");
         }
         switch (key) {
             
-            case SysCmd::Field::SRC_INDEX:{{
-
-    if (cbor_value_is_text_string(&mapIt)) {
-        char valbuf[256];
-        size_t vallen ;
-        cbor_value_calculate_string_length(&mapIt, &vallen);        
-        cbor_value_copy_text_string(&mapIt, valbuf, &vallen, NULL);
-        msg->src = std::string(valbuf, vallen);
-    }
-};
-    cbor_value_advance(&mapIt);
-
-                break;
-            }
-            
-            case SysCmd::Field::SET_TIME_INDEX:{uint64_t v;
+            case SysRequest::Field::SET_TIME_INDEX:{uint64_t v;
     cbor_value_get_uint64(&mapIt, &v);
     msg->set_time = v;  // Assigning the value to target
     cbor_value_advance(&mapIt);
@@ -2232,7 +1951,7 @@ Result<Bytes> SysCmd::cbor_serialize(const SysCmd& msg)  {
                 break;
             }
             
-            case SysCmd::Field::REBOOT_INDEX:{bool b;
+            case SysRequest::Field::REBOOT_INDEX:{bool b;
     cbor_value_get_boolean(&mapIt, &b);
     msg->reboot = b;
     cbor_value_advance(&mapIt);
@@ -2240,7 +1959,7 @@ Result<Bytes> SysCmd::cbor_serialize(const SysCmd& msg)  {
                 break;
             }
             
-            case SysCmd::Field::CONSOLE_INDEX:{{
+            case SysRequest::Field::CONSOLE_INDEX:{{
 
     if (cbor_value_is_text_string(&mapIt)) {
         char valbuf[256];
@@ -2266,7 +1985,106 @@ Result<Bytes> SysCmd::cbor_serialize(const SysCmd& msg)  {
     // leave container
     cbor_value_leave_container(&it, &mapIt);
 
-    return Result<SysCmd*>::Ok(msg);
+    return Result<SysRequest*>::Ok(msg);
+}
+
+Result<Bytes> SysReply::cbor_serialize(const SysReply& msg)  {
+    // buffer: grow if needed by changing initial size
+    std::vector<uint8_t> buffer(1024);
+    CborEncoder encoder, mapEncoder;
+     cbor_encoder_init(&encoder, buffer.data(), buffer.size(), 0);
+
+    // Start top-level map
+    RC_OK(cbor_encoder_create_map(&encoder, &mapEncoder, CborIndefiniteLength));
+
+    if (msg.rc) {
+            RC_OK(cbor_encode_int(&mapEncoder, SysReply::Field::RC_INDEX));
+            RC_OK(cbor_encode_int(&mapEncoder, msg.rc.value()));
+            }
+    if (msg.message) {
+            RC_OK(cbor_encode_int(&mapEncoder, SysReply::Field::MESSAGE_INDEX));
+            RC_OK(cbor_encode_text_stringz(&mapEncoder, msg.message.value().c_str()));
+            }
+    RC_OK(cbor_encoder_close_container(&encoder, &mapEncoder));
+    // get used size
+    size_t used = cbor_encoder_get_buffer_size(&encoder, buffer.data());
+    return Result<Bytes>::Ok(Bytes(buffer.begin(), buffer.begin() + used));
+}
+
+ Result<SysReply*> SysReply::cbor_deserialize(const Bytes& bytes) {
+    CborParser parser;
+    CborValue it, mapIt;
+    SysReply* msg = new SysReply();
+
+    CborError err = cbor_parser_init(bytes.data(), bytes.size(), 0, &parser, &it);
+    if (err != CborNoError) {
+        delete msg;
+        return Result<SysReply*>::Err(-1,"CBOR parse error");
+    }
+
+    if (!cbor_value_is_map(&it)) {
+        delete msg;
+        INFO("CBOR deserialization error: not a map");
+        return Result<SysReply*>::Err(-2,"CBOR deserialization error: not a map");
+    }
+
+    // enter map
+    err = cbor_value_enter_container(&it, &mapIt);
+    if (err != CborNoError) {
+        delete msg;
+        INFO("CBOR deserialization error: failed to enter container");
+        return Result<SysReply*>::Err(-3,"CBOR deserialization error: failed to enter container");
+    }
+
+    // iterate key/value pairs
+    while (!cbor_value_at_end(&mapIt)) {
+        uint64_t key = 0;
+        if (cbor_value_is_unsigned_integer(&mapIt)) {
+            cbor_value_get_uint64(&mapIt, &key);
+            cbor_value_advance(&mapIt);
+        } else {
+            // invalid key type
+            INFO("CBOR deserialization error: invalid key type");
+            delete msg;
+            return Result<SysReply*>::Err(-4,"CBOR deserialization error: invalid key type");
+        }
+        switch (key) {
+            
+            case SysReply::Field::RC_INDEX:{int64_t v;
+    cbor_value_get_int64(&mapIt, &v);
+    msg->rc = v;
+    cbor_value_advance(&mapIt);
+
+                break;
+            }
+            
+            case SysReply::Field::MESSAGE_INDEX:{{
+
+    if (cbor_value_is_text_string(&mapIt)) {
+        char valbuf[256];
+        size_t vallen ;
+        cbor_value_calculate_string_length(&mapIt, &vallen);        
+        cbor_value_copy_text_string(&mapIt, valbuf, &vallen, NULL);
+        msg->message = std::string(valbuf, vallen);
+    }
+};
+    cbor_value_advance(&mapIt);
+
+                break;
+            }
+            
+            default:
+                // skip unknown key
+                cbor_value_advance(&mapIt);
+                break;
+        }
+
+    }
+
+    // leave container
+    cbor_value_leave_container(&it, &mapIt);
+
+    return Result<SysReply*>::Ok(msg);
 }
 
 Result<Bytes> SysEvent::cbor_serialize(const SysEvent& msg)  {
@@ -2742,7 +2560,7 @@ Result<Bytes> MulticastEvent::cbor_serialize(const MulticastEvent& msg)  {
     return Result<MulticastEvent*>::Ok(msg);
 }
 
-Result<Bytes> PingReq::cbor_serialize(const PingReq& msg)  {
+Result<Bytes> PingRequest::cbor_serialize(const PingRequest& msg)  {
     // buffer: grow if needed by changing initial size
     std::vector<uint8_t> buffer(1024);
     CborEncoder encoder, mapEncoder;
@@ -2752,7 +2570,7 @@ Result<Bytes> PingReq::cbor_serialize(const PingReq& msg)  {
     RC_OK(cbor_encoder_create_map(&encoder, &mapEncoder, CborIndefiniteLength));
 
     if (msg.number) {
-            RC_OK(cbor_encode_int(&mapEncoder, PingReq::Field::NUMBER_INDEX));
+            RC_OK(cbor_encode_int(&mapEncoder, PingRequest::Field::NUMBER_INDEX));
             RC_OK(cbor_encode_int(&mapEncoder, msg.number.value()));
             }
     RC_OK(cbor_encoder_close_container(&encoder, &mapEncoder));
@@ -2761,21 +2579,21 @@ Result<Bytes> PingReq::cbor_serialize(const PingReq& msg)  {
     return Result<Bytes>::Ok(Bytes(buffer.begin(), buffer.begin() + used));
 }
 
- Result<PingReq*> PingReq::cbor_deserialize(const Bytes& bytes) {
+ Result<PingRequest*> PingRequest::cbor_deserialize(const Bytes& bytes) {
     CborParser parser;
     CborValue it, mapIt;
-    PingReq* msg = new PingReq();
+    PingRequest* msg = new PingRequest();
 
     CborError err = cbor_parser_init(bytes.data(), bytes.size(), 0, &parser, &it);
     if (err != CborNoError) {
         delete msg;
-        return Result<PingReq*>::Err(-1,"CBOR parse error");
+        return Result<PingRequest*>::Err(-1,"CBOR parse error");
     }
 
     if (!cbor_value_is_map(&it)) {
         delete msg;
         INFO("CBOR deserialization error: not a map");
-        return Result<PingReq*>::Err(-2,"CBOR deserialization error: not a map");
+        return Result<PingRequest*>::Err(-2,"CBOR deserialization error: not a map");
     }
 
     // enter map
@@ -2783,7 +2601,7 @@ Result<Bytes> PingReq::cbor_serialize(const PingReq& msg)  {
     if (err != CborNoError) {
         delete msg;
         INFO("CBOR deserialization error: failed to enter container");
-        return Result<PingReq*>::Err(-3,"CBOR deserialization error: failed to enter container");
+        return Result<PingRequest*>::Err(-3,"CBOR deserialization error: failed to enter container");
     }
 
     // iterate key/value pairs
@@ -2796,11 +2614,11 @@ Result<Bytes> PingReq::cbor_serialize(const PingReq& msg)  {
             // invalid key type
             INFO("CBOR deserialization error: invalid key type");
             delete msg;
-            return Result<PingReq*>::Err(-4,"CBOR deserialization error: invalid key type");
+            return Result<PingRequest*>::Err(-4,"CBOR deserialization error: invalid key type");
         }
         switch (key) {
             
-            case PingReq::Field::NUMBER_INDEX:{{
+            case PingRequest::Field::NUMBER_INDEX:{{
     uint64_t v;
     cbor_value_get_uint64(&mapIt, &(v));
     msg->number = v;
@@ -2821,10 +2639,10 @@ Result<Bytes> PingReq::cbor_serialize(const PingReq& msg)  {
     // leave container
     cbor_value_leave_container(&it, &mapIt);
 
-    return Result<PingReq*>::Ok(msg);
+    return Result<PingRequest*>::Ok(msg);
 }
 
-Result<Bytes> PingRep::cbor_serialize(const PingRep& msg)  {
+Result<Bytes> PingReply::cbor_serialize(const PingReply& msg)  {
     // buffer: grow if needed by changing initial size
     std::vector<uint8_t> buffer(1024);
     CborEncoder encoder, mapEncoder;
@@ -2834,7 +2652,7 @@ Result<Bytes> PingRep::cbor_serialize(const PingRep& msg)  {
     RC_OK(cbor_encoder_create_map(&encoder, &mapEncoder, CborIndefiniteLength));
 
     if (msg.number) {
-            RC_OK(cbor_encode_int(&mapEncoder, PingRep::Field::NUMBER_INDEX));
+            RC_OK(cbor_encode_int(&mapEncoder, PingReply::Field::NUMBER_INDEX));
             RC_OK(cbor_encode_int(&mapEncoder, msg.number.value()));
             }
     RC_OK(cbor_encoder_close_container(&encoder, &mapEncoder));
@@ -2843,21 +2661,21 @@ Result<Bytes> PingRep::cbor_serialize(const PingRep& msg)  {
     return Result<Bytes>::Ok(Bytes(buffer.begin(), buffer.begin() + used));
 }
 
- Result<PingRep*> PingRep::cbor_deserialize(const Bytes& bytes) {
+ Result<PingReply*> PingReply::cbor_deserialize(const Bytes& bytes) {
     CborParser parser;
     CborValue it, mapIt;
-    PingRep* msg = new PingRep();
+    PingReply* msg = new PingReply();
 
     CborError err = cbor_parser_init(bytes.data(), bytes.size(), 0, &parser, &it);
     if (err != CborNoError) {
         delete msg;
-        return Result<PingRep*>::Err(-1,"CBOR parse error");
+        return Result<PingReply*>::Err(-1,"CBOR parse error");
     }
 
     if (!cbor_value_is_map(&it)) {
         delete msg;
         INFO("CBOR deserialization error: not a map");
-        return Result<PingRep*>::Err(-2,"CBOR deserialization error: not a map");
+        return Result<PingReply*>::Err(-2,"CBOR deserialization error: not a map");
     }
 
     // enter map
@@ -2865,7 +2683,7 @@ Result<Bytes> PingRep::cbor_serialize(const PingRep& msg)  {
     if (err != CborNoError) {
         delete msg;
         INFO("CBOR deserialization error: failed to enter container");
-        return Result<PingRep*>::Err(-3,"CBOR deserialization error: failed to enter container");
+        return Result<PingReply*>::Err(-3,"CBOR deserialization error: failed to enter container");
     }
 
     // iterate key/value pairs
@@ -2878,11 +2696,11 @@ Result<Bytes> PingRep::cbor_serialize(const PingRep& msg)  {
             // invalid key type
             INFO("CBOR deserialization error: invalid key type");
             delete msg;
-            return Result<PingRep*>::Err(-4,"CBOR deserialization error: invalid key type");
+            return Result<PingReply*>::Err(-4,"CBOR deserialization error: invalid key type");
         }
         switch (key) {
             
-            case PingRep::Field::NUMBER_INDEX:{{
+            case PingReply::Field::NUMBER_INDEX:{{
     uint64_t v;
     cbor_value_get_uint64(&mapIt, &(v));
     msg->number = v;
@@ -2903,7 +2721,7 @@ Result<Bytes> PingRep::cbor_serialize(const PingRep& msg)  {
     // leave container
     cbor_value_leave_container(&it, &mapIt);
 
-    return Result<PingRep*>::Ok(msg);
+    return Result<PingReply*>::Ok(msg);
 }
 
 Result<Bytes> HoverboardEventRaw::cbor_serialize(const HoverboardEventRaw& msg)  {
@@ -4146,7 +3964,7 @@ Result<Bytes> HoverboardEvent::cbor_serialize(const HoverboardEvent& msg)  {
     return Result<HoverboardEvent*>::Ok(msg);
 }
 
-Result<Bytes> HoverboardCmd::cbor_serialize(const HoverboardCmd& msg)  {
+Result<Bytes> HoverboardRequest::cbor_serialize(const HoverboardRequest& msg)  {
     // buffer: grow if needed by changing initial size
     std::vector<uint8_t> buffer(1024);
     CborEncoder encoder, mapEncoder;
@@ -4156,11 +3974,11 @@ Result<Bytes> HoverboardCmd::cbor_serialize(const HoverboardCmd& msg)  {
     RC_OK(cbor_encoder_create_map(&encoder, &mapEncoder, CborIndefiniteLength));
 
     if (msg.speed) {
-            RC_OK(cbor_encode_int(&mapEncoder, HoverboardCmd::Field::SPEED_INDEX));
+            RC_OK(cbor_encode_int(&mapEncoder, HoverboardRequest::Field::SPEED_INDEX));
             RC_OK(cbor_encode_int(&mapEncoder, msg.speed.value()));
             }
     if (msg.steer) {
-            RC_OK(cbor_encode_int(&mapEncoder, HoverboardCmd::Field::STEER_INDEX));
+            RC_OK(cbor_encode_int(&mapEncoder, HoverboardRequest::Field::STEER_INDEX));
             RC_OK(cbor_encode_int(&mapEncoder, msg.steer.value()));
             }
     RC_OK(cbor_encoder_close_container(&encoder, &mapEncoder));
@@ -4169,21 +3987,21 @@ Result<Bytes> HoverboardCmd::cbor_serialize(const HoverboardCmd& msg)  {
     return Result<Bytes>::Ok(Bytes(buffer.begin(), buffer.begin() + used));
 }
 
- Result<HoverboardCmd*> HoverboardCmd::cbor_deserialize(const Bytes& bytes) {
+ Result<HoverboardRequest*> HoverboardRequest::cbor_deserialize(const Bytes& bytes) {
     CborParser parser;
     CborValue it, mapIt;
-    HoverboardCmd* msg = new HoverboardCmd();
+    HoverboardRequest* msg = new HoverboardRequest();
 
     CborError err = cbor_parser_init(bytes.data(), bytes.size(), 0, &parser, &it);
     if (err != CborNoError) {
         delete msg;
-        return Result<HoverboardCmd*>::Err(-1,"CBOR parse error");
+        return Result<HoverboardRequest*>::Err(-1,"CBOR parse error");
     }
 
     if (!cbor_value_is_map(&it)) {
         delete msg;
         INFO("CBOR deserialization error: not a map");
-        return Result<HoverboardCmd*>::Err(-2,"CBOR deserialization error: not a map");
+        return Result<HoverboardRequest*>::Err(-2,"CBOR deserialization error: not a map");
     }
 
     // enter map
@@ -4191,7 +4009,7 @@ Result<Bytes> HoverboardCmd::cbor_serialize(const HoverboardCmd& msg)  {
     if (err != CborNoError) {
         delete msg;
         INFO("CBOR deserialization error: failed to enter container");
-        return Result<HoverboardCmd*>::Err(-3,"CBOR deserialization error: failed to enter container");
+        return Result<HoverboardRequest*>::Err(-3,"CBOR deserialization error: failed to enter container");
     }
 
     // iterate key/value pairs
@@ -4204,11 +4022,11 @@ Result<Bytes> HoverboardCmd::cbor_serialize(const HoverboardCmd& msg)  {
             // invalid key type
             INFO("CBOR deserialization error: invalid key type");
             delete msg;
-            return Result<HoverboardCmd*>::Err(-4,"CBOR deserialization error: invalid key type");
+            return Result<HoverboardRequest*>::Err(-4,"CBOR deserialization error: invalid key type");
         }
         switch (key) {
             
-            case HoverboardCmd::Field::SPEED_INDEX:{int64_t v;
+            case HoverboardRequest::Field::SPEED_INDEX:{int64_t v;
     cbor_value_get_int64(&mapIt, &v);
     msg->speed = v;
     cbor_value_advance(&mapIt);
@@ -4216,7 +4034,7 @@ Result<Bytes> HoverboardCmd::cbor_serialize(const HoverboardCmd& msg)  {
                 break;
             }
             
-            case HoverboardCmd::Field::STEER_INDEX:{int64_t v;
+            case HoverboardRequest::Field::STEER_INDEX:{int64_t v;
     cbor_value_get_int64(&mapIt, &v);
     msg->steer = v;
     cbor_value_advance(&mapIt);
@@ -4235,7 +4053,7 @@ Result<Bytes> HoverboardCmd::cbor_serialize(const HoverboardCmd& msg)  {
     // leave container
     cbor_value_leave_container(&it, &mapIt);
 
-    return Result<HoverboardCmd*>::Ok(msg);
+    return Result<HoverboardRequest*>::Ok(msg);
 }
 
 Result<Bytes> HoverboardReply::cbor_serialize(const HoverboardReply& msg)  {
@@ -4924,7 +4742,7 @@ Result<Bytes> Ps4Event::cbor_serialize(const Ps4Event& msg)  {
     return Result<Ps4Event*>::Ok(msg);
 }
 
-Result<Bytes> Ps4Cmd::cbor_serialize(const Ps4Cmd& msg)  {
+Result<Bytes> Ps4Request::cbor_serialize(const Ps4Request& msg)  {
     // buffer: grow if needed by changing initial size
     std::vector<uint8_t> buffer(1024);
     CborEncoder encoder, mapEncoder;
@@ -4934,31 +4752,31 @@ Result<Bytes> Ps4Cmd::cbor_serialize(const Ps4Cmd& msg)  {
     RC_OK(cbor_encoder_create_map(&encoder, &mapEncoder, CborIndefiniteLength));
 
     if (msg.rumble_small) {
-            RC_OK(cbor_encode_int(&mapEncoder, Ps4Cmd::Field::RUMBLE_SMALL_INDEX));
+            RC_OK(cbor_encode_int(&mapEncoder, Ps4Request::Field::RUMBLE_SMALL_INDEX));
             RC_OK(cbor_encode_int(&mapEncoder, msg.rumble_small.value()));
             }
     if (msg.rumble_large) {
-            RC_OK(cbor_encode_int(&mapEncoder, Ps4Cmd::Field::RUMBLE_LARGE_INDEX));
+            RC_OK(cbor_encode_int(&mapEncoder, Ps4Request::Field::RUMBLE_LARGE_INDEX));
             RC_OK(cbor_encode_int(&mapEncoder, msg.rumble_large.value()));
             }
     if (msg.led_red) {
-            RC_OK(cbor_encode_int(&mapEncoder, Ps4Cmd::Field::LED_RED_INDEX));
+            RC_OK(cbor_encode_int(&mapEncoder, Ps4Request::Field::LED_RED_INDEX));
             RC_OK(cbor_encode_int(&mapEncoder, msg.led_red.value()));
             }
     if (msg.led_green) {
-            RC_OK(cbor_encode_int(&mapEncoder, Ps4Cmd::Field::LED_GREEN_INDEX));
+            RC_OK(cbor_encode_int(&mapEncoder, Ps4Request::Field::LED_GREEN_INDEX));
             RC_OK(cbor_encode_int(&mapEncoder, msg.led_green.value()));
             }
     if (msg.led_blue) {
-            RC_OK(cbor_encode_int(&mapEncoder, Ps4Cmd::Field::LED_BLUE_INDEX));
+            RC_OK(cbor_encode_int(&mapEncoder, Ps4Request::Field::LED_BLUE_INDEX));
             RC_OK(cbor_encode_int(&mapEncoder, msg.led_blue.value()));
             }
     if (msg.led_flash_on) {
-            RC_OK(cbor_encode_int(&mapEncoder, Ps4Cmd::Field::LED_FLASH_ON_INDEX));
+            RC_OK(cbor_encode_int(&mapEncoder, Ps4Request::Field::LED_FLASH_ON_INDEX));
             RC_OK(cbor_encode_int(&mapEncoder, msg.led_flash_on.value()));
             }
     if (msg.led_flash_off) {
-            RC_OK(cbor_encode_int(&mapEncoder, Ps4Cmd::Field::LED_FLASH_OFF_INDEX));
+            RC_OK(cbor_encode_int(&mapEncoder, Ps4Request::Field::LED_FLASH_OFF_INDEX));
             RC_OK(cbor_encode_int(&mapEncoder, msg.led_flash_off.value()));
             }
     RC_OK(cbor_encoder_close_container(&encoder, &mapEncoder));
@@ -4967,21 +4785,21 @@ Result<Bytes> Ps4Cmd::cbor_serialize(const Ps4Cmd& msg)  {
     return Result<Bytes>::Ok(Bytes(buffer.begin(), buffer.begin() + used));
 }
 
- Result<Ps4Cmd*> Ps4Cmd::cbor_deserialize(const Bytes& bytes) {
+ Result<Ps4Request*> Ps4Request::cbor_deserialize(const Bytes& bytes) {
     CborParser parser;
     CborValue it, mapIt;
-    Ps4Cmd* msg = new Ps4Cmd();
+    Ps4Request* msg = new Ps4Request();
 
     CborError err = cbor_parser_init(bytes.data(), bytes.size(), 0, &parser, &it);
     if (err != CborNoError) {
         delete msg;
-        return Result<Ps4Cmd*>::Err(-1,"CBOR parse error");
+        return Result<Ps4Request*>::Err(-1,"CBOR parse error");
     }
 
     if (!cbor_value_is_map(&it)) {
         delete msg;
         INFO("CBOR deserialization error: not a map");
-        return Result<Ps4Cmd*>::Err(-2,"CBOR deserialization error: not a map");
+        return Result<Ps4Request*>::Err(-2,"CBOR deserialization error: not a map");
     }
 
     // enter map
@@ -4989,7 +4807,7 @@ Result<Bytes> Ps4Cmd::cbor_serialize(const Ps4Cmd& msg)  {
     if (err != CborNoError) {
         delete msg;
         INFO("CBOR deserialization error: failed to enter container");
-        return Result<Ps4Cmd*>::Err(-3,"CBOR deserialization error: failed to enter container");
+        return Result<Ps4Request*>::Err(-3,"CBOR deserialization error: failed to enter container");
     }
 
     // iterate key/value pairs
@@ -5002,11 +4820,11 @@ Result<Bytes> Ps4Cmd::cbor_serialize(const Ps4Cmd& msg)  {
             // invalid key type
             INFO("CBOR deserialization error: invalid key type");
             delete msg;
-            return Result<Ps4Cmd*>::Err(-4,"CBOR deserialization error: invalid key type");
+            return Result<Ps4Request*>::Err(-4,"CBOR deserialization error: invalid key type");
         }
         switch (key) {
             
-            case Ps4Cmd::Field::RUMBLE_SMALL_INDEX:{int64_t v;
+            case Ps4Request::Field::RUMBLE_SMALL_INDEX:{int64_t v;
     cbor_value_get_int64(&mapIt, &v);
     msg->rumble_small = v;
     cbor_value_advance(&mapIt);
@@ -5014,7 +4832,7 @@ Result<Bytes> Ps4Cmd::cbor_serialize(const Ps4Cmd& msg)  {
                 break;
             }
             
-            case Ps4Cmd::Field::RUMBLE_LARGE_INDEX:{int64_t v;
+            case Ps4Request::Field::RUMBLE_LARGE_INDEX:{int64_t v;
     cbor_value_get_int64(&mapIt, &v);
     msg->rumble_large = v;
     cbor_value_advance(&mapIt);
@@ -5022,7 +4840,7 @@ Result<Bytes> Ps4Cmd::cbor_serialize(const Ps4Cmd& msg)  {
                 break;
             }
             
-            case Ps4Cmd::Field::LED_RED_INDEX:{int64_t v;
+            case Ps4Request::Field::LED_RED_INDEX:{int64_t v;
     cbor_value_get_int64(&mapIt, &v);
     msg->led_red = v;
     cbor_value_advance(&mapIt);
@@ -5030,7 +4848,7 @@ Result<Bytes> Ps4Cmd::cbor_serialize(const Ps4Cmd& msg)  {
                 break;
             }
             
-            case Ps4Cmd::Field::LED_GREEN_INDEX:{int64_t v;
+            case Ps4Request::Field::LED_GREEN_INDEX:{int64_t v;
     cbor_value_get_int64(&mapIt, &v);
     msg->led_green = v;
     cbor_value_advance(&mapIt);
@@ -5038,7 +4856,7 @@ Result<Bytes> Ps4Cmd::cbor_serialize(const Ps4Cmd& msg)  {
                 break;
             }
             
-            case Ps4Cmd::Field::LED_BLUE_INDEX:{int64_t v;
+            case Ps4Request::Field::LED_BLUE_INDEX:{int64_t v;
     cbor_value_get_int64(&mapIt, &v);
     msg->led_blue = v;
     cbor_value_advance(&mapIt);
@@ -5046,7 +4864,7 @@ Result<Bytes> Ps4Cmd::cbor_serialize(const Ps4Cmd& msg)  {
                 break;
             }
             
-            case Ps4Cmd::Field::LED_FLASH_ON_INDEX:{int64_t v;
+            case Ps4Request::Field::LED_FLASH_ON_INDEX:{int64_t v;
     cbor_value_get_int64(&mapIt, &v);
     msg->led_flash_on = v;
     cbor_value_advance(&mapIt);
@@ -5054,7 +4872,7 @@ Result<Bytes> Ps4Cmd::cbor_serialize(const Ps4Cmd& msg)  {
                 break;
             }
             
-            case Ps4Cmd::Field::LED_FLASH_OFF_INDEX:{int64_t v;
+            case Ps4Request::Field::LED_FLASH_OFF_INDEX:{int64_t v;
     cbor_value_get_int64(&mapIt, &v);
     msg->led_flash_off = v;
     cbor_value_advance(&mapIt);
@@ -5073,7 +4891,7 @@ Result<Bytes> Ps4Cmd::cbor_serialize(const Ps4Cmd& msg)  {
     // leave container
     cbor_value_leave_container(&it, &mapIt);
 
-    return Result<Ps4Cmd*>::Ok(msg);
+    return Result<Ps4Request*>::Ok(msg);
 }
 
 Result<Bytes> CameraEvent::cbor_serialize(const CameraEvent& msg)  {
@@ -5229,7 +5047,7 @@ Result<Bytes> CameraEvent::cbor_serialize(const CameraEvent& msg)  {
     return Result<CameraEvent*>::Ok(msg);
 }
 
-Result<Bytes> CameraCmd::cbor_serialize(const CameraCmd& msg)  {
+Result<Bytes> CameraRequest::cbor_serialize(const CameraRequest& msg)  {
     // buffer: grow if needed by changing initial size
     std::vector<uint8_t> buffer(1024);
     CborEncoder encoder, mapEncoder;
@@ -5239,15 +5057,15 @@ Result<Bytes> CameraCmd::cbor_serialize(const CameraCmd& msg)  {
     RC_OK(cbor_encoder_create_map(&encoder, &mapEncoder, CborIndefiniteLength));
 
     if (msg.led) {
-            RC_OK(cbor_encode_int(&mapEncoder, CameraCmd::Field::LED_INDEX));
+            RC_OK(cbor_encode_int(&mapEncoder, CameraRequest::Field::LED_INDEX));
             RC_OK(cbor_encode_boolean(&mapEncoder, msg.led.value()));
             }
     if (msg.capture_tcp_destination) {
-            RC_OK(cbor_encode_int(&mapEncoder, CameraCmd::Field::CAPTURE_TCP_DESTINATION_INDEX));
+            RC_OK(cbor_encode_int(&mapEncoder, CameraRequest::Field::CAPTURE_TCP_DESTINATION_INDEX));
             RC_OK(cbor_encode_text_stringz(&mapEncoder, msg.capture_tcp_destination.value().c_str()));
             }
     if (msg.quality) {
-            RC_OK(cbor_encode_int(&mapEncoder, CameraCmd::Field::QUALITY_INDEX));
+            RC_OK(cbor_encode_int(&mapEncoder, CameraRequest::Field::QUALITY_INDEX));
             RC_OK(cbor_encode_int(&mapEncoder, msg.quality.value()));
             }
     RC_OK(cbor_encoder_close_container(&encoder, &mapEncoder));
@@ -5256,21 +5074,21 @@ Result<Bytes> CameraCmd::cbor_serialize(const CameraCmd& msg)  {
     return Result<Bytes>::Ok(Bytes(buffer.begin(), buffer.begin() + used));
 }
 
- Result<CameraCmd*> CameraCmd::cbor_deserialize(const Bytes& bytes) {
+ Result<CameraRequest*> CameraRequest::cbor_deserialize(const Bytes& bytes) {
     CborParser parser;
     CborValue it, mapIt;
-    CameraCmd* msg = new CameraCmd();
+    CameraRequest* msg = new CameraRequest();
 
     CborError err = cbor_parser_init(bytes.data(), bytes.size(), 0, &parser, &it);
     if (err != CborNoError) {
         delete msg;
-        return Result<CameraCmd*>::Err(-1,"CBOR parse error");
+        return Result<CameraRequest*>::Err(-1,"CBOR parse error");
     }
 
     if (!cbor_value_is_map(&it)) {
         delete msg;
         INFO("CBOR deserialization error: not a map");
-        return Result<CameraCmd*>::Err(-2,"CBOR deserialization error: not a map");
+        return Result<CameraRequest*>::Err(-2,"CBOR deserialization error: not a map");
     }
 
     // enter map
@@ -5278,7 +5096,7 @@ Result<Bytes> CameraCmd::cbor_serialize(const CameraCmd& msg)  {
     if (err != CborNoError) {
         delete msg;
         INFO("CBOR deserialization error: failed to enter container");
-        return Result<CameraCmd*>::Err(-3,"CBOR deserialization error: failed to enter container");
+        return Result<CameraRequest*>::Err(-3,"CBOR deserialization error: failed to enter container");
     }
 
     // iterate key/value pairs
@@ -5291,11 +5109,11 @@ Result<Bytes> CameraCmd::cbor_serialize(const CameraCmd& msg)  {
             // invalid key type
             INFO("CBOR deserialization error: invalid key type");
             delete msg;
-            return Result<CameraCmd*>::Err(-4,"CBOR deserialization error: invalid key type");
+            return Result<CameraRequest*>::Err(-4,"CBOR deserialization error: invalid key type");
         }
         switch (key) {
             
-            case CameraCmd::Field::LED_INDEX:{bool b;
+            case CameraRequest::Field::LED_INDEX:{bool b;
     cbor_value_get_boolean(&mapIt, &b);
     msg->led = b;
     cbor_value_advance(&mapIt);
@@ -5303,7 +5121,7 @@ Result<Bytes> CameraCmd::cbor_serialize(const CameraCmd& msg)  {
                 break;
             }
             
-            case CameraCmd::Field::CAPTURE_TCP_DESTINATION_INDEX:{{
+            case CameraRequest::Field::CAPTURE_TCP_DESTINATION_INDEX:{{
 
     if (cbor_value_is_text_string(&mapIt)) {
         char valbuf[256];
@@ -5318,7 +5136,7 @@ Result<Bytes> CameraCmd::cbor_serialize(const CameraCmd& msg)  {
                 break;
             }
             
-            case CameraCmd::Field::QUALITY_INDEX:{int64_t v;
+            case CameraRequest::Field::QUALITY_INDEX:{int64_t v;
     cbor_value_get_int64(&mapIt, &v);
     msg->quality = v;
     cbor_value_advance(&mapIt);
@@ -5337,7 +5155,7 @@ Result<Bytes> CameraCmd::cbor_serialize(const CameraCmd& msg)  {
     // leave container
     cbor_value_leave_container(&it, &mapIt);
 
-    return Result<CameraCmd*>::Ok(msg);
+    return Result<CameraRequest*>::Ok(msg);
 }
 
 Result<Bytes> CameraReply::cbor_serialize(const CameraReply& msg)  {
@@ -5561,7 +5379,7 @@ Result<Bytes> LawnmowerManualEvent::cbor_serialize(const LawnmowerManualEvent& m
     return Result<LawnmowerManualEvent*>::Ok(msg);
 }
 
-Result<Bytes> LawnmowerManualCmd::cbor_serialize(const LawnmowerManualCmd& msg)  {
+Result<Bytes> LawnmowerManualRequest::cbor_serialize(const LawnmowerManualRequest& msg)  {
     // buffer: grow if needed by changing initial size
     std::vector<uint8_t> buffer(1024);
     CborEncoder encoder, mapEncoder;
@@ -5571,35 +5389,35 @@ Result<Bytes> LawnmowerManualCmd::cbor_serialize(const LawnmowerManualCmd& msg) 
     RC_OK(cbor_encoder_create_map(&encoder, &mapEncoder, CborIndefiniteLength));
 
     if (msg.speed) {
-            RC_OK(cbor_encode_int(&mapEncoder, LawnmowerManualCmd::Field::SPEED_INDEX));
+            RC_OK(cbor_encode_int(&mapEncoder, LawnmowerManualRequest::Field::SPEED_INDEX));
             RC_OK(cbor_encode_float(&mapEncoder, msg.speed.value()));
             }
     if (msg.steer) {
-            RC_OK(cbor_encode_int(&mapEncoder, LawnmowerManualCmd::Field::STEER_INDEX));
+            RC_OK(cbor_encode_int(&mapEncoder, LawnmowerManualRequest::Field::STEER_INDEX));
             RC_OK(cbor_encode_float(&mapEncoder, msg.steer.value()));
             }
     if (msg.blade) {
-            RC_OK(cbor_encode_int(&mapEncoder, LawnmowerManualCmd::Field::BLADE_INDEX));
+            RC_OK(cbor_encode_int(&mapEncoder, LawnmowerManualRequest::Field::BLADE_INDEX));
             RC_OK(cbor_encode_boolean(&mapEncoder, msg.blade.value()));
             }
     if (msg.start_manual_control) {
-            RC_OK(cbor_encode_int(&mapEncoder, LawnmowerManualCmd::Field::START_MANUAL_CONTROL_INDEX));
+            RC_OK(cbor_encode_int(&mapEncoder, LawnmowerManualRequest::Field::START_MANUAL_CONTROL_INDEX));
             RC_OK(cbor_encode_boolean(&mapEncoder, msg.start_manual_control.value()));
             }
     if (msg.stop_manual_control) {
-            RC_OK(cbor_encode_int(&mapEncoder, LawnmowerManualCmd::Field::STOP_MANUAL_CONTROL_INDEX));
+            RC_OK(cbor_encode_int(&mapEncoder, LawnmowerManualRequest::Field::STOP_MANUAL_CONTROL_INDEX));
             RC_OK(cbor_encode_boolean(&mapEncoder, msg.stop_manual_control.value()));
             }
     if (msg.emergency_stop) {
-            RC_OK(cbor_encode_int(&mapEncoder, LawnmowerManualCmd::Field::EMERGENCY_STOP_INDEX));
+            RC_OK(cbor_encode_int(&mapEncoder, LawnmowerManualRequest::Field::EMERGENCY_STOP_INDEX));
             RC_OK(cbor_encode_boolean(&mapEncoder, msg.emergency_stop.value()));
             }
     if (msg.start_auto_mode) {
-            RC_OK(cbor_encode_int(&mapEncoder, LawnmowerManualCmd::Field::START_AUTO_MODE_INDEX));
+            RC_OK(cbor_encode_int(&mapEncoder, LawnmowerManualRequest::Field::START_AUTO_MODE_INDEX));
             RC_OK(cbor_encode_boolean(&mapEncoder, msg.start_auto_mode.value()));
             }
     if (msg.stop_auto_mode) {
-            RC_OK(cbor_encode_int(&mapEncoder, LawnmowerManualCmd::Field::STOP_AUTO_MODE_INDEX));
+            RC_OK(cbor_encode_int(&mapEncoder, LawnmowerManualRequest::Field::STOP_AUTO_MODE_INDEX));
             RC_OK(cbor_encode_boolean(&mapEncoder, msg.stop_auto_mode.value()));
             }
     RC_OK(cbor_encoder_close_container(&encoder, &mapEncoder));
@@ -5608,21 +5426,21 @@ Result<Bytes> LawnmowerManualCmd::cbor_serialize(const LawnmowerManualCmd& msg) 
     return Result<Bytes>::Ok(Bytes(buffer.begin(), buffer.begin() + used));
 }
 
- Result<LawnmowerManualCmd*> LawnmowerManualCmd::cbor_deserialize(const Bytes& bytes) {
+ Result<LawnmowerManualRequest*> LawnmowerManualRequest::cbor_deserialize(const Bytes& bytes) {
     CborParser parser;
     CborValue it, mapIt;
-    LawnmowerManualCmd* msg = new LawnmowerManualCmd();
+    LawnmowerManualRequest* msg = new LawnmowerManualRequest();
 
     CborError err = cbor_parser_init(bytes.data(), bytes.size(), 0, &parser, &it);
     if (err != CborNoError) {
         delete msg;
-        return Result<LawnmowerManualCmd*>::Err(-1,"CBOR parse error");
+        return Result<LawnmowerManualRequest*>::Err(-1,"CBOR parse error");
     }
 
     if (!cbor_value_is_map(&it)) {
         delete msg;
         INFO("CBOR deserialization error: not a map");
-        return Result<LawnmowerManualCmd*>::Err(-2,"CBOR deserialization error: not a map");
+        return Result<LawnmowerManualRequest*>::Err(-2,"CBOR deserialization error: not a map");
     }
 
     // enter map
@@ -5630,7 +5448,7 @@ Result<Bytes> LawnmowerManualCmd::cbor_serialize(const LawnmowerManualCmd& msg) 
     if (err != CborNoError) {
         delete msg;
         INFO("CBOR deserialization error: failed to enter container");
-        return Result<LawnmowerManualCmd*>::Err(-3,"CBOR deserialization error: failed to enter container");
+        return Result<LawnmowerManualRequest*>::Err(-3,"CBOR deserialization error: failed to enter container");
     }
 
     // iterate key/value pairs
@@ -5643,11 +5461,11 @@ Result<Bytes> LawnmowerManualCmd::cbor_serialize(const LawnmowerManualCmd& msg) 
             // invalid key type
             INFO("CBOR deserialization error: invalid key type");
             delete msg;
-            return Result<LawnmowerManualCmd*>::Err(-4,"CBOR deserialization error: invalid key type");
+            return Result<LawnmowerManualRequest*>::Err(-4,"CBOR deserialization error: invalid key type");
         }
         switch (key) {
             
-            case LawnmowerManualCmd::Field::SPEED_INDEX:{float f;
+            case LawnmowerManualRequest::Field::SPEED_INDEX:{float f;
     cbor_value_get_float(&mapIt, &f);
     msg->speed = f;
     cbor_value_advance(&mapIt);
@@ -5655,7 +5473,7 @@ Result<Bytes> LawnmowerManualCmd::cbor_serialize(const LawnmowerManualCmd& msg) 
                 break;
             }
             
-            case LawnmowerManualCmd::Field::STEER_INDEX:{float f;
+            case LawnmowerManualRequest::Field::STEER_INDEX:{float f;
     cbor_value_get_float(&mapIt, &f);
     msg->steer = f;
     cbor_value_advance(&mapIt);
@@ -5663,7 +5481,7 @@ Result<Bytes> LawnmowerManualCmd::cbor_serialize(const LawnmowerManualCmd& msg) 
                 break;
             }
             
-            case LawnmowerManualCmd::Field::BLADE_INDEX:{bool b;
+            case LawnmowerManualRequest::Field::BLADE_INDEX:{bool b;
     cbor_value_get_boolean(&mapIt, &b);
     msg->blade = b;
     cbor_value_advance(&mapIt);
@@ -5671,7 +5489,7 @@ Result<Bytes> LawnmowerManualCmd::cbor_serialize(const LawnmowerManualCmd& msg) 
                 break;
             }
             
-            case LawnmowerManualCmd::Field::START_MANUAL_CONTROL_INDEX:{bool b;
+            case LawnmowerManualRequest::Field::START_MANUAL_CONTROL_INDEX:{bool b;
     cbor_value_get_boolean(&mapIt, &b);
     msg->start_manual_control = b;
     cbor_value_advance(&mapIt);
@@ -5679,7 +5497,7 @@ Result<Bytes> LawnmowerManualCmd::cbor_serialize(const LawnmowerManualCmd& msg) 
                 break;
             }
             
-            case LawnmowerManualCmd::Field::STOP_MANUAL_CONTROL_INDEX:{bool b;
+            case LawnmowerManualRequest::Field::STOP_MANUAL_CONTROL_INDEX:{bool b;
     cbor_value_get_boolean(&mapIt, &b);
     msg->stop_manual_control = b;
     cbor_value_advance(&mapIt);
@@ -5687,7 +5505,7 @@ Result<Bytes> LawnmowerManualCmd::cbor_serialize(const LawnmowerManualCmd& msg) 
                 break;
             }
             
-            case LawnmowerManualCmd::Field::EMERGENCY_STOP_INDEX:{bool b;
+            case LawnmowerManualRequest::Field::EMERGENCY_STOP_INDEX:{bool b;
     cbor_value_get_boolean(&mapIt, &b);
     msg->emergency_stop = b;
     cbor_value_advance(&mapIt);
@@ -5695,7 +5513,7 @@ Result<Bytes> LawnmowerManualCmd::cbor_serialize(const LawnmowerManualCmd& msg) 
                 break;
             }
             
-            case LawnmowerManualCmd::Field::START_AUTO_MODE_INDEX:{bool b;
+            case LawnmowerManualRequest::Field::START_AUTO_MODE_INDEX:{bool b;
     cbor_value_get_boolean(&mapIt, &b);
     msg->start_auto_mode = b;
     cbor_value_advance(&mapIt);
@@ -5703,7 +5521,7 @@ Result<Bytes> LawnmowerManualCmd::cbor_serialize(const LawnmowerManualCmd& msg) 
                 break;
             }
             
-            case LawnmowerManualCmd::Field::STOP_AUTO_MODE_INDEX:{bool b;
+            case LawnmowerManualRequest::Field::STOP_AUTO_MODE_INDEX:{bool b;
     cbor_value_get_boolean(&mapIt, &b);
     msg->stop_auto_mode = b;
     cbor_value_advance(&mapIt);
@@ -5722,7 +5540,7 @@ Result<Bytes> LawnmowerManualCmd::cbor_serialize(const LawnmowerManualCmd& msg) 
     // leave container
     cbor_value_leave_container(&it, &mapIt);
 
-    return Result<LawnmowerManualCmd*>::Ok(msg);
+    return Result<LawnmowerManualRequest*>::Ok(msg);
 }
 
 Result<Bytes> LawnmowerManualReply::cbor_serialize(const LawnmowerManualReply& msg)  {
@@ -5978,7 +5796,7 @@ Result<Bytes> LawnmowerAutoEvent::cbor_serialize(const LawnmowerAutoEvent& msg) 
     return Result<LawnmowerAutoEvent*>::Ok(msg);
 }
 
-Result<Bytes> LawnmowerAutoCmd::cbor_serialize(const LawnmowerAutoCmd& msg)  {
+Result<Bytes> LawnmowerAutoRequest::cbor_serialize(const LawnmowerAutoRequest& msg)  {
     // buffer: grow if needed by changing initial size
     std::vector<uint8_t> buffer(1024);
     CborEncoder encoder, mapEncoder;
@@ -5988,27 +5806,27 @@ Result<Bytes> LawnmowerAutoCmd::cbor_serialize(const LawnmowerAutoCmd& msg)  {
     RC_OK(cbor_encoder_create_map(&encoder, &mapEncoder, CborIndefiniteLength));
 
     if (msg.start) {
-            RC_OK(cbor_encode_int(&mapEncoder, LawnmowerAutoCmd::Field::START_INDEX));
+            RC_OK(cbor_encode_int(&mapEncoder, LawnmowerAutoRequest::Field::START_INDEX));
             RC_OK(cbor_encode_boolean(&mapEncoder, msg.start.value()));
             }
     if (msg.stop) {
-            RC_OK(cbor_encode_int(&mapEncoder, LawnmowerAutoCmd::Field::STOP_INDEX));
+            RC_OK(cbor_encode_int(&mapEncoder, LawnmowerAutoRequest::Field::STOP_INDEX));
             RC_OK(cbor_encode_boolean(&mapEncoder, msg.stop.value()));
             }
     if (msg.pause) {
-            RC_OK(cbor_encode_int(&mapEncoder, LawnmowerAutoCmd::Field::PAUSE_INDEX));
+            RC_OK(cbor_encode_int(&mapEncoder, LawnmowerAutoRequest::Field::PAUSE_INDEX));
             RC_OK(cbor_encode_boolean(&mapEncoder, msg.pause.value()));
             }
     if (msg.resume) {
-            RC_OK(cbor_encode_int(&mapEncoder, LawnmowerAutoCmd::Field::RESUME_INDEX));
+            RC_OK(cbor_encode_int(&mapEncoder, LawnmowerAutoRequest::Field::RESUME_INDEX));
             RC_OK(cbor_encode_boolean(&mapEncoder, msg.resume.value()));
             }
     if (msg.mode) {
-            RC_OK(cbor_encode_int(&mapEncoder, LawnmowerAutoCmd::Field::MODE_INDEX));
+            RC_OK(cbor_encode_int(&mapEncoder, LawnmowerAutoRequest::Field::MODE_INDEX));
             RC_OK(cbor_encode_text_stringz(&mapEncoder, msg.mode.value().c_str()));
             }
     if (msg.path) {
-            RC_OK(cbor_encode_int(&mapEncoder, LawnmowerAutoCmd::Field::PATH_INDEX));
+            RC_OK(cbor_encode_int(&mapEncoder, LawnmowerAutoRequest::Field::PATH_INDEX));
             RC_OK(cbor_encode_text_stringz(&mapEncoder, msg.path.value().c_str()));
             }
     RC_OK(cbor_encoder_close_container(&encoder, &mapEncoder));
@@ -6017,21 +5835,21 @@ Result<Bytes> LawnmowerAutoCmd::cbor_serialize(const LawnmowerAutoCmd& msg)  {
     return Result<Bytes>::Ok(Bytes(buffer.begin(), buffer.begin() + used));
 }
 
- Result<LawnmowerAutoCmd*> LawnmowerAutoCmd::cbor_deserialize(const Bytes& bytes) {
+ Result<LawnmowerAutoRequest*> LawnmowerAutoRequest::cbor_deserialize(const Bytes& bytes) {
     CborParser parser;
     CborValue it, mapIt;
-    LawnmowerAutoCmd* msg = new LawnmowerAutoCmd();
+    LawnmowerAutoRequest* msg = new LawnmowerAutoRequest();
 
     CborError err = cbor_parser_init(bytes.data(), bytes.size(), 0, &parser, &it);
     if (err != CborNoError) {
         delete msg;
-        return Result<LawnmowerAutoCmd*>::Err(-1,"CBOR parse error");
+        return Result<LawnmowerAutoRequest*>::Err(-1,"CBOR parse error");
     }
 
     if (!cbor_value_is_map(&it)) {
         delete msg;
         INFO("CBOR deserialization error: not a map");
-        return Result<LawnmowerAutoCmd*>::Err(-2,"CBOR deserialization error: not a map");
+        return Result<LawnmowerAutoRequest*>::Err(-2,"CBOR deserialization error: not a map");
     }
 
     // enter map
@@ -6039,7 +5857,7 @@ Result<Bytes> LawnmowerAutoCmd::cbor_serialize(const LawnmowerAutoCmd& msg)  {
     if (err != CborNoError) {
         delete msg;
         INFO("CBOR deserialization error: failed to enter container");
-        return Result<LawnmowerAutoCmd*>::Err(-3,"CBOR deserialization error: failed to enter container");
+        return Result<LawnmowerAutoRequest*>::Err(-3,"CBOR deserialization error: failed to enter container");
     }
 
     // iterate key/value pairs
@@ -6052,11 +5870,11 @@ Result<Bytes> LawnmowerAutoCmd::cbor_serialize(const LawnmowerAutoCmd& msg)  {
             // invalid key type
             INFO("CBOR deserialization error: invalid key type");
             delete msg;
-            return Result<LawnmowerAutoCmd*>::Err(-4,"CBOR deserialization error: invalid key type");
+            return Result<LawnmowerAutoRequest*>::Err(-4,"CBOR deserialization error: invalid key type");
         }
         switch (key) {
             
-            case LawnmowerAutoCmd::Field::START_INDEX:{bool b;
+            case LawnmowerAutoRequest::Field::START_INDEX:{bool b;
     cbor_value_get_boolean(&mapIt, &b);
     msg->start = b;
     cbor_value_advance(&mapIt);
@@ -6064,7 +5882,7 @@ Result<Bytes> LawnmowerAutoCmd::cbor_serialize(const LawnmowerAutoCmd& msg)  {
                 break;
             }
             
-            case LawnmowerAutoCmd::Field::STOP_INDEX:{bool b;
+            case LawnmowerAutoRequest::Field::STOP_INDEX:{bool b;
     cbor_value_get_boolean(&mapIt, &b);
     msg->stop = b;
     cbor_value_advance(&mapIt);
@@ -6072,7 +5890,7 @@ Result<Bytes> LawnmowerAutoCmd::cbor_serialize(const LawnmowerAutoCmd& msg)  {
                 break;
             }
             
-            case LawnmowerAutoCmd::Field::PAUSE_INDEX:{bool b;
+            case LawnmowerAutoRequest::Field::PAUSE_INDEX:{bool b;
     cbor_value_get_boolean(&mapIt, &b);
     msg->pause = b;
     cbor_value_advance(&mapIt);
@@ -6080,7 +5898,7 @@ Result<Bytes> LawnmowerAutoCmd::cbor_serialize(const LawnmowerAutoCmd& msg)  {
                 break;
             }
             
-            case LawnmowerAutoCmd::Field::RESUME_INDEX:{bool b;
+            case LawnmowerAutoRequest::Field::RESUME_INDEX:{bool b;
     cbor_value_get_boolean(&mapIt, &b);
     msg->resume = b;
     cbor_value_advance(&mapIt);
@@ -6088,7 +5906,7 @@ Result<Bytes> LawnmowerAutoCmd::cbor_serialize(const LawnmowerAutoCmd& msg)  {
                 break;
             }
             
-            case LawnmowerAutoCmd::Field::MODE_INDEX:{{
+            case LawnmowerAutoRequest::Field::MODE_INDEX:{{
 
     if (cbor_value_is_text_string(&mapIt)) {
         char valbuf[256];
@@ -6103,7 +5921,7 @@ Result<Bytes> LawnmowerAutoCmd::cbor_serialize(const LawnmowerAutoCmd& msg)  {
                 break;
             }
             
-            case LawnmowerAutoCmd::Field::PATH_INDEX:{{
+            case LawnmowerAutoRequest::Field::PATH_INDEX:{{
 
     if (cbor_value_is_text_string(&mapIt)) {
         char valbuf[256];
@@ -6129,7 +5947,7 @@ Result<Bytes> LawnmowerAutoCmd::cbor_serialize(const LawnmowerAutoCmd& msg)  {
     // leave container
     cbor_value_leave_container(&it, &mapIt);
 
-    return Result<LawnmowerAutoCmd*>::Ok(msg);
+    return Result<LawnmowerAutoRequest*>::Ok(msg);
 }
 
 Result<Bytes> LawnmowerStatus::cbor_serialize(const LawnmowerStatus& msg)  {

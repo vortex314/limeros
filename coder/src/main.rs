@@ -64,7 +64,13 @@ fn main() -> anyhow::Result<()> {
     .parent()
     .expect("Failed to get parent directory");*/
     init();
+    // test if file exist
+
     let proto_file = Path::new(&args.input);
+    if !proto_file.exists() {
+        panic!("Proto file '{}' does not exist", proto_file.display());
+    }
+    info!("Reading proto file from '{}'", proto_file.display());
     let proto_content = fs::read_to_string(proto_file).expect("Failed to read proto file");
 
     let res = FileDescriptor::parse(&proto_content.as_bytes());

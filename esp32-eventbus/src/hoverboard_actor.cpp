@@ -206,8 +206,8 @@ HoverboardActor::~HoverboardActor()
 void HoverboardActor::on_message(const Envelope &env)
 {
     const Msg &msg = *env.msg;
-    msg.handle<HoverboardCmd>([&](auto hb_cmd)
-                              { INFO("Received HoverboardCmd: speed=%d, steer=%d", hb_cmd.speed.value_or(-1), hb_cmd.steer.value_or(-1));
+    msg.handle<HoverboardRequest>([&](auto hb_cmd)
+                              { INFO("Received HoverboardRequest: speed=%d, steer=%d", hb_cmd.speed.value_or(-1), hb_cmd.steer.value_or(-1));
                                 if (hb_cmd.speed) _speed = hb_cmd.speed.value(); 
                                 if (hb_cmd.steer) _steer = hb_cmd.steer.value() ; });
     msg.handle<TimerMsg>([&](const TimerMsg &msg)

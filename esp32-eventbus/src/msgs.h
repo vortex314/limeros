@@ -63,23 +63,23 @@ typedef enum {
 
 
 
-class Alive : public Msg {
-    MSG(Alive);
+class AliveEvent : public Msg {
+    MSG(AliveEvent);
     public:
-    std::vector<std::string> subscribe;
-    std::vector<std::string> publish;
+    std::vector<std::string> subscribes;
+    std::vector<std::string> publishes;
     std::vector<std::string> services;
     
     // Field indexes
         typedef enum {
-        SUBSCRIBE_INDEX = 3,
-        PUBLISH_INDEX = 4,
-        SERVICES_INDEX = 5,
+        SUBSCRIBES_INDEX = 1,
+        PUBLISHES_INDEX = 2,
+        SERVICES_INDEX = 3,
     } Field;
-    static Result<Bytes> json_serialize(const Alive&);
-    static Result<Alive*> json_deserialize(const Bytes&);
-    static Result<Bytes> cbor_serialize(const Alive&);
-    static Result<Alive*> cbor_deserialize(const Bytes&);
+    static Result<Bytes> json_serialize(const AliveEvent&);
+    static Result<AliveEvent*> json_deserialize(const Bytes&);
+    static Result<Bytes> cbor_serialize(const AliveEvent&);
+    static Result<AliveEvent*> cbor_deserialize(const Bytes&);
 };
 
 class UdpMessage : public Msg {
@@ -124,33 +124,6 @@ class UdpMessageCbor : public Msg {
     static Result<UdpMessageCbor*> cbor_deserialize(const Bytes&);
 };
 
-class ZenohEvent : public Msg {
-    MSG(ZenohEvent);
-    public:
-    std::optional<std::string> zid;
-    std::optional<std::string> what_am_i;
-    std::vector<std::string> peers;
-    std::optional<std::string> prefix;
-    std::vector<std::string> routers;
-    std::optional<std::string> connect;
-    std::optional<std::string> listen;
-    
-    // Field indexes
-        typedef enum {
-        ZID_INDEX = 2,
-        WHAT_AM_I_INDEX = 3,
-        PEERS_INDEX = 4,
-        PREFIX_INDEX = 5,
-        ROUTERS_INDEX = 6,
-        CONNECT_INDEX = 7,
-        LISTEN_INDEX = 8,
-    } Field;
-    static Result<Bytes> json_serialize(const ZenohEvent&);
-    static Result<ZenohEvent*> json_deserialize(const Bytes&);
-    static Result<Bytes> cbor_serialize(const ZenohEvent&);
-    static Result<ZenohEvent*> cbor_deserialize(const Bytes&);
-};
-
 class LogEvent : public Msg {
     MSG(LogEvent);
     public:
@@ -176,25 +149,40 @@ class LogEvent : public Msg {
     static Result<LogEvent*> cbor_deserialize(const Bytes&);
 };
 
-class SysCmd : public Msg {
-    MSG(SysCmd);
+class SysRequest : public Msg {
+    MSG(SysRequest);
     public:
-    std::string src;
     std::optional<uint64_t> set_time;
     std::optional<bool> reboot;
     std::optional<std::string> console;
     
     // Field indexes
         typedef enum {
-        SRC_INDEX = 2,
-        SET_TIME_INDEX = 3,
-        REBOOT_INDEX = 4,
-        CONSOLE_INDEX = 5,
+        SET_TIME_INDEX = 1,
+        REBOOT_INDEX = 2,
+        CONSOLE_INDEX = 3,
     } Field;
-    static Result<Bytes> json_serialize(const SysCmd&);
-    static Result<SysCmd*> json_deserialize(const Bytes&);
-    static Result<Bytes> cbor_serialize(const SysCmd&);
-    static Result<SysCmd*> cbor_deserialize(const Bytes&);
+    static Result<Bytes> json_serialize(const SysRequest&);
+    static Result<SysRequest*> json_deserialize(const Bytes&);
+    static Result<Bytes> cbor_serialize(const SysRequest&);
+    static Result<SysRequest*> cbor_deserialize(const Bytes&);
+};
+
+class SysReply : public Msg {
+    MSG(SysReply);
+    public:
+    std::optional<int32_t> rc;
+    std::optional<std::string> message;
+    
+    // Field indexes
+        typedef enum {
+        RC_INDEX = 1,
+        MESSAGE_INDEX = 2,
+    } Field;
+    static Result<Bytes> json_serialize(const SysReply&);
+    static Result<SysReply*> json_deserialize(const Bytes&);
+    static Result<Bytes> cbor_serialize(const SysReply&);
+    static Result<SysReply*> cbor_deserialize(const Bytes&);
 };
 
 class SysEvent : public Msg {
@@ -270,8 +258,8 @@ class MulticastEvent : public Msg {
     static Result<MulticastEvent*> cbor_deserialize(const Bytes&);
 };
 
-class PingReq : public Msg {
-    MSG(PingReq);
+class PingRequest : public Msg {
+    MSG(PingRequest);
     public:
     std::optional<uint32_t> number;
     
@@ -279,14 +267,14 @@ class PingReq : public Msg {
         typedef enum {
         NUMBER_INDEX = 1,
     } Field;
-    static Result<Bytes> json_serialize(const PingReq&);
-    static Result<PingReq*> json_deserialize(const Bytes&);
-    static Result<Bytes> cbor_serialize(const PingReq&);
-    static Result<PingReq*> cbor_deserialize(const Bytes&);
+    static Result<Bytes> json_serialize(const PingRequest&);
+    static Result<PingRequest*> json_deserialize(const Bytes&);
+    static Result<Bytes> cbor_serialize(const PingRequest&);
+    static Result<PingRequest*> cbor_deserialize(const Bytes&);
 };
 
-class PingRep : public Msg {
-    MSG(PingRep);
+class PingReply : public Msg {
+    MSG(PingReply);
     public:
     std::optional<uint32_t> number;
     
@@ -294,10 +282,10 @@ class PingRep : public Msg {
         typedef enum {
         NUMBER_INDEX = 1,
     } Field;
-    static Result<Bytes> json_serialize(const PingRep&);
-    static Result<PingRep*> json_deserialize(const Bytes&);
-    static Result<Bytes> cbor_serialize(const PingRep&);
-    static Result<PingRep*> cbor_deserialize(const Bytes&);
+    static Result<Bytes> json_serialize(const PingReply&);
+    static Result<PingReply*> json_deserialize(const Bytes&);
+    static Result<Bytes> cbor_serialize(const PingReply&);
+    static Result<PingReply*> cbor_deserialize(const Bytes&);
 };
 
 class HoverboardEventRaw : public Msg {
@@ -510,8 +498,8 @@ class HoverboardEvent : public Msg {
     static Result<HoverboardEvent*> cbor_deserialize(const Bytes&);
 };
 
-class HoverboardCmd : public Msg {
-    MSG(HoverboardCmd);
+class HoverboardRequest : public Msg {
+    MSG(HoverboardRequest);
     public:
     std::optional<int32_t> speed;
     std::optional<int32_t> steer;
@@ -521,10 +509,10 @@ class HoverboardCmd : public Msg {
         SPEED_INDEX = 0,
         STEER_INDEX = 1,
     } Field;
-    static Result<Bytes> json_serialize(const HoverboardCmd&);
-    static Result<HoverboardCmd*> json_deserialize(const Bytes&);
-    static Result<Bytes> cbor_serialize(const HoverboardCmd&);
-    static Result<HoverboardCmd*> cbor_deserialize(const Bytes&);
+    static Result<Bytes> json_serialize(const HoverboardRequest&);
+    static Result<HoverboardRequest*> json_deserialize(const Bytes&);
+    static Result<Bytes> cbor_serialize(const HoverboardRequest&);
+    static Result<HoverboardRequest*> cbor_deserialize(const Bytes&);
 };
 
 class HoverboardReply : public Msg {
@@ -644,8 +632,8 @@ class Ps4Event : public Msg {
     static Result<Ps4Event*> cbor_deserialize(const Bytes&);
 };
 
-class Ps4Cmd : public Msg {
-    MSG(Ps4Cmd);
+class Ps4Request : public Msg {
+    MSG(Ps4Request);
     public:
     std::optional<int32_t> rumble_small;
     std::optional<int32_t> rumble_large;
@@ -665,10 +653,10 @@ class Ps4Cmd : public Msg {
         LED_FLASH_ON_INDEX = 6,
         LED_FLASH_OFF_INDEX = 7,
     } Field;
-    static Result<Bytes> json_serialize(const Ps4Cmd&);
-    static Result<Ps4Cmd*> json_deserialize(const Bytes&);
-    static Result<Bytes> cbor_serialize(const Ps4Cmd&);
-    static Result<Ps4Cmd*> cbor_deserialize(const Bytes&);
+    static Result<Bytes> json_serialize(const Ps4Request&);
+    static Result<Ps4Request*> json_deserialize(const Bytes&);
+    static Result<Bytes> cbor_serialize(const Ps4Request&);
+    static Result<Ps4Request*> cbor_deserialize(const Bytes&);
 };
 
 class CameraEvent : public Msg {
@@ -696,8 +684,8 @@ class CameraEvent : public Msg {
     static Result<CameraEvent*> cbor_deserialize(const Bytes&);
 };
 
-class CameraCmd : public Msg {
-    MSG(CameraCmd);
+class CameraRequest : public Msg {
+    MSG(CameraRequest);
     public:
     std::optional<bool> led;
     std::optional<std::string> capture_tcp_destination;
@@ -709,10 +697,10 @@ class CameraCmd : public Msg {
         CAPTURE_TCP_DESTINATION_INDEX = 2,
         QUALITY_INDEX = 4,
     } Field;
-    static Result<Bytes> json_serialize(const CameraCmd&);
-    static Result<CameraCmd*> json_deserialize(const Bytes&);
-    static Result<Bytes> cbor_serialize(const CameraCmd&);
-    static Result<CameraCmd*> cbor_deserialize(const Bytes&);
+    static Result<Bytes> json_serialize(const CameraRequest&);
+    static Result<CameraRequest*> json_deserialize(const Bytes&);
+    static Result<Bytes> cbor_serialize(const CameraRequest&);
+    static Result<CameraRequest*> cbor_deserialize(const Bytes&);
 };
 
 class CameraReply : public Msg {
@@ -753,8 +741,8 @@ class LawnmowerManualEvent : public Msg {
     static Result<LawnmowerManualEvent*> cbor_deserialize(const Bytes&);
 };
 
-class LawnmowerManualCmd : public Msg {
-    MSG(LawnmowerManualCmd);
+class LawnmowerManualRequest : public Msg {
+    MSG(LawnmowerManualRequest);
     public:
     std::optional<float> speed;
     std::optional<float> steer;
@@ -776,10 +764,10 @@ class LawnmowerManualCmd : public Msg {
         START_AUTO_MODE_INDEX = 7,
         STOP_AUTO_MODE_INDEX = 8,
     } Field;
-    static Result<Bytes> json_serialize(const LawnmowerManualCmd&);
-    static Result<LawnmowerManualCmd*> json_deserialize(const Bytes&);
-    static Result<Bytes> cbor_serialize(const LawnmowerManualCmd&);
-    static Result<LawnmowerManualCmd*> cbor_deserialize(const Bytes&);
+    static Result<Bytes> json_serialize(const LawnmowerManualRequest&);
+    static Result<LawnmowerManualRequest*> json_deserialize(const Bytes&);
+    static Result<Bytes> cbor_serialize(const LawnmowerManualRequest&);
+    static Result<LawnmowerManualRequest*> cbor_deserialize(const Bytes&);
 };
 
 class LawnmowerManualReply : public Msg {
@@ -824,8 +812,8 @@ class LawnmowerAutoEvent : public Msg {
     static Result<LawnmowerAutoEvent*> cbor_deserialize(const Bytes&);
 };
 
-class LawnmowerAutoCmd : public Msg {
-    MSG(LawnmowerAutoCmd);
+class LawnmowerAutoRequest : public Msg {
+    MSG(LawnmowerAutoRequest);
     public:
     std::optional<bool> start;
     std::optional<bool> stop;
@@ -843,10 +831,10 @@ class LawnmowerAutoCmd : public Msg {
         MODE_INDEX = 5,
         PATH_INDEX = 6,
     } Field;
-    static Result<Bytes> json_serialize(const LawnmowerAutoCmd&);
-    static Result<LawnmowerAutoCmd*> json_deserialize(const Bytes&);
-    static Result<Bytes> cbor_serialize(const LawnmowerAutoCmd&);
-    static Result<LawnmowerAutoCmd*> cbor_deserialize(const Bytes&);
+    static Result<Bytes> json_serialize(const LawnmowerAutoRequest&);
+    static Result<LawnmowerAutoRequest*> json_deserialize(const Bytes&);
+    static Result<Bytes> cbor_serialize(const LawnmowerAutoRequest&);
+    static Result<LawnmowerAutoRequest*> cbor_deserialize(const Bytes&);
 };
 
 class LawnmowerStatus : public Msg {

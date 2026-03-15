@@ -1,8 +1,8 @@
 [package]
-name = "prosty"
+name = "coder"
 version = "0.1.0"
 edition = "2024"
-default-run ="prosty"
+default-run ="coder"
 
 [[bin]]
 name ="mermaid"

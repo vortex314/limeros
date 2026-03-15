@@ -31,7 +31,7 @@
                 "run",
                 "--",
                 "--input", "syntax/message.proto",
-                "--output", "../zenoh-esp32-eventbus/src",
+                "--output", "../esp32-eventbus/src",
                 "--lang", "cpp",
                 "--format", "mix"
             ],

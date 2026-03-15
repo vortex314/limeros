@@ -3,22 +3,10 @@
 syntax = "proto3";
 package msgs;
 
-
-message BrokerAnnounce {
-  string ip = 1;
-  uint32 port = 2;
-}
-
-message Alive {
-  // repeated string message_types = 1;
- // repeated string endpoints = 2;
-  repeated string subscribe = 3;
-  repeated string publish = 4;
-  repeated string services = 5;
-  //  string src = 4;
-  //  string ip = 6;
-  //  uint32 port = 7;
-  // uint32 timeout = 8;
+message AliveEvent {
+  repeated string subscribes = 1; // topics that broker will send
+  repeated string publishes = 2; // publishes on these topics
+  repeated string services = 3; // request/reply 
 }
 
 message UdpMessage {
@@ -44,17 +32,6 @@ enum LogLevel {
   ALERT = 6;
 }
 
-
-message ZenohEvent {
-  string zid = 2;
-  string what_am_i = 3;
-  repeated string peers = 4;
-  string prefix = 5;
-  repeated string routers = 6;
-  string connect = 7;
-  string listen = 8;
-}
-
 message LogEvent {
   LogLevel level = 2;
   string message = 3;
@@ -64,11 +41,15 @@ message LogEvent {
   uint64 timestamp = 7;
 }
 
-message SysCmd {
-  required string src = 2;
-  uint64 set_time = 3;
-  bool reboot = 4;
-  string console = 5;
+message SysRequest {
+  uint64 set_time = 1;
+  bool reboot = 2;
+  string console = 3;
+}
+
+message SysReply {
+  int32 rc=1;
+  string message =2;
 }
 
 message SysEvent {
@@ -128,11 +109,11 @@ enum InTyp {
   AUTO_DETECT = 3;
 }
 
-message PingReq {
+message PingRequest {
   uint32 number = 1;
 }
 
-message PingRep {
+message PingReply {
   uint32 number = 1;
 }
 
@@ -237,7 +218,7 @@ message HoverboardEvent {
   float temp = 45; // Calibrated Temperature °C *10
 }
 
-message HoverboardCmd {
+message HoverboardRequest {
   int32 speed = 0;
   int32 steer = 1;
 }
@@ -301,7 +282,7 @@ message Ps4Event {
   int32 temp = 32;
 }
 
-message Ps4Cmd {
+message Ps4Request {
   int32 rumble_small = 1;
   int32 rumble_large = 2;
   int32 led_red = 3;
@@ -320,7 +301,7 @@ message CameraEvent {
   int32 quality = 6;
 }
 
-message CameraCmd {
+message CameraRequest {
   bool led = 1;
   string capture_tcp_destination = 2;
   int32 quality = 4;
@@ -347,7 +328,7 @@ message LawnmowerManualEvent {
   bool blade = 3;
 }
 
-message LawnmowerManualCmd {
+message LawnmowerManualRequest {
   float speed = 1;
   float steer = 2;
   bool blade = 3;
@@ -372,7 +353,7 @@ message LawnmowerAutoEvent {
   string path = 6;
 }
 
-message LawnmowerAutoCmd {
+message LawnmowerAutoRequest {
   bool start = 1;
   bool stop = 2;
   bool pause = 3;

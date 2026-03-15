@@ -9,7 +9,7 @@ use tokio::net::UdpSocket;
 use tokio::task::JoinHandle;
 
 
-use crate::msgs::{Alive, Msg, UdpMessage};
+use crate::msgs::{AliveEvent, Msg, UdpMessage};
 
 // --- CONSTANTS ---
 pub const MULTICAST_PORT: u16 = 50000;
@@ -80,7 +80,7 @@ impl Scout {
             udp_message.msg_type, udp_message.src
         );
 
-        if Some("Alive") != udp_message.msg_type.as_deref() {
+        if Some("AliveEvent") != udp_message.msg_type.as_deref() {
             return Ok(());
         }
 
@@ -91,13 +91,13 @@ impl Scout {
         let payload = udp_message
             .payload
             .as_ref()
-            .ok_or_else(|| anyhow::anyhow!("Alive message missing payload"))?;
+            .ok_or_else(|| anyhow::anyhow!("AliveEvent message missing payload"))?;
 
     //    let subscriptions = self.subscriptions.clone();
 
-        let alive = Alive::json_deserialize(payload)?;
-        let subscribe = alive.subscribe.clone().unwrap_or_default();
-        let publish = alive.publish.clone().unwrap_or_default();
+        let alive = AliveEvent::json_deserialize(payload)?;
+        let subscribe = alive.subscribes.clone().unwrap_or_default();
+        let publish = alive.publishes.clone().unwrap_or_default();
         let services = alive.services.clone().unwrap_or_default();
 
         // Update endpoint
@@ -114,7 +114,7 @@ impl Scout {
         );
 
         // Update subscriptions
-        if let Some(subs) = alive.subscribe.as_ref() {
+        if let Some(subs) = alive.subscribes.as_ref() {
             for sub in subs {
                 let subscription = Subscription {
                     event_pattern: sub.clone(),

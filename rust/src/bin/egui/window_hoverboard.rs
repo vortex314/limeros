@@ -5,7 +5,7 @@ use eframe::egui::{self, Slider};
 use ehmi::{Bar, Gauge};
 use futures::executor::block_on;
 use limeros::{
-    Msg, TypedUdpMessage, UdpMessage, UdpMessageHandler, UdpNode, eventbus::Bus, msgs::{HoverboardCmd, HoverboardEvent, TypedMessage}
+    Msg, TypedUdpMessage, UdpMessage, UdpMessageHandler, UdpNode, eventbus::Bus, msgs::{HoverboardRequest, HoverboardEvent, TypedMessage}
 };
 use log::info;
 use tokio::sync::mpsc::{Receiver, Sender};
@@ -79,11 +79,11 @@ impl HoverboardWindow {
             return;
         }
         let _ = self.node.sender().try_send(UdpMessage {
-            dst: Some("broker".to_string()),
+            dst: Some("esp1".to_string()),
             src: Some("egui-monitor".to_string()),
-            msg_type: Some(HoverboardCmd::MSG_TYPE.to_string()),
+            msg_type: Some(HoverboardRequest::MSG_TYPE.to_string()),
             payload: Some(
-                serde_json::to_vec(&HoverboardCmd {
+                serde_json::to_vec(&HoverboardRequest {
                     speed: Some(self.speed_slider as i32),
                     steer: Some(self.steer_slider as i32),
                     ..Default::default()
@@ -92,7 +92,7 @@ impl HoverboardWindow {
             ),
         });
         info!(
-            "Sent HoverboardCmd: speed={} steer={}",
+            "Sent HoverboardRequest: speed={} steer={} to esp1",
             self.speed_slider, self.steer_slider
         );
         self.speed_previous = self.speed_slider;

@@ -103,50 +103,24 @@ pub enum LawnmowerMode {
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default,Encode, Decode)]
 #[cbor(map)]
-pub struct BrokerAnnounce {
+pub struct AliveEvent {
     #[n(1)]
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub ip: Option<String>,
+    pub subscribes: Option<Vec<String>>,
     #[n(2)]
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub port: Option<u32>,
-}
-
-impl TypedMessage for BrokerAnnounce {
-    const ID: u32 = 524;
-    const MSG_TYPE: &'static str = "BrokerAnnounce";
-}
-
-impl Msg for BrokerAnnounce {
-    fn type_name(&self) -> &'static str {<Self as TypedMessage>::MSG_TYPE}
-    fn type_id(&self) -> u32 {<Self as TypedMessage>::ID}
-    fn cbor_serialize(&self) -> Result<Vec<u8>> {Ok(minicbor::to_vec(self)?)}
-    fn cbor_deserialize(v:&Vec<u8>) -> Result<Self> where Self : Sized {Ok(minicbor::decode::<Self>(v.as_slice())?)}
-    fn json_serialize(&self) -> Result<Vec<u8>> {Ok(serde_json::to_vec(self) ?)}
-    fn json_deserialize(v:& Vec<u8>) -> Result<Self> where Self : Sized {Ok(serde_json::from_slice(v.as_slice()) ?)}
-}
-    
-
-#[derive(Debug, Clone, Serialize, Deserialize, Default,Encode, Decode)]
-#[cbor(map)]
-pub struct Alive {
+    pub publishes: Option<Vec<String>>,
     #[n(3)]
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub subscribe: Option<Vec<String>>,
-    #[n(4)]
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub publish: Option<Vec<String>>,
-    #[n(5)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub services: Option<Vec<String>>,
 }
 
-impl TypedMessage for Alive {
-    const ID: u32 = 57419;
-    const MSG_TYPE: &'static str = "Alive";
+impl TypedMessage for AliveEvent {
+    const ID: u32 = 64775;
+    const MSG_TYPE: &'static str = "AliveEvent";
 }
 
-impl Msg for Alive {
+impl Msg for AliveEvent {
     fn type_name(&self) -> &'static str {<Self as TypedMessage>::MSG_TYPE}
     fn type_id(&self) -> u32 {<Self as TypedMessage>::ID}
     fn cbor_serialize(&self) -> Result<Vec<u8>> {Ok(minicbor::to_vec(self)?)}
@@ -222,47 +196,6 @@ impl Msg for UdpMessageCbor {
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default,Encode, Decode)]
 #[cbor(map)]
-pub struct ZenohEvent {
-    #[n(2)]
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub zid: Option<String>,
-    #[n(3)]
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub what_am_i: Option<String>,
-    #[n(4)]
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub peers: Option<Vec<String>>,
-    #[n(5)]
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub prefix: Option<String>,
-    #[n(6)]
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub routers: Option<Vec<String>>,
-    #[n(7)]
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub connect: Option<String>,
-    #[n(8)]
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub listen: Option<String>,
-}
-
-impl TypedMessage for ZenohEvent {
-    const ID: u32 = 48902;
-    const MSG_TYPE: &'static str = "ZenohEvent";
-}
-
-impl Msg for ZenohEvent {
-    fn type_name(&self) -> &'static str {<Self as TypedMessage>::MSG_TYPE}
-    fn type_id(&self) -> u32 {<Self as TypedMessage>::ID}
-    fn cbor_serialize(&self) -> Result<Vec<u8>> {Ok(minicbor::to_vec(self)?)}
-    fn cbor_deserialize(v:&Vec<u8>) -> Result<Self> where Self : Sized {Ok(minicbor::decode::<Self>(v.as_slice())?)}
-    fn json_serialize(&self) -> Result<Vec<u8>> {Ok(serde_json::to_vec(self) ?)}
-    fn json_deserialize(v:& Vec<u8>) -> Result<Self> where Self : Sized {Ok(serde_json::from_slice(v.as_slice()) ?)}
-}
-    
-
-#[derive(Debug, Clone, Serialize, Deserialize, Default,Encode, Decode)]
-#[cbor(map)]
 pub struct LogEvent {
     #[n(2)]
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -301,27 +234,50 @@ impl Msg for LogEvent {
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default,Encode, Decode)]
 #[cbor(map)]
-pub struct SysCmd {
-    #[n(2)]
-    
-    pub src: String,
-    #[n(3)]
+pub struct SysRequest {
+    #[n(1)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub set_time: Option<u64>,
-    #[n(4)]
+    #[n(2)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub reboot: Option<bool>,
-    #[n(5)]
+    #[n(3)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub console: Option<String>,
 }
 
-impl TypedMessage for SysCmd {
-    const ID: u32 = 51983;
-    const MSG_TYPE: &'static str = "SysCmd";
+impl TypedMessage for SysRequest {
+    const ID: u32 = 54292;
+    const MSG_TYPE: &'static str = "SysRequest";
 }
 
-impl Msg for SysCmd {
+impl Msg for SysRequest {
+    fn type_name(&self) -> &'static str {<Self as TypedMessage>::MSG_TYPE}
+    fn type_id(&self) -> u32 {<Self as TypedMessage>::ID}
+    fn cbor_serialize(&self) -> Result<Vec<u8>> {Ok(minicbor::to_vec(self)?)}
+    fn cbor_deserialize(v:&Vec<u8>) -> Result<Self> where Self : Sized {Ok(minicbor::decode::<Self>(v.as_slice())?)}
+    fn json_serialize(&self) -> Result<Vec<u8>> {Ok(serde_json::to_vec(self) ?)}
+    fn json_deserialize(v:& Vec<u8>) -> Result<Self> where Self : Sized {Ok(serde_json::from_slice(v.as_slice()) ?)}
+}
+    
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default,Encode, Decode)]
+#[cbor(map)]
+pub struct SysReply {
+    #[n(1)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub rc: Option<i32>,
+    #[n(2)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub message: Option<String>,
+}
+
+impl TypedMessage for SysReply {
+    const ID: u32 = 23319;
+    const MSG_TYPE: &'static str = "SysReply";
+}
+
+impl Msg for SysReply {
     fn type_name(&self) -> &'static str {<Self as TypedMessage>::MSG_TYPE}
     fn type_id(&self) -> u32 {<Self as TypedMessage>::ID}
     fn cbor_serialize(&self) -> Result<Vec<u8>> {Ok(minicbor::to_vec(self)?)}
@@ -444,18 +400,18 @@ impl Msg for MulticastEvent {
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default,Encode, Decode)]
 #[cbor(map)]
-pub struct PingReq {
+pub struct PingRequest {
     #[n(1)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub number: Option<u32>,
 }
 
-impl TypedMessage for PingReq {
-    const ID: u32 = 27754;
-    const MSG_TYPE: &'static str = "PingReq";
+impl TypedMessage for PingRequest {
+    const ID: u32 = 35709;
+    const MSG_TYPE: &'static str = "PingRequest";
 }
 
-impl Msg for PingReq {
+impl Msg for PingRequest {
     fn type_name(&self) -> &'static str {<Self as TypedMessage>::MSG_TYPE}
     fn type_id(&self) -> u32 {<Self as TypedMessage>::ID}
     fn cbor_serialize(&self) -> Result<Vec<u8>> {Ok(minicbor::to_vec(self)?)}
@@ -467,18 +423,18 @@ impl Msg for PingReq {
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default,Encode, Decode)]
 #[cbor(map)]
-pub struct PingRep {
+pub struct PingReply {
     #[n(1)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub number: Option<u32>,
 }
 
-impl TypedMessage for PingRep {
-    const ID: u32 = 28011;
-    const MSG_TYPE: &'static str = "PingRep";
+impl TypedMessage for PingReply {
+    const ID: u32 = 62078;
+    const MSG_TYPE: &'static str = "PingReply";
 }
 
-impl Msg for PingRep {
+impl Msg for PingReply {
     fn type_name(&self) -> &'static str {<Self as TypedMessage>::MSG_TYPE}
     fn type_id(&self) -> u32 {<Self as TypedMessage>::ID}
     fn cbor_serialize(&self) -> Result<Vec<u8>> {Ok(minicbor::to_vec(self)?)}
@@ -806,7 +762,7 @@ impl Msg for HoverboardEvent {
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default,Encode, Decode)]
 #[cbor(map)]
-pub struct HoverboardCmd {
+pub struct HoverboardRequest {
     #[n(0)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub speed: Option<i32>,
@@ -815,12 +771,12 @@ pub struct HoverboardCmd {
     pub steer: Option<i32>,
 }
 
-impl TypedMessage for HoverboardCmd {
-    const ID: u32 = 58218;
-    const MSG_TYPE: &'static str = "HoverboardCmd";
+impl TypedMessage for HoverboardRequest {
+    const ID: u32 = 63089;
+    const MSG_TYPE: &'static str = "HoverboardRequest";
 }
 
-impl Msg for HoverboardCmd {
+impl Msg for HoverboardRequest {
     fn type_name(&self) -> &'static str {<Self as TypedMessage>::MSG_TYPE}
     fn type_id(&self) -> u32 {<Self as TypedMessage>::ID}
     fn cbor_serialize(&self) -> Result<Vec<u8>> {Ok(minicbor::to_vec(self)?)}
@@ -1009,7 +965,7 @@ impl Msg for Ps4Event {
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default,Encode, Decode)]
 #[cbor(map)]
-pub struct Ps4Cmd {
+pub struct Ps4Request {
     #[n(1)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub rumble_small: Option<i32>,
@@ -1033,12 +989,12 @@ pub struct Ps4Cmd {
     pub led_flash_off: Option<i32>,
 }
 
-impl TypedMessage for Ps4Cmd {
-    const ID: u32 = 50497;
-    const MSG_TYPE: &'static str = "Ps4Cmd";
+impl TypedMessage for Ps4Request {
+    const ID: u32 = 5722;
+    const MSG_TYPE: &'static str = "Ps4Request";
 }
 
-impl Msg for Ps4Cmd {
+impl Msg for Ps4Request {
     fn type_name(&self) -> &'static str {<Self as TypedMessage>::MSG_TYPE}
     fn type_id(&self) -> u32 {<Self as TypedMessage>::ID}
     fn cbor_serialize(&self) -> Result<Vec<u8>> {Ok(minicbor::to_vec(self)?)}
@@ -1088,7 +1044,7 @@ impl Msg for CameraEvent {
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default,Encode, Decode)]
 #[cbor(map)]
-pub struct CameraCmd {
+pub struct CameraRequest {
     #[n(1)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub led: Option<bool>,
@@ -1100,12 +1056,12 @@ pub struct CameraCmd {
     pub quality: Option<i32>,
 }
 
-impl TypedMessage for CameraCmd {
-    const ID: u32 = 61551;
-    const MSG_TYPE: &'static str = "CameraCmd";
+impl TypedMessage for CameraRequest {
+    const ID: u32 = 63860;
+    const MSG_TYPE: &'static str = "CameraRequest";
 }
 
-impl Msg for CameraCmd {
+impl Msg for CameraRequest {
     fn type_name(&self) -> &'static str {<Self as TypedMessage>::MSG_TYPE}
     fn type_id(&self) -> u32 {<Self as TypedMessage>::ID}
     fn cbor_serialize(&self) -> Result<Vec<u8>> {Ok(minicbor::to_vec(self)?)}
@@ -1175,7 +1131,7 @@ impl Msg for LawnmowerManualEvent {
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default,Encode, Decode)]
 #[cbor(map)]
-pub struct LawnmowerManualCmd {
+pub struct LawnmowerManualRequest {
     #[n(1)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub speed: Option<f32>,
@@ -1202,12 +1158,12 @@ pub struct LawnmowerManualCmd {
     pub stop_auto_mode: Option<bool>,
 }
 
-impl TypedMessage for LawnmowerManualCmd {
-    const ID: u32 = 1850;
-    const MSG_TYPE: &'static str = "LawnmowerManualCmd";
+impl TypedMessage for LawnmowerManualRequest {
+    const ID: u32 = 47649;
+    const MSG_TYPE: &'static str = "LawnmowerManualRequest";
 }
 
-impl Msg for LawnmowerManualCmd {
+impl Msg for LawnmowerManualRequest {
     fn type_name(&self) -> &'static str {<Self as TypedMessage>::MSG_TYPE}
     fn type_id(&self) -> u32 {<Self as TypedMessage>::ID}
     fn cbor_serialize(&self) -> Result<Vec<u8>> {Ok(minicbor::to_vec(self)?)}
@@ -1283,7 +1239,7 @@ impl Msg for LawnmowerAutoEvent {
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default,Encode, Decode)]
 #[cbor(map)]
-pub struct LawnmowerAutoCmd {
+pub struct LawnmowerAutoRequest {
     #[n(1)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub start: Option<bool>,
@@ -1304,12 +1260,12 @@ pub struct LawnmowerAutoCmd {
     pub path: Option<String>,
 }
 
-impl TypedMessage for LawnmowerAutoCmd {
-    const ID: u32 = 22063;
-    const MSG_TYPE: &'static str = "LawnmowerAutoCmd";
+impl TypedMessage for LawnmowerAutoRequest {
+    const ID: u32 = 24372;
+    const MSG_TYPE: &'static str = "LawnmowerAutoRequest";
 }
 
-impl Msg for LawnmowerAutoCmd {
+impl Msg for LawnmowerAutoRequest {
     fn type_name(&self) -> &'static str {<Self as TypedMessage>::MSG_TYPE}
     fn type_id(&self) -> u32 {<Self as TypedMessage>::ID}
     fn cbor_serialize(&self) -> Result<Vec<u8>> {Ok(minicbor::to_vec(self)?)}

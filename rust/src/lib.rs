@@ -14,7 +14,7 @@ pub mod logger;
 pub mod msgs;
 use msgs::TypedMessage;
 
-pub use crate::msgs::{Alive, Msg, UdpMessage};
+pub use crate::msgs::{AliveEvent, Msg, UdpMessage};
 
 pub mod scout;
 pub use scout::Scout;
@@ -164,7 +164,7 @@ impl UdpNode {
     }
 
     /*
-       send my Alive periodically via multicast
+       send my AliveEvent periodically via multicast
     */
     fn start_multicast_sender(node: Arc<Self>) -> JoinHandle<()> {
         // To be implemented if needed
@@ -179,20 +179,20 @@ impl UdpNode {
                 interval.tick().await;
 
                 // 1. Send Heartbeat
-                let mut alive = Alive::default();
+                let mut alive = AliveEvent::default();
                 let my_id = my_id.lock().await;
                 let my_subscriptions = my_subscriptions.lock().await;
-                alive.subscribe = Some(my_subscriptions.clone());
+                alive.subscribes = Some(my_subscriptions.clone());
 
                 if let Ok(payload) = alive.json_serialize() {
                     let packet = UdpMessage {
                         src: Some(my_id.clone()),
                         dst: None,
-                        msg_type: Some(Alive::MSG_TYPE.to_string()),
+                        msg_type: Some(AliveEvent::MSG_TYPE.to_string()),
                         payload: Some(payload),
                     };
                     // We send this via our standard TX queue, aiming at the Multicast Addr
-                    debug!("MC Send Alive {:?}", alive);
+                    debug!("MC Send AliveEvent {:?}", alive);
                     let data = UdpMessage::cbor_serialize(&packet).unwrap();
                     let _ = unicast_socket.send_to(&data, &node.multicast_addr).await;
                 }
@@ -233,7 +233,7 @@ impl UdpNode {
     fn start_unicast_receiver(node: Arc<Self>) -> JoinHandle<()> {
         let generic_handlers = node.generic_handlers.clone();
         let recv_socket = node.unicast_socket.clone();
-        let handlers = node.handlers.clone();
+    //    let handlers = node.handlers.clone();
         tokio::spawn(async move {
             let mut buf = [0u8; 65535];
             loop {
