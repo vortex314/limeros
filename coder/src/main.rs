@@ -120,8 +120,7 @@ fn main() -> anyhow::Result<()> {
         })?;
         info!(
             "Generating C++ code from '{}' format to '{}'",
-            tera_file_src,
-            cpp_name
+            tera_file_src, cpp_name
         );
 
         let header_rendered = render(&package, &enums, &messages, tera_file_inc.as_str())?;
@@ -131,8 +130,7 @@ fn main() -> anyhow::Result<()> {
         })?;
         info!(
             "Generating C++ code from '{}' format to '{}'",
-            tera_file_inc,
-            inc_name
+            tera_file_inc, inc_name
         );
     } else {
         error!("Unsupported language: {:?}", args.lang);
@@ -172,7 +170,13 @@ fn field_type_to_rust_type(field_type: &FieldType) -> String {
         FieldType::Uint32 => "u32".to_string(),
         FieldType::Uint64 => "u64".to_string(),
         FieldType::String => "String".to_string(),
-        FieldType::MessageOrEnum(msg_name) => msg_name.clone(),
+        FieldType::MessageOrEnum(msg_name) => {
+            if (msg_name == "Poly") || (msg_name == "google.protobuf.Any") {
+                "serde_json::Value".to_string()
+            } else {
+                msg_name.clone()
+            }
+        }
         FieldType::Map(_other_name) => format!(
             "std::collections::HashMap<{},{}>",
             field_type_to_rust_type(&_other_name.0),

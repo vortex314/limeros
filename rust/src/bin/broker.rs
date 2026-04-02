@@ -15,11 +15,11 @@ impl UdpMessageHandler for Forwarder {
     async fn handle(&self, udp_message: &UdpMessage) -> anyhow::Result<()> {
         debug!(
             "Forwarder received message of type {:?} from {:?}",
-            udp_message.msg_type, udp_message.src
+            udp_message.typ, udp_message.src
         );
         
-        if let Some(msg_type) = &udp_message.msg_type {
-            if let Some(dsts) = self.subscriptions.get(msg_type) {
+        if let Some(typ) = &udp_message.typ {
+            if let Some(dsts) = self.subscriptions.get(typ) {
                 for dst in dsts.iter() {
                     self.sender
                         .send(UdpMessage {
@@ -29,7 +29,7 @@ impl UdpMessageHandler for Forwarder {
                         .await?;
                     debug!(
                         "Forwarded message of type {:?} from {:?} to {:?}",
-                        udp_message.msg_type,
+                        udp_message.typ,
                         udp_message.src,
                         dst.destination.clone()
                     );
@@ -45,7 +45,7 @@ impl UdpMessageHandler for Forwarder {
                         .await?;
                     debug!(
                         "(*)Forwarded message of type {:?} from {:?} to {:?}",
-                        udp_message.msg_type,
+                        udp_message.typ,
                         udp_message.src,
                         dst.destination.clone()
                     );

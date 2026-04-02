@@ -61,10 +61,10 @@ impl HoverboardWindow {
 impl HoverboardWindow {
     fn handle_event(&mut self) -> Result<()> {
         let udp_msg = self.receiver.try_recv()?;
-        if udp_msg.msg_type.as_deref() != Some(HoverboardEvent::MSG_TYPE) {
+        if udp_msg.typ.as_deref() != Some(HoverboardEvent::MSG_TYPE) {
             return Ok(());
         }
-        let event = serde_json::from_slice::<HoverboardEvent>(&udp_msg.payload.unwrap())?;
+        let event = HoverboardEvent::from_value(udp_msg.msg.unwrap())?;
         self.last_update = Instant::now();
         event.spdl.map(|v| self.speed_left = v as f32);
         event.spdr.map(|v| self.speed_right = v as f32);
@@ -81,9 +81,9 @@ impl HoverboardWindow {
         let _ = self.node.sender().try_send(UdpMessage {
             dst: Some("esp1".to_string()),
             src: Some("egui-monitor".to_string()),
-            msg_type: Some(HoverboardRequest::MSG_TYPE.to_string()),
-            payload: Some(
-                serde_json::to_vec(&HoverboardRequest {
+            typ: Some(HoverboardRequest::MSG_TYPE.to_string()),
+            msg: Some(
+                serde_json::to_value(&HoverboardRequest {
                     speed: Some(self.speed_slider as i32),
                     steer: Some(self.steer_slider as i32),
                     ..Default::default()

@@ -12,8 +12,9 @@ SysActor::SysActor(const char *name) : Actor(name)
 
 void SysActor::on_start()
 {
-    INFO("Starting SysActor");
-    emit(new ZenohSubscribe("src/time_server/clock/utc"));
+    AliveEvent *alive_event = new AliveEvent();
+    alive_event->publishes.push_back(SysEvent::name_value);
+    emit(alive_event);
 }
 
 SysActor::~SysActor()

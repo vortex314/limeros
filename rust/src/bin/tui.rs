@@ -27,7 +27,7 @@ use tokio::sync::Mutex;
 struct Record {
     pub timestamp: SystemTime,
     pub src: String,
-    pub msg_type: String,
+    pub typ: String,
     pub field_name: String,
     pub value: String,
 }
@@ -35,7 +35,7 @@ struct Record {
 impl PartialEq for Record {
     fn eq(&self, other: &Self) -> bool {
         self.src == other.src
-            && self.msg_type == other.msg_type
+            && self.typ == other.typ
             && self.field_name == other.field_name
     }
 }
@@ -45,7 +45,7 @@ impl Eq for Record {}
 impl std::hash::Hash for Record {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.src.hash(state);
-        self.msg_type.hash(state);
+        self.typ.hash(state);
         self.field_name.hash(state);
     }
 }
@@ -109,14 +109,14 @@ impl UdpMessageHandler for TuiHandler {
         let  app = self.state.lock().await;
 
         // Parse the payload (assuming JSON as per your UdpNode implementation)
-        let fields = if let Some(payload) = &udp_message.payload {
-            let v: serde_json::Value = serde_json::from_slice(payload).unwrap_or_default();
+        let fields = if let Some(payload) = &udp_message.msg {
+            let v: serde_json::Value = payload.clone();
             if let serde_json::Value::Object(map) = v {
                 map.into_iter().map(|(k, v)| (k, v.to_string())).collect()
             } else {
                 vec![(
                     "raw".to_string(),
-                    String::from_utf8_lossy(payload).into_owned(),
+                    payload.to_string(),
                 )]
             }
         } else {
@@ -127,13 +127,13 @@ impl UdpMessageHandler for TuiHandler {
             let key = format!(
                 "{}:{}:{}",
                 udp_message.src.clone().unwrap_or_default(),
-                udp_message.msg_type.clone().unwrap_or_default(),
+                udp_message.typ.clone().unwrap_or_default(),
                 field_name
             );
             let record = Record {
                 timestamp: SystemTime::now(),
                 src: udp_message.src.clone().unwrap_or_default(),
-                msg_type: udp_message.msg_type.clone().unwrap_or_default(),
+                typ: udp_message.typ.clone().unwrap_or_default(),
                 field_name: field_name.clone(),
                 value: value.clone(),
             };
@@ -330,7 +330,7 @@ fn render_events_tab(f: &mut Frame, area: Rect, cache: Arc<DashMap<String, Recor
         let ord = match sort_column {
             SortColumn::Time => a.timestamp.cmp(&b.timestamp),
             SortColumn::Source => a.src.cmp(&b.src),
-            SortColumn::Type => a.msg_type.cmp(&b.msg_type),
+            SortColumn::Type => a.typ.cmp(&b.typ),
             SortColumn::Field => a.field_name.cmp(&b.field_name),
         };
         if sort_desc {
@@ -344,7 +344,7 @@ fn render_events_tab(f: &mut Frame, area: Rect, cache: Arc<DashMap<String, Recor
         rows.push(Row::new(vec![
             Cell::from(system_time_to_hhmmss(&record.timestamp)),
             Cell::from(record.src.clone()),
-            Cell::from(record.msg_type.clone()),
+            Cell::from(record.typ.clone()),
             Cell::from(record.field_name.clone()),
             Cell::from(record.value.clone()),
         ]));

@@ -7,11 +7,10 @@
 #include <cbor.h>
 #include <msg.h>
 #include <serdes.h>
-#include <poly.h>
+
+
 
 typedef std::vector<uint8_t> Bytes;
-typedef JsonVariant Value;
-typedef poly::Poly Poly;
 
 {% for en in enums %}
 typedef enum {
@@ -22,7 +21,6 @@ typedef enum {
 {% endfor %}
 
 {% for msg in messages %}
-{% if msg.name != "Poly" %}
 class {{ msg.name }} : public Msg {
     MSG({{ msg.name }});
     public:
@@ -45,8 +43,5 @@ class {{ msg.name }} : public Msg {
     static Result<{{msg.name}}*> json_deserialize(const Bytes&);
     static Result<Bytes> cbor_serialize(const {{msg.name}}&);
     static Result<{{msg.name}}*> cbor_deserialize(const Bytes&);
-    static Result<Poly> to_poly(const {{msg.name}}&);
-    static Result<{{msg.name}}*> from_poly(const Poly&);
 };
-{% endif %}
 {% endfor %}

@@ -15,7 +15,7 @@ MdnsActor::~MdnsActor()
 
 void MdnsActor::on_start()
 {
-    INFO("OTA Actor started");
+    INFO("mDNS Actor started");
 }
 
 void MdnsActor::init()

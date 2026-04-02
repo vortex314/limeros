@@ -1,6 +1,6 @@
 use clap::Parser;
 use limeros::{
-    TypedUdpMessage, UdpMessage, UdpMessageHandler, UdpNode, logger, msgs::{PingRep, PingReq, SysEvent, TypedMessage}
+    TypedUdpMessage, UdpMessage, UdpMessageHandler, UdpNode, logger, msgs::{PingReply, PingRequest, SysEvent, TypedMessage}
 };
 use log::info;
 use std::{sync::Arc, time::Duration};
@@ -32,17 +32,17 @@ struct Handler {
 impl UdpMessageHandler for Handler {
     
     async fn handle(& self, udp_message: & UdpMessage) -> anyhow::Result<()> {
-        match udp_message.msg_type.as_deref() {
+        match udp_message.typ.as_deref() {
             Some(SysEvent::MSG_TYPE) => {
                 let typed_msg = TypedUdpMessage::<SysEvent>::from(udp_message.clone())?;
                 info!("Generic Handler received SysEvent: {:?} ", typed_msg);
             },
-            Some(PingRep::MSG_TYPE) => {
-                let typed_msg = TypedUdpMessage::<PingRep>::from(udp_message.clone())?;
-                info!("Generic Handler received PingRep: {:?} ", typed_msg);
+            Some(PingReply::MSG_TYPE) => {
+                let typed_msg = TypedUdpMessage::<PingReply>::from(udp_message.clone())?;
+                info!("Generic Handler received PingReply: {:?} ", typed_msg);
                 self.node.send_msg_to(
                     typed_msg.src.as_deref().unwrap_or("unknown"),
-                    PingReq {
+                    PingRequest {
                         number: typed_msg.payload.as_ref().and_then(|p| p.number).map(|n| n + 1),
                         ..Default::default()
                     },
@@ -88,12 +88,12 @@ async fn main() -> anyhow::Result<()> {
         }
     });
 
-    node.on::<PingRep, _, _>(move |s, event| {
+    node.on::<PingReply, _, _>(move |s, event| {
         let node_name = node_name_clone.clone();
-        info!("Client handler for PingRep {}", s);
+        info!("Client handler for PingReply {}", s);
         async move {
             if s == node_name.as_str() {
-                info!("Received PingReply: {} => {:?} ", s, event);
+                info!("Received PingReplyly: {} => {:?} ", s, event);
                 return;
             }
         }
@@ -107,13 +107,13 @@ async fn main() -> anyhow::Result<()> {
         .await;
         node.send_msg_to(
             "esp1",
-            PingReq {
+            PingRequest {
                 number: Some(42),
                 ..Default::default()
             },
         )
         .await;
-    info!("{} sent SysEvent and PingReq", args.node_name);
+    info!("{} sent SysEvent and PingRequest", args.node_name);
         sleep(Duration::from_secs(args.frequency)).await;
     }
 }

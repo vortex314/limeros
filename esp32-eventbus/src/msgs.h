@@ -7,10 +7,11 @@
 #include <cbor.h>
 #include <msg.h>
 #include <serdes.h>
-
-
+#include <poly.h>
 
 typedef std::vector<uint8_t> Bytes;
+typedef JsonVariant Value;
+typedef poly::Poly Poly;
 
 
 typedef enum {
@@ -63,6 +64,59 @@ typedef enum {
 
 
 
+
+
+
+class UdpMessage : public Msg {
+    MSG(UdpMessage);
+    public:
+    std::optional<std::string> dst;
+    std::optional<std::string> src;
+    std::optional<std::string> typ;
+    std::optional<Poly> msg;
+    
+    // Field indexes
+        typedef enum {
+        DST_INDEX = 1,
+        SRC_INDEX = 2,
+        TYP_INDEX = 3,
+        MSG_INDEX = 4,
+    } Field;
+    static Result<Bytes> json_serialize(const UdpMessage&);
+    static Result<UdpMessage*> json_deserialize(const Bytes&);
+    static Result<Bytes> cbor_serialize(const UdpMessage&);
+    static Result<UdpMessage*> cbor_deserialize(const Bytes&);
+    static Result<Poly> to_poly(const UdpMessage&);
+    static Result<UdpMessage*> from_poly(const Poly&);
+};
+
+
+
+class UdpMessageCbor : public Msg {
+    MSG(UdpMessageCbor);
+    public:
+    std::optional<uint32_t> dst;
+    std::optional<uint32_t> src;
+    std::optional<uint32_t> typ;
+    std::optional<Poly> msg;
+    
+    // Field indexes
+        typedef enum {
+        DST_INDEX = 1,
+        SRC_INDEX = 2,
+        TYP_INDEX = 3,
+        MSG_INDEX = 4,
+    } Field;
+    static Result<Bytes> json_serialize(const UdpMessageCbor&);
+    static Result<UdpMessageCbor*> json_deserialize(const Bytes&);
+    static Result<Bytes> cbor_serialize(const UdpMessageCbor&);
+    static Result<UdpMessageCbor*> cbor_deserialize(const Bytes&);
+    static Result<Poly> to_poly(const UdpMessageCbor&);
+    static Result<UdpMessageCbor*> from_poly(const Poly&);
+};
+
+
+
 class AliveEvent : public Msg {
     MSG(AliveEvent);
     public:
@@ -80,49 +134,11 @@ class AliveEvent : public Msg {
     static Result<AliveEvent*> json_deserialize(const Bytes&);
     static Result<Bytes> cbor_serialize(const AliveEvent&);
     static Result<AliveEvent*> cbor_deserialize(const Bytes&);
+    static Result<Poly> to_poly(const AliveEvent&);
+    static Result<AliveEvent*> from_poly(const Poly&);
 };
 
-class UdpMessage : public Msg {
-    MSG(UdpMessage);
-    public:
-    std::optional<std::string> dst;
-    std::optional<std::string> src;
-    std::optional<std::string> msg_type;
-    std::optional<Bytes> payload;
-    
-    // Field indexes
-        typedef enum {
-        DST_INDEX = 1,
-        SRC_INDEX = 2,
-        MSG_TYPE_INDEX = 3,
-        PAYLOAD_INDEX = 4,
-    } Field;
-    static Result<Bytes> json_serialize(const UdpMessage&);
-    static Result<UdpMessage*> json_deserialize(const Bytes&);
-    static Result<Bytes> cbor_serialize(const UdpMessage&);
-    static Result<UdpMessage*> cbor_deserialize(const Bytes&);
-};
 
-class UdpMessageCbor : public Msg {
-    MSG(UdpMessageCbor);
-    public:
-    std::optional<uint32_t> dst;
-    std::optional<uint32_t> src;
-    std::optional<uint32_t> msg_type;
-    std::optional<Bytes> payload;
-    
-    // Field indexes
-        typedef enum {
-        DST_INDEX = 1,
-        SRC_INDEX = 2,
-        MSG_TYPE_INDEX = 3,
-        PAYLOAD_INDEX = 4,
-    } Field;
-    static Result<Bytes> json_serialize(const UdpMessageCbor&);
-    static Result<UdpMessageCbor*> json_deserialize(const Bytes&);
-    static Result<Bytes> cbor_serialize(const UdpMessageCbor&);
-    static Result<UdpMessageCbor*> cbor_deserialize(const Bytes&);
-};
 
 class LogEvent : public Msg {
     MSG(LogEvent);
@@ -147,7 +163,11 @@ class LogEvent : public Msg {
     static Result<LogEvent*> json_deserialize(const Bytes&);
     static Result<Bytes> cbor_serialize(const LogEvent&);
     static Result<LogEvent*> cbor_deserialize(const Bytes&);
+    static Result<Poly> to_poly(const LogEvent&);
+    static Result<LogEvent*> from_poly(const Poly&);
 };
+
+
 
 class SysRequest : public Msg {
     MSG(SysRequest);
@@ -166,7 +186,11 @@ class SysRequest : public Msg {
     static Result<SysRequest*> json_deserialize(const Bytes&);
     static Result<Bytes> cbor_serialize(const SysRequest&);
     static Result<SysRequest*> cbor_deserialize(const Bytes&);
+    static Result<Poly> to_poly(const SysRequest&);
+    static Result<SysRequest*> from_poly(const Poly&);
 };
+
+
 
 class SysReply : public Msg {
     MSG(SysReply);
@@ -183,7 +207,11 @@ class SysReply : public Msg {
     static Result<SysReply*> json_deserialize(const Bytes&);
     static Result<Bytes> cbor_serialize(const SysReply&);
     static Result<SysReply*> cbor_deserialize(const Bytes&);
+    static Result<Poly> to_poly(const SysReply&);
+    static Result<SysReply*> from_poly(const Poly&);
 };
+
+
 
 class SysEvent : public Msg {
     MSG(SysEvent);
@@ -208,7 +236,11 @@ class SysEvent : public Msg {
     static Result<SysEvent*> json_deserialize(const Bytes&);
     static Result<Bytes> cbor_serialize(const SysEvent&);
     static Result<SysEvent*> cbor_deserialize(const Bytes&);
+    static Result<Poly> to_poly(const SysEvent&);
+    static Result<SysEvent*> from_poly(const Poly&);
 };
+
+
 
 class WifiEvent : public Msg {
     MSG(WifiEvent);
@@ -237,7 +269,11 @@ class WifiEvent : public Msg {
     static Result<WifiEvent*> json_deserialize(const Bytes&);
     static Result<Bytes> cbor_serialize(const WifiEvent&);
     static Result<WifiEvent*> cbor_deserialize(const Bytes&);
+    static Result<Poly> to_poly(const WifiEvent&);
+    static Result<WifiEvent*> from_poly(const Poly&);
 };
+
+
 
 class MulticastEvent : public Msg {
     MSG(MulticastEvent);
@@ -256,7 +292,11 @@ class MulticastEvent : public Msg {
     static Result<MulticastEvent*> json_deserialize(const Bytes&);
     static Result<Bytes> cbor_serialize(const MulticastEvent&);
     static Result<MulticastEvent*> cbor_deserialize(const Bytes&);
+    static Result<Poly> to_poly(const MulticastEvent&);
+    static Result<MulticastEvent*> from_poly(const Poly&);
 };
+
+
 
 class PingRequest : public Msg {
     MSG(PingRequest);
@@ -271,7 +311,11 @@ class PingRequest : public Msg {
     static Result<PingRequest*> json_deserialize(const Bytes&);
     static Result<Bytes> cbor_serialize(const PingRequest&);
     static Result<PingRequest*> cbor_deserialize(const Bytes&);
+    static Result<Poly> to_poly(const PingRequest&);
+    static Result<PingRequest*> from_poly(const Poly&);
 };
+
+
 
 class PingReply : public Msg {
     MSG(PingReply);
@@ -286,7 +330,11 @@ class PingReply : public Msg {
     static Result<PingReply*> json_deserialize(const Bytes&);
     static Result<Bytes> cbor_serialize(const PingReply&);
     static Result<PingReply*> cbor_deserialize(const Bytes&);
+    static Result<Poly> to_poly(const PingReply&);
+    static Result<PingReply*> from_poly(const Poly&);
 };
+
+
 
 class HoverboardEventRaw : public Msg {
     MSG(HoverboardEventRaw);
@@ -391,7 +439,11 @@ class HoverboardEventRaw : public Msg {
     static Result<HoverboardEventRaw*> json_deserialize(const Bytes&);
     static Result<Bytes> cbor_serialize(const HoverboardEventRaw&);
     static Result<HoverboardEventRaw*> cbor_deserialize(const Bytes&);
+    static Result<Poly> to_poly(const HoverboardEventRaw&);
+    static Result<HoverboardEventRaw*> from_poly(const Poly&);
 };
+
+
 
 class HoverboardEvent : public Msg {
     MSG(HoverboardEvent);
@@ -496,7 +548,11 @@ class HoverboardEvent : public Msg {
     static Result<HoverboardEvent*> json_deserialize(const Bytes&);
     static Result<Bytes> cbor_serialize(const HoverboardEvent&);
     static Result<HoverboardEvent*> cbor_deserialize(const Bytes&);
+    static Result<Poly> to_poly(const HoverboardEvent&);
+    static Result<HoverboardEvent*> from_poly(const Poly&);
 };
+
+
 
 class HoverboardRequest : public Msg {
     MSG(HoverboardRequest);
@@ -513,7 +569,11 @@ class HoverboardRequest : public Msg {
     static Result<HoverboardRequest*> json_deserialize(const Bytes&);
     static Result<Bytes> cbor_serialize(const HoverboardRequest&);
     static Result<HoverboardRequest*> cbor_deserialize(const Bytes&);
+    static Result<Poly> to_poly(const HoverboardRequest&);
+    static Result<HoverboardRequest*> from_poly(const Poly&);
 };
+
+
 
 class HoverboardReply : public Msg {
     MSG(HoverboardReply);
@@ -530,7 +590,11 @@ class HoverboardReply : public Msg {
     static Result<HoverboardReply*> json_deserialize(const Bytes&);
     static Result<Bytes> cbor_serialize(const HoverboardReply&);
     static Result<HoverboardReply*> cbor_deserialize(const Bytes&);
+    static Result<Poly> to_poly(const HoverboardReply&);
+    static Result<HoverboardReply*> from_poly(const Poly&);
 };
+
+
 
 class TouchPoint : public Msg {
     MSG(TouchPoint);
@@ -551,7 +615,11 @@ class TouchPoint : public Msg {
     static Result<TouchPoint*> json_deserialize(const Bytes&);
     static Result<Bytes> cbor_serialize(const TouchPoint&);
     static Result<TouchPoint*> cbor_deserialize(const Bytes&);
+    static Result<Poly> to_poly(const TouchPoint&);
+    static Result<TouchPoint*> from_poly(const Poly&);
 };
+
+
 
 class Ps4Event : public Msg {
     MSG(Ps4Event);
@@ -630,7 +698,11 @@ class Ps4Event : public Msg {
     static Result<Ps4Event*> json_deserialize(const Bytes&);
     static Result<Bytes> cbor_serialize(const Ps4Event&);
     static Result<Ps4Event*> cbor_deserialize(const Bytes&);
+    static Result<Poly> to_poly(const Ps4Event&);
+    static Result<Ps4Event*> from_poly(const Poly&);
 };
+
+
 
 class Ps4Request : public Msg {
     MSG(Ps4Request);
@@ -657,7 +729,11 @@ class Ps4Request : public Msg {
     static Result<Ps4Request*> json_deserialize(const Bytes&);
     static Result<Bytes> cbor_serialize(const Ps4Request&);
     static Result<Ps4Request*> cbor_deserialize(const Bytes&);
+    static Result<Poly> to_poly(const Ps4Request&);
+    static Result<Ps4Request*> from_poly(const Poly&);
 };
+
+
 
 class CameraEvent : public Msg {
     MSG(CameraEvent);
@@ -682,7 +758,11 @@ class CameraEvent : public Msg {
     static Result<CameraEvent*> json_deserialize(const Bytes&);
     static Result<Bytes> cbor_serialize(const CameraEvent&);
     static Result<CameraEvent*> cbor_deserialize(const Bytes&);
+    static Result<Poly> to_poly(const CameraEvent&);
+    static Result<CameraEvent*> from_poly(const Poly&);
 };
+
+
 
 class CameraRequest : public Msg {
     MSG(CameraRequest);
@@ -701,7 +781,11 @@ class CameraRequest : public Msg {
     static Result<CameraRequest*> json_deserialize(const Bytes&);
     static Result<Bytes> cbor_serialize(const CameraRequest&);
     static Result<CameraRequest*> cbor_deserialize(const Bytes&);
+    static Result<Poly> to_poly(const CameraRequest&);
+    static Result<CameraRequest*> from_poly(const Poly&);
 };
+
+
 
 class CameraReply : public Msg {
     MSG(CameraReply);
@@ -720,7 +804,11 @@ class CameraReply : public Msg {
     static Result<CameraReply*> json_deserialize(const Bytes&);
     static Result<Bytes> cbor_serialize(const CameraReply&);
     static Result<CameraReply*> cbor_deserialize(const Bytes&);
+    static Result<Poly> to_poly(const CameraReply&);
+    static Result<CameraReply*> from_poly(const Poly&);
 };
+
+
 
 class LawnmowerManualEvent : public Msg {
     MSG(LawnmowerManualEvent);
@@ -739,7 +827,11 @@ class LawnmowerManualEvent : public Msg {
     static Result<LawnmowerManualEvent*> json_deserialize(const Bytes&);
     static Result<Bytes> cbor_serialize(const LawnmowerManualEvent&);
     static Result<LawnmowerManualEvent*> cbor_deserialize(const Bytes&);
+    static Result<Poly> to_poly(const LawnmowerManualEvent&);
+    static Result<LawnmowerManualEvent*> from_poly(const Poly&);
 };
+
+
 
 class LawnmowerManualRequest : public Msg {
     MSG(LawnmowerManualRequest);
@@ -768,7 +860,11 @@ class LawnmowerManualRequest : public Msg {
     static Result<LawnmowerManualRequest*> json_deserialize(const Bytes&);
     static Result<Bytes> cbor_serialize(const LawnmowerManualRequest&);
     static Result<LawnmowerManualRequest*> cbor_deserialize(const Bytes&);
+    static Result<Poly> to_poly(const LawnmowerManualRequest&);
+    static Result<LawnmowerManualRequest*> from_poly(const Poly&);
 };
+
+
 
 class LawnmowerManualReply : public Msg {
     MSG(LawnmowerManualReply);
@@ -785,7 +881,11 @@ class LawnmowerManualReply : public Msg {
     static Result<LawnmowerManualReply*> json_deserialize(const Bytes&);
     static Result<Bytes> cbor_serialize(const LawnmowerManualReply&);
     static Result<LawnmowerManualReply*> cbor_deserialize(const Bytes&);
+    static Result<Poly> to_poly(const LawnmowerManualReply&);
+    static Result<LawnmowerManualReply*> from_poly(const Poly&);
 };
+
+
 
 class LawnmowerAutoEvent : public Msg {
     MSG(LawnmowerAutoEvent);
@@ -810,7 +910,11 @@ class LawnmowerAutoEvent : public Msg {
     static Result<LawnmowerAutoEvent*> json_deserialize(const Bytes&);
     static Result<Bytes> cbor_serialize(const LawnmowerAutoEvent&);
     static Result<LawnmowerAutoEvent*> cbor_deserialize(const Bytes&);
+    static Result<Poly> to_poly(const LawnmowerAutoEvent&);
+    static Result<LawnmowerAutoEvent*> from_poly(const Poly&);
 };
+
+
 
 class LawnmowerAutoRequest : public Msg {
     MSG(LawnmowerAutoRequest);
@@ -835,7 +939,11 @@ class LawnmowerAutoRequest : public Msg {
     static Result<LawnmowerAutoRequest*> json_deserialize(const Bytes&);
     static Result<Bytes> cbor_serialize(const LawnmowerAutoRequest&);
     static Result<LawnmowerAutoRequest*> cbor_deserialize(const Bytes&);
+    static Result<Poly> to_poly(const LawnmowerAutoRequest&);
+    static Result<LawnmowerAutoRequest*> from_poly(const Poly&);
 };
+
+
 
 class LawnmowerStatus : public Msg {
     MSG(LawnmowerStatus);
@@ -856,7 +964,11 @@ class LawnmowerStatus : public Msg {
     static Result<LawnmowerStatus*> json_deserialize(const Bytes&);
     static Result<Bytes> cbor_serialize(const LawnmowerStatus&);
     static Result<LawnmowerStatus*> cbor_deserialize(const Bytes&);
+    static Result<Poly> to_poly(const LawnmowerStatus&);
+    static Result<LawnmowerStatus*> from_poly(const Poly&);
 };
+
+
 
 class MotorEvent : public Msg {
     MSG(MotorEvent);
@@ -881,5 +993,99 @@ class MotorEvent : public Msg {
     static Result<MotorEvent*> json_deserialize(const Bytes&);
     static Result<Bytes> cbor_serialize(const MotorEvent&);
     static Result<MotorEvent*> cbor_deserialize(const Bytes&);
+    static Result<Poly> to_poly(const MotorEvent&);
+    static Result<MotorEvent*> from_poly(const Poly&);
 };
+
+
+
+class Max31855Event : public Msg {
+    MSG(Max31855Event);
+    public:
+    std::optional<float> thermocouple_c;
+    std::optional<float> internal_c;
+    std::optional<bool> fault;
+    std::optional<bool> open_circuit;
+    std::optional<bool> short_to_gnd;
+    std::optional<bool> short_to_vcc;
+    std::optional<uint64_t> timestamp_ms;
+    
+    // Field indexes
+        typedef enum {
+        THERMOCOUPLE_C_INDEX = 1,
+        INTERNAL_C_INDEX = 2,
+        FAULT_INDEX = 3,
+        OPEN_CIRCUIT_INDEX = 4,
+        SHORT_TO_GND_INDEX = 5,
+        SHORT_TO_VCC_INDEX = 6,
+        TIMESTAMP_MS_INDEX = 7,
+    } Field;
+    static Result<Bytes> json_serialize(const Max31855Event&);
+    static Result<Max31855Event*> json_deserialize(const Bytes&);
+    static Result<Bytes> cbor_serialize(const Max31855Event&);
+    static Result<Max31855Event*> cbor_deserialize(const Bytes&);
+    static Result<Poly> to_poly(const Max31855Event&);
+    static Result<Max31855Event*> from_poly(const Poly&);
+};
+
+
+
+class HeatingRequest : public Msg {
+    MSG(HeatingRequest);
+    public:
+    std::optional<float> setpoint_c;
+    std::optional<bool> enabled;
+    std::optional<float> kp;
+    std::optional<float> ki;
+    std::optional<float> kd;
+    std::optional<bool> reset_integral;
+    
+    // Field indexes
+        typedef enum {
+        SETPOINT_C_INDEX = 1,
+        ENABLED_INDEX = 2,
+        KP_INDEX = 3,
+        KI_INDEX = 4,
+        KD_INDEX = 5,
+        RESET_INTEGRAL_INDEX = 6,
+    } Field;
+    static Result<Bytes> json_serialize(const HeatingRequest&);
+    static Result<HeatingRequest*> json_deserialize(const Bytes&);
+    static Result<Bytes> cbor_serialize(const HeatingRequest&);
+    static Result<HeatingRequest*> cbor_deserialize(const Bytes&);
+    static Result<Poly> to_poly(const HeatingRequest&);
+    static Result<HeatingRequest*> from_poly(const Poly&);
+};
+
+
+
+class HeatingEvent : public Msg {
+    MSG(HeatingEvent);
+    public:
+    std::optional<float> temperature_c;
+    std::optional<float> setpoint_c;
+    std::optional<float> output_pct;
+    std::optional<bool> enabled;
+    std::optional<bool> heater_on;
+    std::optional<bool> fault;
+    std::optional<uint64_t> timestamp_ms;
+    
+    // Field indexes
+        typedef enum {
+        TEMPERATURE_C_INDEX = 1,
+        SETPOINT_C_INDEX = 2,
+        OUTPUT_PCT_INDEX = 3,
+        ENABLED_INDEX = 4,
+        HEATER_ON_INDEX = 5,
+        FAULT_INDEX = 6,
+        TIMESTAMP_MS_INDEX = 7,
+    } Field;
+    static Result<Bytes> json_serialize(const HeatingEvent&);
+    static Result<HeatingEvent*> json_deserialize(const Bytes&);
+    static Result<Bytes> cbor_serialize(const HeatingEvent&);
+    static Result<HeatingEvent*> cbor_deserialize(const Bytes&);
+    static Result<Poly> to_poly(const HeatingEvent&);
+    static Result<HeatingEvent*> from_poly(const Poly&);
+};
+
 

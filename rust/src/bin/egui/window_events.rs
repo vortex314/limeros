@@ -60,7 +60,7 @@ impl WindowEvents {
                 let ord = match self.sort_col {
                     SortColumn::Time => a.timestamp.cmp(&b.timestamp),
                     SortColumn::Source => a.src.cmp(&b.src),
-                    SortColumn::Type => a.msg_type.cmp(&b.msg_type),
+                    SortColumn::Type => a.typ.cmp(&b.typ),
                     SortColumn::Field => a.field_name.cmp(&b.field_name),
                 };
                 if self.sort_desc {
@@ -111,7 +111,7 @@ impl WindowEvents {
                         let time_str = chrono::DateTime::<chrono::Local>::from(r.timestamp)
                             .format("%H:%M:%S")
                             .to_string();
-                        let key = format!("{}:{}:{}", r.src, r.msg_type, r.field_name);
+                        let key = format!("{}:{}:{}", r.src, r.typ, r.field_name);
 
                         row.col(|ui| {
                             ui.label(time_str);
@@ -120,7 +120,7 @@ impl WindowEvents {
                             ui.label(&r.src);
                         });
                         row.col(|ui| {
-                            ui.label(&r.msg_type);
+                            ui.label(&r.typ);
                         });
                         row.col(|ui| {
                             ui.label(&r.field_name);

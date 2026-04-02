@@ -3,25 +3,32 @@
 syntax = "proto3";
 package msgs;
 
+message Poly {
+  string typ = 1;
+  bytes data = 2;
+}
+
+message UdpMessage {
+  string dst = 1;
+  string src = 2;
+  string typ = 3;
+  Poly msg = 4;
+}
+
+message UdpMessageCbor {
+  uint32 dst = 1;
+  uint32 src = 2;
+  uint32 typ = 3;
+  Poly msg = 4;
+}
+
 message AliveEvent {
   repeated string subscribes = 1; // topics that broker will send
   repeated string publishes = 2; // publishes on these topics
   repeated string services = 3; // request/reply 
 }
 
-message UdpMessage {
-  string dst = 1;
-  string src = 2;
-  string msg_type = 3;
-  bytes payload = 4;
-}
 
-message UdpMessageCbor {
-  uint32 dst = 1;
-  uint32 src = 2;
-  uint32 msg_type = 3;
-  bytes payload = 4;
-}
 
 enum LogLevel {
   DEBUG = 1;
@@ -376,4 +383,37 @@ message MotorEvent {
   float current = 4;
   float speed = 5;
   float position = 6;
+}
+
+// MAX31855 Thermocouple Sensor Message
+
+message Max31855Event {
+  float thermocouple_c = 1;
+  float internal_c = 2;
+  bool fault = 3;
+  bool open_circuit = 4;
+  bool short_to_gnd = 5;
+  bool short_to_vcc = 6;
+  uint64 timestamp_ms = 7;
+}
+
+// Heating Controller Message
+
+message HeatingRequest {
+  float setpoint_c = 1;
+  bool enabled = 2;
+  float kp = 3;
+  float ki = 4;
+  float kd = 5;
+  bool reset_integral = 6;
+}
+
+message HeatingEvent {
+  float temperature_c = 1;
+  float setpoint_c = 2;
+  float output_pct = 3;
+  bool enabled = 4;
+  bool heater_on = 5;
+  bool fault = 6;
+  uint64 timestamp_ms = 7;
 }

@@ -17,11 +17,15 @@ mod window_events;
 use window_endpoints::WindowEndpoints;
 use window_events::WindowEvents;
 mod window_gauge;
+mod window_heater;
 mod window_hoverboard;
+mod window_max31855;
 mod window_plot;
 use limeros::eventbus::ActorImpl;
 use limeros::eventbus::Eventbus;
+use window_heater::WindowHeater;
 use window_hoverboard::HoverboardWindow;
+use window_max31855::WindowMax31855;
 
 mod widget_alive;
 use rand::prelude::*;
@@ -39,7 +43,7 @@ struct MetricData {
 struct Record {
     pub timestamp: SystemTime,
     pub src: String,
-    pub msg_type: String,
+    pub typ: String,
     pub field_name: String,
     pub value: String,
     pub counter: u64,
@@ -54,7 +58,9 @@ struct UdpMonitorApp {
 
     graph_data: Arc<DashMap<String, MetricData>>,
     selected_fields: HashSet<String>,
+    window_heater: WindowHeater,
     window_hoverboard: HoverboardWindow,
+    window_max31855: WindowMax31855,
     window_events: window_events::WindowEvents,
     window_endpoints: window_endpoints::WindowEndpoints,
     window_others: Arc<DashMap<String, Box<dyn MyWindow>>>,
@@ -86,7 +92,9 @@ impl UdpMonitorApp {
             window_endpoints: WindowEndpoints::new(node.clone(), endpoints.clone()),
             graph_data: graph_data.clone(),
             selected_fields: HashSet::new(),
+            window_heater: WindowHeater::new(node.clone()),
             window_hoverboard: HoverboardWindow::new(node.clone()),
+            window_max31855: WindowMax31855::new(node.clone()),
             window_others: window_others.clone(),
         }
     }
@@ -103,9 +111,15 @@ impl eframe::App for UdpMonitorApp {
             self.window_events
                 .show(ui)
                 .expect("Failed to show Events window");
+            self.window_heater
+                .show(ui)
+                .expect("Failed to show Heater window");
             self.window_hoverboard
                 .show(ui)
                 .expect("Failed to show Hoverboard window");
+            self.window_max31855
+                .show(ui)
+                .expect("Failed to show Max31855 window");
             for mut window in self.window_others.iter_mut() {
                 window.show(ui).expect("Failed to show other window");
                 if window.is_closed() {
@@ -137,14 +151,14 @@ struct GuiHandler {
 impl UdpMessageHandler for GuiHandler {
     async fn handle(&self, udp_message: &UdpMessage) -> anyhow::Result<()> {
         // Parse the payload (assuming JSON as per your UdpNode implementation)
-        let fields = if let Some(payload) = &udp_message.payload {
-            let v: serde_json::Value = serde_json::from_slice(payload).unwrap_or_default();
+        let fields = if let Some(payload) = &udp_message.msg {
+            let v: serde_json::Value = payload.clone();
             if let serde_json::Value::Object(map) = v {
                 map.into_iter().map(|(k, v)| (k, v.to_string())).collect()
             } else {
                 vec![(
                     "raw".to_string(),
-                    String::from_utf8_lossy(payload).into_owned(),
+                    payload.to_string(),
                 )]
             }
         } else {
@@ -155,13 +169,13 @@ impl UdpMessageHandler for GuiHandler {
             let key = format!(
                 "{}:{}:{}",
                 udp_message.src.clone().unwrap_or_default(),
-                udp_message.msg_type.clone().unwrap_or_default(),
+                udp_message.typ.clone().unwrap_or_default(),
                 field_name
             );
             let mut record = Record {
                 timestamp: SystemTime::now(),
                 src: udp_message.src.clone().unwrap_or_default(),
-                msg_type: udp_message.msg_type.clone().unwrap_or_default(),
+                typ: udp_message.typ.clone().unwrap_or_default(),
                 field_name: field_name.clone(),
                 value: value.clone(),
                 counter: 1,
@@ -184,7 +198,7 @@ impl UdpMessageHandler for GuiHandler {
                 let key = format!(
                     "{}:{}:{}",
                     udp_message.src.as_deref().unwrap_or("?"),
-                    udp_message.msg_type.as_deref().unwrap_or("?"),
+                    udp_message.typ.as_deref().unwrap_or("?"),
                     field_name
                 );
                 let key_clone = key.clone();

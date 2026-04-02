@@ -25,21 +25,21 @@ pub use scout::Endpoint;
 pub struct TypedUdpMessage<T> where T: TypedMessage {
     pub src: Option<String>,
     pub dst: Option<String>,
-    pub msg_type: Option<String>,
+    pub typ: Option<String>,
     pub payload: Option<T>,
 }
 
 impl<T> TypedUdpMessage<T> where T: TypedMessage+Msg {
     pub fn from(udp_message: UdpMessage) -> Result<Self> {
-        if T::MSG_TYPE != udp_message.msg_type.as_deref().unwrap_or("") {
+        if T::MSG_TYPE != udp_message.typ.as_deref().unwrap_or("") {
             return Err(anyhow::anyhow!("Message type mismatch"));
         }
         Ok(
         TypedUdpMessage {
             src: udp_message.src,
             dst: udp_message.dst,
-            msg_type: udp_message.msg_type,
-            payload: udp_message.payload.map(|p| T::json_deserialize(&p).ok()).flatten(),
+            typ: udp_message.typ,
+            payload: udp_message.msg.map(|p| T::from_value(p).ok()).flatten(),
         })  
     }
 }
@@ -184,16 +184,16 @@ impl UdpNode {
                 let my_subscriptions = my_subscriptions.lock().await;
                 alive.subscribes = Some(my_subscriptions.clone());
 
-                if let Ok(payload) = alive.json_serialize() {
+                if let Ok(payload) = alive.to_value() {
                     let packet = UdpMessage {
                         src: Some(my_id.clone()),
                         dst: None,
-                        msg_type: Some(AliveEvent::MSG_TYPE.to_string()),
-                        payload: Some(payload),
+                        typ: Some(AliveEvent::MSG_TYPE.to_string()),
+                        msg: Some(payload),
                     };
                     // We send this via our standard TX queue, aiming at the Multicast Addr
                     debug!("MC Send AliveEvent {:?}", alive);
-                    let data = UdpMessage::cbor_serialize(&packet).unwrap();
+                    let data = UdpMessage::json_serialize(&packet).unwrap();
                     let _ = unicast_socket.send_to(&data, &node.multicast_addr).await;
                 }
             }
@@ -209,7 +209,7 @@ impl UdpNode {
                     if let Some(addr) = node.multicast_scout.endpoint_to_addr(dst_endpoint) {
                         debug!(
                             "UC Send {:?} to {:?} @ {:?}",
-                            udp_message.msg_type, dst_endpoint, addr
+                            udp_message.typ, dst_endpoint, addr
                         );
 
                         addr
@@ -221,7 +221,7 @@ impl UdpNode {
                     info!("No destination endpoint specified");
                     continue;
                 };
-                if let Ok(data) = udp_message.cbor_serialize() {
+                if let Ok(data) = udp_message.json_serialize() {
                     if let Err(e) = send_socket.send_to(&data, target).await {
                         error!("Send error: {}", e);
                     }
@@ -239,7 +239,7 @@ impl UdpNode {
             loop {
                 if let Ok((len, addr)) = recv_socket.recv_from(&mut buf).await {
                     let data: Vec<u8> = buf[..len].to_vec();
-                    if let Ok(packet) = UdpMessage::cbor_deserialize(&data) {
+                    if let Ok(packet) = UdpMessage::json_deserialize(&data) {
                         let gen_handlers = generic_handlers.clone();
                         let handlers_guard = gen_handlers.lock().await;
                         for i in 0..handlers_guard.len() {
@@ -260,7 +260,7 @@ impl UdpNode {
                         }
                         
                     } else {
-                        info!("Failed to decode CBOR packet from {}", addr);
+                        info!("Failed to decode JSON packet from {}", addr);
                     }
                 }
             }
@@ -274,8 +274,8 @@ impl UdpNode {
         let udp_message = UdpMessage {
             src: Some(self.my_id.lock().await.clone()),
             dst: Some("broker".to_string()),
-            msg_type: Some(T::MSG_TYPE.to_string()),
-            payload: Some(event.json_serialize().unwrap()),
+            typ: Some(T::MSG_TYPE.to_string()),
+            msg: Some(event.to_value().unwrap()),
         };
         self.tx_queue_sender.send(udp_message).await.unwrap()
     }
@@ -287,18 +287,18 @@ impl UdpNode {
         let udp_message = UdpMessage {
             src: Some(self.my_id.lock().await.clone()),
             dst: Some(dst.to_string()),
-            msg_type: Some(T::MSG_TYPE.to_string()),
-            payload: Some(msg.json_serialize().unwrap()),
+            typ: Some(T::MSG_TYPE.to_string()),
+            msg: Some(msg.to_value().unwrap()),
         };
         self.tx_queue_sender.send(udp_message).await.unwrap()
     }
 // add a generic U
-    pub fn add_handler<H>(&self, msg_type: &str, handler: H)
+    pub fn add_handler<H>(&self, typ: &str, handler: H)
     where
         H: MessageHandler + 'static,
     {
         self.handlers
-            .insert(msg_type.to_string(), Box::new(handler));
+            .insert(typ.to_string(), Box::new(handler));
     }
 
     pub fn add_sender(&self, sender: mpsc::Sender<UdpMessage>) {
@@ -326,13 +326,13 @@ impl UdpNode {
         dest_id: &str,
         msg: T,
     ) -> anyhow::Result<()> {
-        let payload = msg.json_serialize()?;
+        let payload = msg.to_value()?;
 
         let packet = UdpMessage {
             src: Some(src.to_string()),
             dst: Some(dest_id.to_string()),
-            msg_type: Some(T::MSG_TYPE.to_string()),
-            payload: Some(payload),
+            typ: Some(T::MSG_TYPE.to_string()),
+            msg: Some(payload),
         };
 
         self.tx_queue_sender

@@ -19,6 +19,7 @@
 #include <ota_actor.h>
 #include <mdns_actor.h>
 #include <hoverboard_actor.h>
+#include <max31855_actor.h>
 #include <log.h>
 
 #ifndef DEVICE_NAME
@@ -37,29 +38,32 @@ extern "C" void app_main()
   INFO("Free heap size: %ld ", esp_get_free_heap_size());
   INFO("Stack high water mark: %ld \n", uxTaskGetStackHighWaterMark(NULL));
 
-  eventbus.register_actor(new WifiActor("wifi"));                // manage wifi connection, will block on start until connected
-  eventbus.register_actor(new SysActor("sys"));                  // manage the system
- // eventbus.register_actor(new ZenohActor("zenoh", DEVICE_NAME)); // bridge the eventbus
-  eventbus.register_actor(new McActor("mc", DEVICE_NAME));       // multicast actor
-  eventbus.register_actor(new LedActor("led"));                  // blink the led
-  eventbus.register_actor(new OtaActor("ota"));                  // ota via tftp
-  eventbus.register_actor(new MdnsActor("mdns", DEVICE_NAME));   // mdns service
+  eventbus.register_actor(new WifiActor("wifi"));              // manage wifi connection, will block on start until connected
+  eventbus.register_actor(new SysActor("sys"));                // manage the system
+                                                               // eventbus.register_actor(new ZenohActor("zenoh", DEVICE_NAME)); // bridge the eventbus
+  eventbus.register_actor(new McActor("mc", DEVICE_NAME));     // multicast actor
+  eventbus.register_actor(new LedActor("led"));                // blink the led
+  eventbus.register_actor(new OtaActor("ota"));                // ota via tftp
+  eventbus.register_actor(new MdnsActor("mdns", DEVICE_NAME)); // mdns service
+#ifdef ENABLE_DESOLDERING
+  eventbus.register_actor(new Max31855Actor("heater", 500)); // MAX31855 + PID + SSR heating control
+#endif
 #ifdef ENABLE_HOVERBOARD
   eventbus.register_actor(new HoverboardActor("hb")); // hoverboard interface
 #endif
-// debugging handler to log all eventbus traffic, comment for beauty
-  /*eventbus.register_handler([](const Envelope &env) // just log eventbus traffic
+  // debugging handler to log all eventbus traffic, comment for beauty
+  eventbus.register_handler([](const Envelope &env) // just log eventbus traffic
                             {
                               const char *src = env.src ? env.src->name() : "";
                               const char *dst = env.dst ? env.dst->name() : "";
-                              INFO(" heap : %ld Event '%s' => '%s' : %s", esp_get_free_heap_size(), src, dst, env.msg->type_name()); // comment for beauty
-                            });*/
+                              INFO(" Event '%s' => '%s' : %s", src, dst, env.msg->type_name()); // comment for beauty
+                            });
   eventbus.loop();
 }
 /*
-Initializes the non-volatile storage (NVS) and, 
-if necessary, erases and re-initializes it when specific errors are detected. 
-Additionally, it reports the currently running OTA partition and attempts to mark the current application as valid, 
+Initializes the non-volatile storage (NVS) and,
+if necessary, erases and re-initializes it when specific errors are detected.
+Additionally, it reports the currently running OTA partition and attempts to mark the current application as valid,
 canceling any pending rollback if successful.
 */
 esp_err_t nvs_ota_init()

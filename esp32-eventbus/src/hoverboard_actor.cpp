@@ -100,7 +100,10 @@ Result<bool> HoverboardActor::init_uart()
 void HoverboardActor::on_start()
 {
     INFO("Starting HoverboardActor");
-    emit(new ZenohSubscribe("src/time_server/clock/utc"));
+    AliveEvent *alive_event = new AliveEvent();
+    alive_event->publishes.push_back(HoverboardEvent::name_value);
+    alive_event->services.push_back(HoverboardRequest::name_value);
+    emit(alive_event);
 }
 
 /**
@@ -207,7 +210,7 @@ void HoverboardActor::on_message(const Envelope &env)
 {
     const Msg &msg = *env.msg;
     msg.handle<HoverboardRequest>([&](auto hb_cmd)
-                              { INFO("Received HoverboardRequest: speed=%d, steer=%d", hb_cmd.speed.value_or(-1), hb_cmd.steer.value_or(-1));
+                                  { INFO("Received HoverboardRequest: speed=%d, steer=%d", hb_cmd.speed.value_or(-1), hb_cmd.steer.value_or(-1));
                                 if (hb_cmd.speed) _speed = hb_cmd.speed.value(); 
                                 if (hb_cmd.steer) _steer = hb_cmd.steer.value() ; });
     msg.handle<TimerMsg>([&](const TimerMsg &msg)

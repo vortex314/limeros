@@ -14,7 +14,7 @@ use wry::WebViewBuilder;
 #[derive(serde::Serialize, Clone)]
 struct Record {
     pub src: String,
-    pub msg_type: String,
+    pub typ: String,
     pub field_name: String,
     pub value: String,
 }
@@ -51,7 +51,7 @@ impl ApplicationHandler for App {
                         tbody.innerHTML = data.map(r => `
                             <tr>
                                 <td>${r.src}</td>
-                                <td>${r.msg_type}</td>
+                                <td>${r.typ}</td>
                                 <td>${r.field_name}</td>
                                 <td>${r.value}</td>
                             </tr>
@@ -97,22 +97,22 @@ struct AppHandler {
 impl UdpMessageHandler for AppHandler {
     async fn handle(&self, udp_message: &UdpMessage) -> anyhow::Result<()> {
         let payload = udp_message
-            .payload
+            .msg
             .as_ref()
             .ok_or(anyhow::anyhow!("No payload"))?;
-        let v: serde_json::Value = serde_json::from_slice(payload).unwrap_or_default();
+        let v: serde_json::Value = payload.clone();
 
         if let serde_json::Value::Object(map) = v {
             for (field_name, value) in map {
                 let key = format!(
                     "{}:{}:{}",
                     udp_message.src.as_deref().unwrap_or("?"),
-                    udp_message.msg_type.as_deref().unwrap_or("?"),
+                    udp_message.typ.as_deref().unwrap_or("?"),
                     field_name
                 );
                 let record = Record {
                     src: udp_message.src.clone().unwrap_or_default(),
-                    msg_type: udp_message.msg_type.clone().unwrap_or_default(),
+                    typ: udp_message.typ.clone().unwrap_or_default(),
                     field_name: field_name.clone(),
                     value: value.to_string(),
                 };

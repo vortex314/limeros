@@ -73,14 +73,14 @@ impl Scout {
 
     pub(crate) fn handle_multicast_packet(&self, data: &[u8], addr: SocketAddr) -> Result<()> {
         let data_vec = data.to_vec();
-        let udp_message = UdpMessage::cbor_deserialize(&data_vec)?;
+        let udp_message = UdpMessage::json_deserialize(&data_vec)?;
 
-        debug!(
+        info!(
             "MC Recv {:?} from {:?}",
-            udp_message.msg_type, udp_message.src
+            udp_message.typ, udp_message.src
         );
 
-        if Some("AliveEvent") != udp_message.msg_type.as_deref() {
+        if Some("AliveEvent") != udp_message.typ.as_deref() {
             return Ok(());
         }
 
@@ -89,13 +89,13 @@ impl Scout {
             .clone()
             .unwrap_or_else(|| "unknown".to_string());
         let payload = udp_message
-            .payload
+            .msg
             .as_ref()
             .ok_or_else(|| anyhow::anyhow!("AliveEvent message missing payload"))?;
 
     //    let subscriptions = self.subscriptions.clone();
 
-        let alive = AliveEvent::json_deserialize(payload)?;
+        let alive = AliveEvent::from_value(payload.clone())?;
         let subscribe = alive.subscribes.clone().unwrap_or_default();
         let publish = alive.publishes.clone().unwrap_or_default();
         let services = alive.services.clone().unwrap_or_default();
