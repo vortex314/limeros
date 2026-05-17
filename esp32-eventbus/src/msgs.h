@@ -172,12 +172,14 @@ class LogEvent : public Msg {
 class SysRequest : public Msg {
     MSG(SysRequest);
     public:
+    std::optional<uint32_t> req_id;
     std::optional<uint64_t> set_time;
     std::optional<bool> reboot;
     std::optional<std::string> console;
     
     // Field indexes
         typedef enum {
+        REQ_ID_INDEX = 0,
         SET_TIME_INDEX = 1,
         REBOOT_INDEX = 2,
         CONSOLE_INDEX = 3,
@@ -195,11 +197,13 @@ class SysRequest : public Msg {
 class SysReply : public Msg {
     MSG(SysReply);
     public:
+    std::optional<uint32_t> req_id;
     std::optional<int32_t> rc;
     std::optional<std::string> message;
     
     // Field indexes
         typedef enum {
+        REQ_ID_INDEX = 0,
         RC_INDEX = 1,
         MESSAGE_INDEX = 2,
     } Field;
@@ -301,10 +305,12 @@ class MulticastEvent : public Msg {
 class PingRequest : public Msg {
     MSG(PingRequest);
     public:
+    std::optional<uint32_t> req_id;
     std::optional<uint32_t> number;
     
     // Field indexes
         typedef enum {
+        REQ_ID_INDEX = 0,
         NUMBER_INDEX = 1,
     } Field;
     static Result<Bytes> json_serialize(const PingRequest&);
@@ -320,10 +326,12 @@ class PingRequest : public Msg {
 class PingReply : public Msg {
     MSG(PingReply);
     public:
+    std::optional<uint32_t> req_id;
     std::optional<uint32_t> number;
     
     // Field indexes
         typedef enum {
+        REQ_ID_INDEX = 0,
         NUMBER_INDEX = 1,
     } Field;
     static Result<Bytes> json_serialize(const PingReply&);
@@ -497,52 +505,52 @@ class HoverboardEvent : public Msg {
     
     // Field indexes
         typedef enum {
-        CTRL_MOD_INDEX = 0,
-        CTRL_TYP_INDEX = 1,
-        CUR_MOT_MAX_INDEX = 2,
-        RPM_MOT_MAX_INDEX = 3,
-        FI_WEAK_ENA_INDEX = 4,
-        FI_WEAK_HI_INDEX = 5,
-        FI_WEAK_LO_INDEX = 6,
-        FI_WEAK_MAX_INDEX = 7,
-        PHASE_ADV_MAX_DEG_INDEX = 8,
-        INPUT1_RAW_INDEX = 9,
-        INPUT1_TYP_INDEX = 10,
-        INPUT1_MIN_INDEX = 11,
-        INPUT1_MID_INDEX = 12,
-        INPUT1_MAX_INDEX = 13,
-        INPUT1_CMD_INDEX = 14,
-        INPUT2_RAW_INDEX = 15,
-        INPUT2_TYP_INDEX = 16,
-        INPUT2_MIN_INDEX = 17,
-        INPUT2_MID_INDEX = 18,
-        INPUT2_MAX_INDEX = 19,
-        INPUT2_CMD_INDEX = 20,
-        AUX_INPUT1_RAW_INDEX = 21,
-        AUX_INPUT1_TYP_INDEX = 22,
-        AUX_INPUT1_MIN_INDEX = 23,
-        AUX_INPUT1_MID_INDEX = 24,
-        AUX_INPUT1_MAX_INDEX = 25,
-        AUX_INPUT1_CMD_INDEX = 26,
-        AUX_INPUT2_RAW_INDEX = 27,
-        AUX_INPUT2_TYP_INDEX = 28,
-        AUX_INPUT2_MIN_INDEX = 29,
-        AUX_INPUT2_MID_INDEX = 30,
-        AUX_INPUT2_MAX_INDEX = 31,
-        AUX_INPUT2_CMD_INDEX = 32,
-        DC_CURR_INDEX = 33,
-        RDC_CURR_INDEX = 34,
-        LDC_CURR_INDEX = 35,
-        CMDL_INDEX = 36,
-        CMDR_INDEX = 37,
-        SPD_AVG_INDEX = 38,
-        SPDL_INDEX = 39,
-        SPDR_INDEX = 40,
-        FILTER_RATE_INDEX = 41,
-        SPD_COEF_INDEX = 42,
-        STR_COEF_INDEX = 43,
-        BATV_INDEX = 44,
-        TEMP_INDEX = 45,
+        CTRL_MOD_INDEX = 1,
+        CTRL_TYP_INDEX = 2,
+        CUR_MOT_MAX_INDEX = 3,
+        RPM_MOT_MAX_INDEX = 4,
+        FI_WEAK_ENA_INDEX = 5,
+        FI_WEAK_HI_INDEX = 6,
+        FI_WEAK_LO_INDEX = 7,
+        FI_WEAK_MAX_INDEX = 8,
+        PHASE_ADV_MAX_DEG_INDEX = 9,
+        INPUT1_RAW_INDEX = 10,
+        INPUT1_TYP_INDEX = 11,
+        INPUT1_MIN_INDEX = 12,
+        INPUT1_MID_INDEX = 13,
+        INPUT1_MAX_INDEX = 14,
+        INPUT1_CMD_INDEX = 15,
+        INPUT2_RAW_INDEX = 16,
+        INPUT2_TYP_INDEX = 17,
+        INPUT2_MIN_INDEX = 18,
+        INPUT2_MID_INDEX = 19,
+        INPUT2_MAX_INDEX = 20,
+        INPUT2_CMD_INDEX = 21,
+        AUX_INPUT1_RAW_INDEX = 22,
+        AUX_INPUT1_TYP_INDEX = 23,
+        AUX_INPUT1_MIN_INDEX = 24,
+        AUX_INPUT1_MID_INDEX = 25,
+        AUX_INPUT1_MAX_INDEX = 26,
+        AUX_INPUT1_CMD_INDEX = 27,
+        AUX_INPUT2_RAW_INDEX = 28,
+        AUX_INPUT2_TYP_INDEX = 29,
+        AUX_INPUT2_MIN_INDEX = 30,
+        AUX_INPUT2_MID_INDEX = 31,
+        AUX_INPUT2_MAX_INDEX = 32,
+        AUX_INPUT2_CMD_INDEX = 33,
+        DC_CURR_INDEX = 34,
+        RDC_CURR_INDEX = 35,
+        LDC_CURR_INDEX = 36,
+        CMDL_INDEX = 37,
+        CMDR_INDEX = 38,
+        SPD_AVG_INDEX = 39,
+        SPDL_INDEX = 40,
+        SPDR_INDEX = 41,
+        FILTER_RATE_INDEX = 42,
+        SPD_COEF_INDEX = 43,
+        STR_COEF_INDEX = 44,
+        BATV_INDEX = 45,
+        TEMP_INDEX = 46,
     } Field;
     static Result<Bytes> json_serialize(const HoverboardEvent&);
     static Result<HoverboardEvent*> json_deserialize(const Bytes&);
@@ -557,13 +565,15 @@ class HoverboardEvent : public Msg {
 class HoverboardRequest : public Msg {
     MSG(HoverboardRequest);
     public:
+    std::optional<uint32_t> req_id;
     std::optional<int32_t> speed;
     std::optional<int32_t> steer;
     
     // Field indexes
         typedef enum {
-        SPEED_INDEX = 0,
-        STEER_INDEX = 1,
+        REQ_ID_INDEX = 0,
+        SPEED_INDEX = 1,
+        STEER_INDEX = 2,
     } Field;
     static Result<Bytes> json_serialize(const HoverboardRequest&);
     static Result<HoverboardRequest*> json_deserialize(const Bytes&);
@@ -578,13 +588,15 @@ class HoverboardRequest : public Msg {
 class HoverboardReply : public Msg {
     MSG(HoverboardReply);
     public:
+    std::optional<uint32_t> req_id;
     std::optional<int32_t> error_code;
     std::optional<std::string> message;
     
     // Field indexes
         typedef enum {
-        ERROR_CODE_INDEX = 0,
-        MESSAGE_INDEX = 1,
+        REQ_ID_INDEX = 0,
+        ERROR_CODE_INDEX = 1,
+        MESSAGE_INDEX = 2,
     } Field;
     static Result<Bytes> json_serialize(const HoverboardReply&);
     static Result<HoverboardReply*> json_deserialize(const Bytes&);
@@ -707,6 +719,7 @@ class Ps4Event : public Msg {
 class Ps4Request : public Msg {
     MSG(Ps4Request);
     public:
+    std::optional<uint32_t> req_id;
     std::optional<int32_t> rumble_small;
     std::optional<int32_t> rumble_large;
     std::optional<int32_t> led_red;
@@ -717,6 +730,7 @@ class Ps4Request : public Msg {
     
     // Field indexes
         typedef enum {
+        REQ_ID_INDEX = 0,
         RUMBLE_SMALL_INDEX = 1,
         RUMBLE_LARGE_INDEX = 2,
         LED_RED_INDEX = 3,
@@ -767,12 +781,14 @@ class CameraEvent : public Msg {
 class CameraRequest : public Msg {
     MSG(CameraRequest);
     public:
+    std::optional<uint32_t> req_id;
     std::optional<bool> led;
     std::optional<std::string> capture_tcp_destination;
     std::optional<int32_t> quality;
     
     // Field indexes
         typedef enum {
+        REQ_ID_INDEX = 0,
         LED_INDEX = 1,
         CAPTURE_TCP_DESTINATION_INDEX = 2,
         QUALITY_INDEX = 4,
@@ -790,12 +806,14 @@ class CameraRequest : public Msg {
 class CameraReply : public Msg {
     MSG(CameraReply);
     public:
+    std::optional<uint32_t> req_id;
     std::optional<int32_t> error_code;
     std::optional<std::string> message;
     std::optional<Bytes> data;
     
     // Field indexes
         typedef enum {
+        REQ_ID_INDEX = 0,
         ERROR_CODE_INDEX = 1,
         MESSAGE_INDEX = 2,
         DATA_INDEX = 3,
@@ -836,6 +854,7 @@ class LawnmowerManualEvent : public Msg {
 class LawnmowerManualRequest : public Msg {
     MSG(LawnmowerManualRequest);
     public:
+    std::optional<uint32_t> req_id;
     std::optional<float> speed;
     std::optional<float> steer;
     std::optional<bool> blade;
@@ -847,6 +866,7 @@ class LawnmowerManualRequest : public Msg {
     
     // Field indexes
         typedef enum {
+        REQ_ID_INDEX = 0,
         SPEED_INDEX = 1,
         STEER_INDEX = 2,
         BLADE_INDEX = 3,
@@ -869,11 +889,13 @@ class LawnmowerManualRequest : public Msg {
 class LawnmowerManualReply : public Msg {
     MSG(LawnmowerManualReply);
     public:
+    std::optional<uint32_t> req_id;
     std::optional<int32_t> error_code;
     std::optional<std::string> message;
     
     // Field indexes
         typedef enum {
+        REQ_ID_INDEX = 0,
         ERROR_CODE_INDEX = 1,
         MESSAGE_INDEX = 2,
     } Field;
@@ -919,6 +941,7 @@ class LawnmowerAutoEvent : public Msg {
 class LawnmowerAutoRequest : public Msg {
     MSG(LawnmowerAutoRequest);
     public:
+    std::optional<uint32_t> req_id;
     std::optional<bool> start;
     std::optional<bool> stop;
     std::optional<bool> pause;
@@ -928,6 +951,7 @@ class LawnmowerAutoRequest : public Msg {
     
     // Field indexes
         typedef enum {
+        REQ_ID_INDEX = 0,
         START_INDEX = 1,
         STOP_INDEX = 2,
         PAUSE_INDEX = 3,
@@ -1033,6 +1057,7 @@ class Max31855Event : public Msg {
 class HeatingRequest : public Msg {
     MSG(HeatingRequest);
     public:
+    std::optional<uint32_t> req_id;
     std::optional<float> setpoint_c;
     std::optional<bool> enabled;
     std::optional<float> kp;
@@ -1042,6 +1067,7 @@ class HeatingRequest : public Msg {
     
     // Field indexes
         typedef enum {
+        REQ_ID_INDEX = 0,
         SETPOINT_C_INDEX = 1,
         ENABLED_INDEX = 2,
         KP_INDEX = 3,
