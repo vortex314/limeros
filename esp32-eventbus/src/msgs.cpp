@@ -33,7 +33,7 @@ Result<UdpMessage*> UdpMessage::from_poly(const Poly& value) {
     
             if (!value["msg"].is_null())
                 msg->msg = value["msg"];
-    return Result<UdpMessage*>::Ok(msg);
+    return Result<UdpMessage*>::Ok(msg.release());
 }
 
 Result<Bytes> UdpMessage::json_serialize(const UdpMessage& msg)  {
@@ -119,7 +119,7 @@ Result<UdpMessageCbor*> UdpMessageCbor::from_poly(const Poly& value) {
     
             if (!value["msg"].is_null())
                 msg->msg = value["msg"];
-    return Result<UdpMessageCbor*>::Ok(msg);
+    return Result<UdpMessageCbor*>::Ok(msg.release());
 }
 
 Result<Bytes> UdpMessageCbor::json_serialize(const UdpMessageCbor& msg)  {
@@ -216,7 +216,7 @@ Result<AliveEvent*> AliveEvent::from_poly(const Poly& value) {
                     msg->services.push_back(item.as_string());
                 }
             }
-    return Result<AliveEvent*>::Ok(msg);
+    return Result<AliveEvent*>::Ok(msg.release());
 }
 
 Result<Bytes> AliveEvent::json_serialize(const AliveEvent& msg)  {
@@ -332,7 +332,7 @@ Result<LogEvent*> LogEvent::from_poly(const Poly& value) {
                     msg->timestamp = static_cast<uint64_t>(value["timestamp"].as_uint64());
                 }
             }
-    return Result<LogEvent*>::Ok(msg);
+    return Result<LogEvent*>::Ok(msg.release());
 }
 
 Result<Bytes> LogEvent::json_serialize(const LogEvent& msg)  {
@@ -409,7 +409,7 @@ Result<SysRequest*> SysRequest::from_poly(const Poly& value) {
     
             if (value["console"].is_string())
                 msg->console = value["console"].as_string();
-    return Result<SysRequest*>::Ok(msg);
+    return Result<SysRequest*>::Ok(msg.release());
 }
 
 Result<Bytes> SysRequest::json_serialize(const SysRequest& msg)  {
@@ -476,7 +476,7 @@ Result<SysReply*> SysReply::from_poly(const Poly& value) {
     
             if (value["message"].is_string())
                 msg->message = value["message"].as_string();
-    return Result<SysReply*>::Ok(msg);
+    return Result<SysReply*>::Ok(msg.release());
 }
 
 Result<Bytes> SysReply::json_serialize(const SysReply& msg)  {
@@ -562,7 +562,7 @@ Result<SysEvent*> SysEvent::from_poly(const Poly& value) {
     
             if (value["build_date"].is_string())
                 msg->build_date = value["build_date"].as_string();
-    return Result<SysEvent*>::Ok(msg);
+    return Result<SysEvent*>::Ok(msg.release());
 }
 
 Result<Bytes> SysEvent::json_serialize(const SysEvent& msg)  {
@@ -655,7 +655,7 @@ Result<WifiEvent*> WifiEvent::from_poly(const Poly& value) {
     
             if (value["netmask"].is_string())
                 msg->netmask = value["netmask"].as_string();
-    return Result<WifiEvent*>::Ok(msg);
+    return Result<WifiEvent*>::Ok(msg.release());
 }
 
 Result<Bytes> WifiEvent::json_serialize(const WifiEvent& msg)  {
@@ -734,7 +734,7 @@ Result<MulticastEvent*> MulticastEvent::from_poly(const Poly& value) {
                     msg->mtu = static_cast<uint32_t>(value["mtu"].as_uint64());
                 }
             }
-    return Result<MulticastEvent*>::Ok(msg);
+    return Result<MulticastEvent*>::Ok(msg.release());
 }
 
 Result<Bytes> MulticastEvent::json_serialize(const MulticastEvent& msg)  {
@@ -794,7 +794,7 @@ Result<PingRequest*> PingRequest::from_poly(const Poly& value) {
                     msg->number = static_cast<uint32_t>(value["number"].as_uint64());
                 }
             }
-    return Result<PingRequest*>::Ok(msg);
+    return Result<PingRequest*>::Ok(msg.release());
 }
 
 Result<Bytes> PingRequest::json_serialize(const PingRequest& msg)  {
@@ -851,7 +851,7 @@ Result<PingReply*> PingReply::from_poly(const Poly& value) {
                     msg->number = static_cast<uint32_t>(value["number"].as_uint64());
                 }
             }
-    return Result<PingReply*>::Ok(msg);
+    return Result<PingReply*>::Ok(msg.release());
 }
 
 Result<Bytes> PingReply::json_serialize(const PingReply& msg)  {
@@ -1304,7 +1304,7 @@ Result<HoverboardEventRaw*> HoverboardEventRaw::from_poly(const Poly& value) {
                     msg->temp = static_cast<int32_t>(value["temp"].as_uint64());
                 }
             }
-    return Result<HoverboardEventRaw*>::Ok(msg);
+    return Result<HoverboardEventRaw*>::Ok(msg.release());
 }
 
 Result<Bytes> HoverboardEventRaw::json_serialize(const HoverboardEventRaw& msg)  {
@@ -1864,7 +1864,7 @@ Result<HoverboardEvent*> HoverboardEvent::from_poly(const Poly& value) {
     
             if (value["temp"].is_float())
                 msg->temp = static_cast<float>(value["temp"].as_double());
-    return Result<HoverboardEvent*>::Ok(msg);
+    return Result<HoverboardEvent*>::Ok(msg.release());
 }
 
 Result<Bytes> HoverboardEvent::json_serialize(const HoverboardEvent& msg)  {
@@ -2062,7 +2062,7 @@ Result<HoverboardRequest*> HoverboardRequest::from_poly(const Poly& value) {
                     msg->steer = static_cast<int32_t>(value["steer"].as_uint64());
                 }
             }
-    return Result<HoverboardRequest*>::Ok(msg);
+    return Result<HoverboardRequest*>::Ok(msg.release());
 }
 
 Result<Bytes> HoverboardRequest::json_serialize(const HoverboardRequest& msg)  {
@@ -2126,7 +2126,7 @@ Result<HoverboardReply*> HoverboardReply::from_poly(const Poly& value) {
     
             if (value["message"].is_string())
                 msg->message = value["message"].as_string();
-    return Result<HoverboardReply*>::Ok(msg);
+    return Result<HoverboardReply*>::Ok(msg.release());
 }
 
 Result<Bytes> HoverboardReply::json_serialize(const HoverboardReply& msg)  {
@@ -2199,7 +2199,7 @@ Result<TouchPoint*> TouchPoint::from_poly(const Poly& value) {
                     msg->y = static_cast<int32_t>(value["y"].as_uint64());
                 }
             }
-    return Result<TouchPoint*>::Ok(msg);
+    return Result<TouchPoint*>::Ok(msg.release());
 }
 
 Result<Bytes> TouchPoint::json_serialize(const TouchPoint& msg)  {
@@ -2436,7 +2436,7 @@ Result<Ps4Event*> Ps4Event::from_poly(const Poly& value) {
                     msg->temp = static_cast<int32_t>(value["temp"].as_uint64());
                 }
             }
-    return Result<Ps4Event*>::Ok(msg);
+    return Result<Ps4Event*>::Ok(msg.release());
 }
 
 Result<Bytes> Ps4Event::json_serialize(const Ps4Event& msg)  {
@@ -2640,7 +2640,7 @@ Result<Ps4Request*> Ps4Request::from_poly(const Poly& value) {
                     msg->led_flash_off = static_cast<int32_t>(value["led_flash_off"].as_uint64());
                 }
             }
-    return Result<Ps4Request*>::Ok(msg);
+    return Result<Ps4Request*>::Ok(msg.release());
 }
 
 Result<Bytes> Ps4Request::json_serialize(const Ps4Request& msg)  {
@@ -2737,7 +2737,7 @@ Result<CameraEvent*> CameraEvent::from_poly(const Poly& value) {
                     msg->quality = static_cast<int32_t>(value["quality"].as_uint64());
                 }
             }
-    return Result<CameraEvent*>::Ok(msg);
+    return Result<CameraEvent*>::Ok(msg.release());
 }
 
 Result<Bytes> CameraEvent::json_serialize(const CameraEvent& msg)  {
@@ -2815,7 +2815,7 @@ Result<CameraRequest*> CameraRequest::from_poly(const Poly& value) {
                     msg->quality = static_cast<int32_t>(value["quality"].as_uint64());
                 }
             }
-    return Result<CameraRequest*>::Ok(msg);
+    return Result<CameraRequest*>::Ok(msg.release());
 }
 
 Result<Bytes> CameraRequest::json_serialize(const CameraRequest& msg)  {
@@ -2887,7 +2887,7 @@ Result<CameraReply*> CameraReply::from_poly(const Poly& value) {
     
             if (value["data"].is_string())
                 msg->data = base64_decode(value["data"].as_string());
-    return Result<CameraReply*>::Ok(msg);
+    return Result<CameraReply*>::Ok(msg.release());
 }
 
 Result<Bytes> CameraReply::json_serialize(const CameraReply& msg)  {
@@ -2955,7 +2955,7 @@ Result<LawnmowerManualEvent*> LawnmowerManualEvent::from_poly(const Poly& value)
     
             if (value["blade"].is_bool())
                 msg->blade = value["blade"].as_bool();
-    return Result<LawnmowerManualEvent*>::Ok(msg);
+    return Result<LawnmowerManualEvent*>::Ok(msg.release());
 }
 
 Result<Bytes> LawnmowerManualEvent::json_serialize(const LawnmowerManualEvent& msg)  {
@@ -3038,7 +3038,7 @@ Result<LawnmowerManualRequest*> LawnmowerManualRequest::from_poly(const Poly& va
     
             if (value["stop_auto_mode"].is_bool())
                 msg->stop_auto_mode = value["stop_auto_mode"].as_bool();
-    return Result<LawnmowerManualRequest*>::Ok(msg);
+    return Result<LawnmowerManualRequest*>::Ok(msg.release());
 }
 
 Result<Bytes> LawnmowerManualRequest::json_serialize(const LawnmowerManualRequest& msg)  {
@@ -3120,7 +3120,7 @@ Result<LawnmowerManualReply*> LawnmowerManualReply::from_poly(const Poly& value)
     
             if (value["message"].is_string())
                 msg->message = value["message"].as_string();
-    return Result<LawnmowerManualReply*>::Ok(msg);
+    return Result<LawnmowerManualReply*>::Ok(msg.release());
 }
 
 Result<Bytes> LawnmowerManualReply::json_serialize(const LawnmowerManualReply& msg)  {
@@ -3186,7 +3186,7 @@ Result<LawnmowerAutoEvent*> LawnmowerAutoEvent::from_poly(const Poly& value) {
     
             if (value["path"].is_string())
                 msg->path = value["path"].as_string();
-    return Result<LawnmowerAutoEvent*>::Ok(msg);
+    return Result<LawnmowerAutoEvent*>::Ok(msg.release());
 }
 
 Result<Bytes> LawnmowerAutoEvent::json_serialize(const LawnmowerAutoEvent& msg)  {
@@ -3270,7 +3270,7 @@ Result<LawnmowerAutoRequest*> LawnmowerAutoRequest::from_poly(const Poly& value)
     
             if (value["path"].is_string())
                 msg->path = value["path"].as_string();
-    return Result<LawnmowerAutoRequest*>::Ok(msg);
+    return Result<LawnmowerAutoRequest*>::Ok(msg.release());
 }
 
 Result<Bytes> LawnmowerAutoRequest::json_serialize(const LawnmowerAutoRequest& msg)  {
@@ -3345,7 +3345,7 @@ Result<LawnmowerStatus*> LawnmowerStatus::from_poly(const Poly& value) {
     
             if (value["error_message"].is_string())
                 msg->error_message = value["error_message"].as_string();
-    return Result<LawnmowerStatus*>::Ok(msg);
+    return Result<LawnmowerStatus*>::Ok(msg.release());
 }
 
 Result<Bytes> LawnmowerStatus::json_serialize(const LawnmowerStatus& msg)  {
@@ -3419,7 +3419,7 @@ Result<MotorEvent*> MotorEvent::from_poly(const Poly& value) {
     
             if (value["position"].is_float())
                 msg->position = static_cast<float>(value["position"].as_double());
-    return Result<MotorEvent*>::Ok(msg);
+    return Result<MotorEvent*>::Ok(msg.release());
 }
 
 Result<Bytes> MotorEvent::json_serialize(const MotorEvent& msg)  {
@@ -3503,7 +3503,7 @@ Result<Max31855Event*> Max31855Event::from_poly(const Poly& value) {
                     msg->timestamp_ms = static_cast<uint64_t>(value["timestamp_ms"].as_uint64());
                 }
             }
-    return Result<Max31855Event*>::Ok(msg);
+    return Result<Max31855Event*>::Ok(msg.release());
 }
 
 Result<Bytes> Max31855Event::json_serialize(const Max31855Event& msg)  {
@@ -3590,7 +3590,7 @@ Result<HeatingRequest*> HeatingRequest::from_poly(const Poly& value) {
     
             if (value["reset_integral"].is_bool())
                 msg->reset_integral = value["reset_integral"].as_bool();
-    return Result<HeatingRequest*>::Ok(msg);
+    return Result<HeatingRequest*>::Ok(msg.release());
 }
 
 Result<Bytes> HeatingRequest::json_serialize(const HeatingRequest& msg)  {
@@ -3677,7 +3677,7 @@ Result<HeatingEvent*> HeatingEvent::from_poly(const Poly& value) {
                     msg->timestamp_ms = static_cast<uint64_t>(value["timestamp_ms"].as_uint64());
                 }
             }
-    return Result<HeatingEvent*>::Ok(msg);
+    return Result<HeatingEvent*>::Ok(msg.release());
 }
 
 Result<Bytes> HeatingEvent::json_serialize(const HeatingEvent& msg)  {

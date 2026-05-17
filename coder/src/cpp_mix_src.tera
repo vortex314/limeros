@@ -117,7 +117,7 @@ Result<{{msg.name}}*> {{msg.name}}::from_poly(const Poly& value) {
             }
         {%- endif %}
     {% endfor -%}
-    return Result<{{msg.name}}*>::Ok(msg);
+    return Result<{{msg.name}}*>::Ok(msg.release());
 }
 
 Result<Bytes> {{msg.name}}::json_serialize(const {{msg.name}}& msg)  {
