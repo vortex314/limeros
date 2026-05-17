@@ -219,6 +219,7 @@ private:
     ActorRef _self;
     Timers _timers;
     EventBus *_eventbus = nullptr;
+    std::vector<const char *> _interests; // message type names this actor handles
 
 public:
     Actor(const char *name) : _self(name) { _self.set_local(true); };
@@ -229,6 +230,25 @@ public:
     virtual void on_message(const Envelope &env)
     {
         WARN(" No message handler for actor %s ", _self.name());
+    }
+
+    /// Declare that this actor handles messages of the given type name.
+    /// Call in the constructor. If no interests are registered, the actor
+    /// receives all messages (backward-compatible default).
+    void add_interest(const char *type_name) { _interests.push_back(type_name); }
+
+    /// Returns true if this actor should receive messages of the given type.
+    /// An empty interest list means "accept all".
+    bool accepts(const char *type_name) const
+    {
+        if (_interests.empty())
+            return true;
+        for (auto &interest : _interests)
+        {
+            if (strcmp(interest, type_name) == 0)
+                return true;
+        }
+        return false;
     }
     std::vector<int> get_expired_timers() { return _timers.get_expired_timers(); }
     Timers &timers() { return _timers; }
@@ -262,7 +282,15 @@ public:
 
 /*
 
-A thread is created to manage multiple actors. The thread will wait for the actor with the lowest sleep time and handle the command or timer event.
+A thread is created to manage multiple actors. The thread will wait for the
+actor with the lowest sleep time and handle the command or timer event.
+
+NOTE: The `Thread` class is currently unused in production. `main.cpp` runs
+a single-threaded `EventBus::loop()` in `app_main` which fans messages to all
+actors sequentially. The `Thread` infrastructure (per-actor FreeRTOS queues
+with `QueueSet` multiplexing) is available for actors that need isolation
+(e.g., blocking I/O, OTA writes) but has not yet been adopted. Evaluate
+whether to adopt it or remove it before adding new actors.
 
 */
 

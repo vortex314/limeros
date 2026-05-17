@@ -13,6 +13,20 @@ pub trait Msg  : Send + Sync {
     fn json_deserialize(v:&Vec<u8>) -> Result<Self> where Self : Sized;
     fn from_value(v:serde_json::Value) -> Result<Self> where Self : Sized;
     fn to_value(&self) -> Result<serde_json::Value> where Self : Sized;
+
+    /// CBOR serialization (available with `cbor` feature flag).
+    /// Default implementation delegates to JSON; override for compact CBOR encoding.
+    #[cfg(feature = "cbor")]
+    fn cbor_serialize(&self) -> Result<Vec<u8>> {
+        self.json_serialize()
+    }
+
+    /// CBOR deserialization (available with `cbor` feature flag).
+    /// Default implementation delegates to JSON; override for compact CBOR decoding.
+    #[cfg(feature = "cbor")]
+    fn cbor_deserialize(v: &Vec<u8>) -> Result<Self> where Self : Sized {
+        Self::json_deserialize(v)
+    }
 }
 
 
@@ -74,50 +88,30 @@ pub enum LawnmowerMode {
 
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct AliveEvent {
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub subscribes: Option<Vec<String>>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub publishes: Option<Vec<String>>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub services: Option<Vec<String>>,
-}
-
-impl TypedMessage for AliveEvent {
-    const ID: u32 = 64775;
-    const MSG_TYPE: &'static str = "AliveEvent";
-}
-
-impl Msg for AliveEvent {
-    fn type_name(&self) -> &'static str {<Self as TypedMessage>::MSG_TYPE}
-    fn type_id(&self) -> u32 {<Self as TypedMessage>::ID}
-    fn json_serialize(&self) -> Result<Vec<u8>> {Ok(serde_json::to_vec(self) ?)}
-    fn json_deserialize(v:& Vec<u8>) -> Result<Self> where Self : Sized {Ok(serde_json::from_slice(v.as_slice()) ?)}
-    fn from_value(v:serde_json::Value) -> Result<Self> where Self : Sized {Ok(serde_json::from_value(v) ?)}
-    fn to_value(&self) -> Result<serde_json::Value> where Self : Sized {Ok(serde_json::to_value(self) ?)}
-}
-    
-
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct Value {
+pub struct Poly {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub typ: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub data: Option<Vec<u8>>,
 }
 
-impl TypedMessage for Value {
-    const ID: u32 = 50775;
-    const MSG_TYPE: &'static str = "Value";
+impl TypedMessage for Poly {
+    const ID: u32 = 30006;
+    const MSG_TYPE: &'static str = "Poly";
 }
 
-impl Msg for Value {
+impl Msg for Poly {
     fn type_name(&self) -> &'static str {<Self as TypedMessage>::MSG_TYPE}
     fn type_id(&self) -> u32 {<Self as TypedMessage>::ID}
     fn json_serialize(&self) -> Result<Vec<u8>> {Ok(serde_json::to_vec(self) ?)}
     fn json_deserialize(v:& Vec<u8>) -> Result<Self> where Self : Sized {Ok(serde_json::from_slice(v.as_slice()) ?)}
     fn from_value(v:serde_json::Value) -> Result<Self> where Self : Sized {Ok(serde_json::from_value(v) ?)}
     fn to_value(&self) -> Result<serde_json::Value> where Self : Sized {Ok(serde_json::to_value(self) ?)}
+
+    #[cfg(feature = "cbor")]
+    fn cbor_serialize(&self) -> Result<Vec<u8>> {Ok(serde_cbor::to_vec(self) ?)}
+    #[cfg(feature = "cbor")]
+    fn cbor_deserialize(v:& Vec<u8>) -> Result<Self> where Self : Sized {Ok(serde_cbor::from_slice(v.as_slice()) ?)}
 }
     
 
@@ -166,6 +160,36 @@ impl TypedMessage for UdpMessageCbor {
 }
 
 impl Msg for UdpMessageCbor {
+    fn type_name(&self) -> &'static str {<Self as TypedMessage>::MSG_TYPE}
+    fn type_id(&self) -> u32 {<Self as TypedMessage>::ID}
+    fn json_serialize(&self) -> Result<Vec<u8>> {Ok(serde_json::to_vec(self) ?)}
+    fn json_deserialize(v:& Vec<u8>) -> Result<Self> where Self : Sized {Ok(serde_json::from_slice(v.as_slice()) ?)}
+    fn from_value(v:serde_json::Value) -> Result<Self> where Self : Sized {Ok(serde_json::from_value(v) ?)}
+    fn to_value(&self) -> Result<serde_json::Value> where Self : Sized {Ok(serde_json::to_value(self) ?)}
+
+    #[cfg(feature = "cbor")]
+    fn cbor_serialize(&self) -> Result<Vec<u8>> {Ok(serde_cbor::to_vec(self) ?)}
+    #[cfg(feature = "cbor")]
+    fn cbor_deserialize(v:& Vec<u8>) -> Result<Self> where Self : Sized {Ok(serde_cbor::from_slice(v.as_slice()) ?)}
+}
+    
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct AliveEvent {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub subscribes: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub publishes: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub services: Option<Vec<String>>,
+}
+
+impl TypedMessage for AliveEvent {
+    const ID: u32 = 64775;
+    const MSG_TYPE: &'static str = "AliveEvent";
+}
+
+impl Msg for AliveEvent {
     fn type_name(&self) -> &'static str {<Self as TypedMessage>::MSG_TYPE}
     fn type_id(&self) -> u32 {<Self as TypedMessage>::ID}
     fn json_serialize(&self) -> Result<Vec<u8>> {Ok(serde_json::to_vec(self) ?)}

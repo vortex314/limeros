@@ -353,7 +353,10 @@ void EventBus::loop()
             }
             for (Actor *actor : _actors)
             {
-                actor->on_message(*pmsg);
+                if (actor->accepts(pmsg->msg->type_name()))
+                {
+                    actor->on_message(*pmsg);
+                }
             }
             delete pmsg;
         }
