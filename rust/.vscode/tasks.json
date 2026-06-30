@@ -26,7 +26,7 @@
             }
         },
         {
-            "label": "cargo",
+            "label": "client",
             "type": "shell",
             "options": {
                 "cwd": "${workspaceFolder}",
@@ -41,7 +41,7 @@
             ],
             "group": {
                 "kind": "build",
-   //             "isDefault": true
+                "isDefault": true
             },
             "presentation": {
                 "clear": true                        // <-- this line

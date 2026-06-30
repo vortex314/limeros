@@ -9,7 +9,7 @@ use tokio::net::UdpSocket;
 use tokio::task::JoinHandle;
 
 
-use crate::msgs::{AliveEvent, Msg, UdpMessage};
+use crate::msgs::{DeviceAliveEvent, Msg, UdpMessage};
 
 // --- CONSTANTS ---
 pub const MULTICAST_PORT: u16 = 50000;
@@ -37,7 +37,7 @@ pub struct Endpoint {
 pub struct Scout {
     multicast_addr: SocketAddr,
     multicast_socket: Arc<UdpSocket>,
-    pub endpoints: Arc<DashMap<String, Endpoint>>,
+    pub endpoints: Arc<DashMap<u32, Endpoint>>,
     pub subscriptions: Arc<DashMap<String, Vec<Subscription>>>,
 }
 
@@ -73,38 +73,39 @@ impl Scout {
 
     pub(crate) fn handle_multicast_packet(&self, data: &[u8], addr: SocketAddr) -> Result<()> {
         let data_vec = data.to_vec();
-        let udp_message = UdpMessage::json_deserialize(&data_vec)?;
+        let udp_message = UdpMessage::from_bytes(&data_vec)?;
 
         info!(
             "MC Recv {:?} from {:?}",
-            udp_message.typ, udp_message.src
+            udp_message.msg_typ, udp_message.src
         );
 
-        if Some("AliveEvent") != udp_message.typ.as_deref() {
+        if Some(DeviceAliveEvent::ID) != udp_message.msg_typ {
             return Ok(());
         }
 
         let src = udp_message
             .src
             .clone()
-            .unwrap_or_else(|| "unknown".to_string());
+            .unwrap_or_else(|| 0);
         let payload = udp_message
-            .msg
+            .payload
             .as_ref()
             .ok_or_else(|| anyhow::anyhow!("AliveEvent message missing payload"))?;
 
     //    let subscriptions = self.subscriptions.clone();
 
-        let alive = AliveEvent::from_value(payload.clone())?;
-        let subscribe = alive.subscribes.clone().unwrap_or_default();
-        let publish = alive.publishes.clone().unwrap_or_default();
-        let services = alive.services.clone().unwrap_or_default();
+        let alive = DeviceAliveEvent::from_bytes(&payload.clone())?;
+        let subscribe = alive.subscribes.clone();
+        let publish = alive.publishes.clone();
+        let services = alive.requests.clone();
+        let id = alive.device_id.clone();
 
         // Update endpoint
         self.endpoints.insert(
             src.clone(),
             Endpoint {
-                name: src.clone(),
+                name: id.unwrap_or_else(|| "unknown".to_string()),
                 addr,
                 last_seen: Instant::now(),
                 subscribe: subscribe.clone(),
@@ -114,7 +115,7 @@ impl Scout {
         );
 
         // Update subscriptions
-        if let Some(subs) = alive.subscribes.as_ref() {
+        if let subs = alive.subscribes {
             for sub in subs {
                 let subscription = Subscription {
                     event_pattern: sub.clone(),
@@ -211,8 +212,8 @@ impl Scout {
         })
     }
 
-    pub fn endpoint_to_addr(&self, endpoint: &str) -> Option<SocketAddr> {
-        if let Some(entry) = self.endpoints.get(endpoint) {
+    pub fn endpoint_to_addr(&self, endpoint: u32) -> Option<SocketAddr> {
+        if let Some(entry) = self.endpoints.get(&endpoint) {
             Some(entry.value().addr)
         } else {
             None

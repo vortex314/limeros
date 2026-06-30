@@ -4,16 +4,21 @@ use anyhow::Result;
 use eframe::egui::{self, Slider};
 use ehmi::Bar;
 use limeros::{
-    Msg, UdpMessage, UdpNode, msgs::{HeatingEvent, HeatingRequest, TypedMessage}
+    Msg, TypedMessage, UdpMessage, UdpNode,
+    msgs::{HeatingEvent, HeatingRequest},
 };
 use tokio::sync::mpsc::{Receiver, Sender};
 
-use crate::{my_window::MyWindow, widget_alive::WidgetAlive};
+use crate::{
+    my_window::{EndpointWindowContext, MyWindow, Supports, WindowRegistration},
+    widget_alive::WidgetAlive,
+};
 
-const MAX_UPDATE_INTERVAL_MS: u128 = 10000;
+const MAX_UPDATE_INTERVAL_MS: u128 = 10_000;
 
 pub struct WindowHeater {
     node: Arc<UdpNode>,
+    source: Option<String>,
     open: bool,
     enabled: bool,
     setpoint_c: f32,
@@ -30,16 +35,25 @@ pub struct WindowHeater {
     heater_on: bool,
     fault: bool,
     last_update: Instant,
-    sender: Sender<UdpMessage>,
+    _sender: Sender<UdpMessage>,
     receiver: Receiver<UdpMessage>,
 }
 
 impl WindowHeater {
     pub fn new(node: Arc<UdpNode>) -> Self {
+        Self::from_source(node, None)
+    }
+
+    pub fn for_source(node: Arc<UdpNode>, source: impl Into<String>) -> Self {
+        Self::from_source(node, Some(source.into()))
+    }
+
+    fn from_source(node: Arc<UdpNode>, source: Option<String>) -> Self {
         let (sender, receiver) = tokio::sync::mpsc::channel(100);
         node.add_sender(sender.clone());
         Self {
             node,
+            source,
             open: true,
             enabled: false,
             setpoint_c: 0.0,
@@ -56,18 +70,38 @@ impl WindowHeater {
             heater_on: false,
             fault: false,
             last_update: Instant::now(),
-            sender,
+            _sender: sender,
             receiver,
         }
     }
 
+    pub fn supports_config() -> Supports {
+        Supports {
+            publishes: vec![HeatingRequest::NAME.to_string()],
+            subscribes: vec![HeatingEvent::NAME.to_string()],
+            ..Default::default()
+        }
+    }
+
+    pub fn registration() -> WindowRegistration {
+        WindowRegistration::endpoint(
+            "heater",
+            "Heater",
+            Self::supports_config,
+            |ctx: EndpointWindowContext| Box::new(Self::for_source(ctx.node, ctx.source)),
+        )
+    }
+
     fn handle_event(&mut self) {
         while let Ok(udp_msg) = self.receiver.try_recv() {
+            if udp_msg.src.as_deref() != self.source.as_deref() {
+                continue;
+            }
             if udp_msg.typ.as_deref() != Some(HeatingEvent::MSG_TYPE) {
                 continue;
             }
-            if let Some(payload) = udp_msg.msg {
-                if let Ok(event) = HeatingEvent::from_value(payload) {
+            if let Some(payload) = udp_msg.msg.as_ref() {
+                if let Ok(event) = HeatingEvent::from_value(payload.clone()) {
                     self.last_update = Instant::now();
                     if let Some(value) = event.temperature_c {
                         self.temperature_c = value;
@@ -104,7 +138,7 @@ impl WindowHeater {
             return;
         }
 
-        let payload = HeatingRequest {
+        let req = HeatingRequest {
             setpoint_c: Some(self.setpoint_c),
             enabled: Some(self.enabled),
             kp: Some(self.kp),
@@ -112,12 +146,13 @@ impl WindowHeater {
             kd: Some(self.kd),
             ..Default::default()
         };
+        let payload = req.to_value().unwrap();
 
         let _ = self.node.sender().try_send(UdpMessage {
-            dst: Some("heater".to_string()),
-            src: Some("egui-monitor".to_string()),
+            dst: self.source.clone(),
+            src: None,
             typ: Some(HeatingRequest::MSG_TYPE.to_string()),
-            msg: payload.to_value().ok(),
+            msg: Some(payload),
         });
 
         self.setpoint_previous = self.setpoint_c;
@@ -198,7 +233,12 @@ impl MyWindow for WindowHeater {
 
     fn show(&mut self, ui: &mut egui::Ui) -> Result<()> {
         let mut open = self.open;
-        egui::Window::new(self.name())
+        let title = self
+            .source
+            .as_ref()
+            .map(|source| format!("{} [{}]", self.name(), source))
+            .unwrap_or_else(|| self.name().to_string());
+        egui::Window::new(title)
             .open(&mut open)
             .resizable([true, true])
             .default_size([500.0, 240.0])
@@ -212,5 +252,9 @@ impl MyWindow for WindowHeater {
 
     fn is_closed(&self) -> bool {
         !self.open
+    }
+
+    fn supports(&self) -> Option<Supports> {
+        Some(Self::supports_config())
     }
 }

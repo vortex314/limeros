@@ -1,0 +1,14 @@
+- a UDP broker that supports routing based on subscriptions and translations of id's to strings
+- it parses the UdpMessage
+- it has a cache of integer->string mappings , where the integer was the FNV32 hash of the string
+- it supports subscribe messages based on id or string in the src,dst or message_type
+- the dictionary is initialzized from file and regularly saved to file in a simple csv format
+- it listens to a well-known UDP port for multicast messages of devices
+- it is very low latency on id based routing 
+- it is mapping to string-based for logging and metrics processing by subscribers 
+- it supports the SubscribeRequest for FNV id's or String, when it is string based , then the format is string, otherwise the original message remains binary
+- it emits its own metrics BrokerEvent
+- it handles self BrokerRequest : - add_word, 
+    - subscribe FNV id for src,dst,msg_type
+    - subscribe string for src,dst,msg_type ( wildcard add_on ) 
+- ConfigInfo 

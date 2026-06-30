@@ -2,6 +2,7 @@ use dashmap::DashMap;
 use eframe::egui::{self};
 use limeros::{
     eventbus::{as_message, Bus},
+    msgs::{HoverboardEvent, Msg, SysEvent, TypedMessage, WifiEvent},
     logger, AliveEvent, Endpoint, UdpMessage, UdpMessageHandler, UdpNode,
 };
 use log::info;
@@ -21,11 +22,10 @@ mod window_heater;
 mod window_hoverboard;
 mod window_max31855;
 mod window_plot;
+mod window_registry;
 use limeros::eventbus::ActorImpl;
 use limeros::eventbus::Eventbus;
 use window_heater::WindowHeater;
-use window_hoverboard::HoverboardWindow;
-use window_max31855::WindowMax31855;
 
 mod widget_alive;
 use rand::prelude::*;
@@ -59,8 +59,6 @@ struct UdpMonitorApp {
     graph_data: Arc<DashMap<String, MetricData>>,
     selected_fields: HashSet<String>,
     window_heater: WindowHeater,
-    window_hoverboard: HoverboardWindow,
-    window_max31855: WindowMax31855,
     window_events: window_events::WindowEvents,
     window_endpoints: window_endpoints::WindowEndpoints,
     window_others: Arc<DashMap<String, Box<dyn MyWindow>>>,
@@ -85,16 +83,20 @@ impl UdpMonitorApp {
             bus: bus.clone(),
             cache: cache.clone(),
             window_events: WindowEvents::new(
+                node.clone(),
                 cache.clone(),
+                endpoints.clone(),
                 window_others.clone(),
                 graph_data.clone(),
             ),
-            window_endpoints: WindowEndpoints::new(node.clone(), endpoints.clone()),
+            window_endpoints: WindowEndpoints::new(
+                node.clone(),
+                endpoints.clone(),
+                window_others.clone(),
+            ),
             graph_data: graph_data.clone(),
             selected_fields: HashSet::new(),
             window_heater: WindowHeater::new(node.clone()),
-            window_hoverboard: HoverboardWindow::new(node.clone()),
-            window_max31855: WindowMax31855::new(node.clone()),
             window_others: window_others.clone(),
         }
     }
@@ -114,17 +116,16 @@ impl eframe::App for UdpMonitorApp {
             self.window_heater
                 .show(ui)
                 .expect("Failed to show Heater window");
-            self.window_hoverboard
-                .show(ui)
-                .expect("Failed to show Hoverboard window");
-            self.window_max31855
-                .show(ui)
-                .expect("Failed to show Max31855 window");
+
+            let mut closed_windows = Vec::new();
             for mut window in self.window_others.iter_mut() {
                 window.show(ui).expect("Failed to show other window");
                 if window.is_closed() {
-                    self.window_others.remove(window.key());
+                    closed_windows.push(window.key().clone());
                 }
+            }
+            for key in closed_windows {
+                self.window_others.remove(&key);
             }
         });
 
@@ -150,16 +151,11 @@ struct GuiHandler {
 #[async_trait::async_trait]
 impl UdpMessageHandler for GuiHandler {
     async fn handle(&self, udp_message: &UdpMessage) -> anyhow::Result<()> {
-        // Parse the payload (assuming JSON as per your UdpNode implementation)
-        let fields = if let Some(payload) = &udp_message.msg {
-            let v: serde_json::Value = payload.clone();
+        let fields: Vec<(String, String)> = if let Some(v) = &udp_message.msg {
             if let serde_json::Value::Object(map) = v {
-                map.into_iter().map(|(k, v)| (k, v.to_string())).collect()
+                map.into_iter().map(|(k, v)| (k.clone(), v.to_string())).collect()
             } else {
-                vec![(
-                    "raw".to_string(),
-                    payload.to_string(),
-                )]
+                vec![("raw".to_string(), v.to_string())]
             }
         } else {
             vec![]
@@ -168,8 +164,8 @@ impl UdpMessageHandler for GuiHandler {
         for (field_name, value) in &fields {
             let key = format!(
                 "{}:{}:{}",
-                udp_message.src.clone().unwrap_or_default(),
-                udp_message.typ.clone().unwrap_or_default(),
+                udp_message.src.as_deref().unwrap_or("?"),
+                udp_message.typ.as_deref().unwrap_or("?"),
                 field_name
             );
             let mut record = Record {
@@ -197,8 +193,14 @@ impl UdpMessageHandler for GuiHandler {
             if let Ok(num) = value.parse::<f64>() {
                 let key = format!(
                     "{}:{}:{}",
-                    udp_message.src.as_deref().unwrap_or("?"),
-                    udp_message.typ.as_deref().unwrap_or("?"),
+                    udp_message
+                        .src
+                        .map(|v| v.to_string())
+                        .unwrap_or_else(|| "?".to_string()),
+                    udp_message
+                        .typ
+                        .clone()
+                        .unwrap_or_else(|| "?".to_string()),
                     field_name
                 );
                 let key_clone = key.clone();
@@ -240,7 +242,7 @@ impl ActorImpl for EventbusActor {
 impl UdpMessageHandler for EventbusActor {
     async fn handle(&self, udp_message: &UdpMessage) -> anyhow::Result<()> {
         // deserialize UDP message and emit to eventbus
-        self.eb.emit(udp_message.clone());
+        let _ = self.eb.emit(udp_message.clone());
         Ok(())
     }
 }
@@ -254,7 +256,7 @@ async fn main() -> anyhow::Result<()> {
 
     let eb = Eventbus::new();
 
-    eb.bus().emit(AliveEvent::default());
+    let _ = eb.bus().emit(AliveEvent::default());
 
     let cache = Arc::new(DashMap::new());
     let graph_data = Arc::new(DashMap::new());
@@ -268,10 +270,9 @@ async fn main() -> anyhow::Result<()> {
     let n = UdpNode::new(node_name.as_str(), "239.0.0.1:50000")
         .await
         .unwrap();
-    /*n.add_subscription(SysEvent::MSG_TYPE).await;
+    n.add_subscription(SysEvent::MSG_TYPE).await;
     n.add_subscription(WifiEvent::MSG_TYPE).await;
-    n.add_subscription(HoverboardEvent::MSG_TYPE).await;*/
-    n.add_subscription("*").await;
+    n.add_subscription(HoverboardEvent::MSG_TYPE).await;
     n.add_generic_handler(GuiHandler {
         cache: cache.clone(),
         graph_data: graph_data.clone(),

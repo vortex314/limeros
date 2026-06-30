@@ -3,15 +3,12 @@
 #include <vector>
 #include <cstdint>
 #include <optional>
-#include <ArduinoJson.h>
 #include <cbor.h>
+#include <functional>
+#include <sstream>
 #include <msg.h>
-#include <serdes.h>
-#include <poly.h>
 
 typedef std::vector<uint8_t> Bytes;
-typedef JsonVariant Value;
-typedef poly::Poly Poly;
 
 
 typedef enum {
@@ -64,85 +61,62 @@ typedef enum {
 
 
 
-
-
-
-class UdpMessage : public Msg {
+class UdpMessage : public Msg{
     MSG(UdpMessage);
     public:
-    std::optional<std::string> dst;
-    std::optional<std::string> src;
-    std::optional<std::string> typ;
-    std::optional<Poly> msg;
-    
-    // Field indexes
-        typedef enum {
-        DST_INDEX = 1,
-        SRC_INDEX = 2,
-        TYP_INDEX = 3,
-        MSG_INDEX = 4,
-    } Field;
-    static Result<Bytes> json_serialize(const UdpMessage&);
-    static Result<UdpMessage*> json_deserialize(const Bytes&);
-    static Result<Bytes> cbor_serialize(const UdpMessage&);
-    static Result<UdpMessage*> cbor_deserialize(const Bytes&);
-    static Result<Poly> to_poly(const UdpMessage&);
-    static Result<UdpMessage*> from_poly(const Poly&);
-};
 
-
-
-class UdpMessageCbor : public Msg {
-    MSG(UdpMessageCbor);
-    public:
     std::optional<uint32_t> dst;
     std::optional<uint32_t> src;
-    std::optional<uint32_t> typ;
-    std::optional<Poly> msg;
+    std::optional<uint32_t> msg_typ;
+    std::optional<uint32_t> req_id;
+    std::optional<Bytes> payload;
     
+
     // Field indexes
-        typedef enum {
+    typedef enum {
         DST_INDEX = 1,
         SRC_INDEX = 2,
-        TYP_INDEX = 3,
-        MSG_INDEX = 4,
+        MSG_TYP_INDEX = 3,
+        REQ_ID_INDEX = 4,
+        PAYLOAD_INDEX = 5,
     } Field;
-    static Result<Bytes> json_serialize(const UdpMessageCbor&);
-    static Result<UdpMessageCbor*> json_deserialize(const Bytes&);
-    static Result<Bytes> cbor_serialize(const UdpMessageCbor&);
-    static Result<UdpMessageCbor*> cbor_deserialize(const Bytes&);
-    static Result<Poly> to_poly(const UdpMessageCbor&);
-    static Result<UdpMessageCbor*> from_poly(const Poly&);
+
+    Bytes serialize() const;
+    UdpMessage* deserialize(const Bytes& bytes);
+    std::string to_string() const;
 };
 
-
-
-class AliveEvent : public Msg {
-    MSG(AliveEvent);
+class DeviceAliveEvent : public Msg{
+    MSG(DeviceAliveEvent);
     public:
+
+    std::optional<std::string> device_id;
+    std::vector<std::string> objects;
     std::vector<std::string> subscribes;
     std::vector<std::string> publishes;
-    std::vector<std::string> services;
+    std::vector<std::string> requests;
+    std::vector<std::string> replies;
     
+
     // Field indexes
-        typedef enum {
-        SUBSCRIBES_INDEX = 1,
-        PUBLISHES_INDEX = 2,
-        SERVICES_INDEX = 3,
+    typedef enum {
+        DEVICE_ID_INDEX = 1,
+        OBJECTS_INDEX = 2,
+        SUBSCRIBES_INDEX = 3,
+        PUBLISHES_INDEX = 4,
+        REQUESTS_INDEX = 5,
+        REPLIES_INDEX = 6,
     } Field;
-    static Result<Bytes> json_serialize(const AliveEvent&);
-    static Result<AliveEvent*> json_deserialize(const Bytes&);
-    static Result<Bytes> cbor_serialize(const AliveEvent&);
-    static Result<AliveEvent*> cbor_deserialize(const Bytes&);
-    static Result<Poly> to_poly(const AliveEvent&);
-    static Result<AliveEvent*> from_poly(const Poly&);
+
+    Bytes serialize() const;
+    DeviceAliveEvent* deserialize(const Bytes& bytes);
+    std::string to_string() const;
 };
 
-
-
-class LogEvent : public Msg {
+class LogEvent : public Msg{
     MSG(LogEvent);
     public:
+
     std::optional<LogLevel> level;
     std::optional<std::string> message;
     std::optional<int32_t> error_code;
@@ -150,8 +124,9 @@ class LogEvent : public Msg {
     std::optional<int32_t> line;
     std::optional<uint64_t> timestamp;
     
+
     // Field indexes
-        typedef enum {
+    typedef enum {
         LEVEL_INDEX = 2,
         MESSAGE_INDEX = 3,
         ERROR_CODE_INDEX = 4,
@@ -159,67 +134,60 @@ class LogEvent : public Msg {
         LINE_INDEX = 6,
         TIMESTAMP_INDEX = 7,
     } Field;
-    static Result<Bytes> json_serialize(const LogEvent&);
-    static Result<LogEvent*> json_deserialize(const Bytes&);
-    static Result<Bytes> cbor_serialize(const LogEvent&);
-    static Result<LogEvent*> cbor_deserialize(const Bytes&);
-    static Result<Poly> to_poly(const LogEvent&);
-    static Result<LogEvent*> from_poly(const Poly&);
+
+    Bytes serialize() const;
+    LogEvent* deserialize(const Bytes& bytes);
+    std::string to_string() const;
 };
 
-
-
-class SysRequest : public Msg {
+class SysRequest : public Msg{
     MSG(SysRequest);
     public:
+
     std::optional<uint32_t> req_id;
     std::optional<uint64_t> set_time;
     std::optional<bool> reboot;
     std::optional<std::string> console;
     
+
     // Field indexes
-        typedef enum {
+    typedef enum {
         REQ_ID_INDEX = 0,
         SET_TIME_INDEX = 1,
         REBOOT_INDEX = 2,
         CONSOLE_INDEX = 3,
     } Field;
-    static Result<Bytes> json_serialize(const SysRequest&);
-    static Result<SysRequest*> json_deserialize(const Bytes&);
-    static Result<Bytes> cbor_serialize(const SysRequest&);
-    static Result<SysRequest*> cbor_deserialize(const Bytes&);
-    static Result<Poly> to_poly(const SysRequest&);
-    static Result<SysRequest*> from_poly(const Poly&);
+
+    Bytes serialize() const;
+    SysRequest* deserialize(const Bytes& bytes);
+    std::string to_string() const;
 };
 
-
-
-class SysReply : public Msg {
+class SysReply : public Msg{
     MSG(SysReply);
     public:
+
     std::optional<uint32_t> req_id;
     std::optional<int32_t> rc;
     std::optional<std::string> message;
     
+
     // Field indexes
-        typedef enum {
+    typedef enum {
         REQ_ID_INDEX = 0,
         RC_INDEX = 1,
         MESSAGE_INDEX = 2,
     } Field;
-    static Result<Bytes> json_serialize(const SysReply&);
-    static Result<SysReply*> json_deserialize(const Bytes&);
-    static Result<Bytes> cbor_serialize(const SysReply&);
-    static Result<SysReply*> cbor_deserialize(const Bytes&);
-    static Result<Poly> to_poly(const SysReply&);
-    static Result<SysReply*> from_poly(const Poly&);
+
+    Bytes serialize() const;
+    SysReply* deserialize(const Bytes& bytes);
+    std::string to_string() const;
 };
 
-
-
-class SysEvent : public Msg {
+class SysEvent : public Msg{
     MSG(SysEvent);
     public:
+
     std::optional<uint64_t> utc;
     std::optional<uint64_t> uptime;
     std::optional<uint64_t> free_heap;
@@ -227,8 +195,9 @@ class SysEvent : public Msg {
     std::optional<std::string> cpu_board;
     std::optional<std::string> build_date;
     
+
     // Field indexes
-        typedef enum {
+    typedef enum {
         UTC_INDEX = 1,
         UPTIME_INDEX = 2,
         FREE_HEAP_INDEX = 3,
@@ -236,19 +205,16 @@ class SysEvent : public Msg {
         CPU_BOARD_INDEX = 5,
         BUILD_DATE_INDEX = 6,
     } Field;
-    static Result<Bytes> json_serialize(const SysEvent&);
-    static Result<SysEvent*> json_deserialize(const Bytes&);
-    static Result<Bytes> cbor_serialize(const SysEvent&);
-    static Result<SysEvent*> cbor_deserialize(const Bytes&);
-    static Result<Poly> to_poly(const SysEvent&);
-    static Result<SysEvent*> from_poly(const Poly&);
+
+    Bytes serialize() const;
+    SysEvent* deserialize(const Bytes& bytes);
+    std::string to_string() const;
 };
 
-
-
-class WifiEvent : public Msg {
+class WifiEvent : public Msg{
     MSG(WifiEvent);
     public:
+
     std::optional<std::string> ssid;
     std::optional<std::string> bssid;
     std::optional<int32_t> rssi;
@@ -258,8 +224,9 @@ class WifiEvent : public Msg {
     std::optional<std::string> gateway;
     std::optional<std::string> netmask;
     
+
     // Field indexes
-        typedef enum {
+    typedef enum {
         SSID_INDEX = 2,
         BSSID_INDEX = 3,
         RSSI_INDEX = 4,
@@ -269,84 +236,75 @@ class WifiEvent : public Msg {
         GATEWAY_INDEX = 8,
         NETMASK_INDEX = 9,
     } Field;
-    static Result<Bytes> json_serialize(const WifiEvent&);
-    static Result<WifiEvent*> json_deserialize(const Bytes&);
-    static Result<Bytes> cbor_serialize(const WifiEvent&);
-    static Result<WifiEvent*> cbor_deserialize(const Bytes&);
-    static Result<Poly> to_poly(const WifiEvent&);
-    static Result<WifiEvent*> from_poly(const Poly&);
+
+    Bytes serialize() const;
+    WifiEvent* deserialize(const Bytes& bytes);
+    std::string to_string() const;
 };
 
-
-
-class MulticastEvent : public Msg {
+class MulticastEvent : public Msg{
     MSG(MulticastEvent);
     public:
+
     std::optional<std::string> group;
     std::optional<int32_t> port;
     std::optional<uint32_t> mtu;
     
+
     // Field indexes
-        typedef enum {
+    typedef enum {
         GROUP_INDEX = 2,
         PORT_INDEX = 3,
         MTU_INDEX = 4,
     } Field;
-    static Result<Bytes> json_serialize(const MulticastEvent&);
-    static Result<MulticastEvent*> json_deserialize(const Bytes&);
-    static Result<Bytes> cbor_serialize(const MulticastEvent&);
-    static Result<MulticastEvent*> cbor_deserialize(const Bytes&);
-    static Result<Poly> to_poly(const MulticastEvent&);
-    static Result<MulticastEvent*> from_poly(const Poly&);
+
+    Bytes serialize() const;
+    MulticastEvent* deserialize(const Bytes& bytes);
+    std::string to_string() const;
 };
 
-
-
-class PingRequest : public Msg {
+class PingRequest : public Msg{
     MSG(PingRequest);
     public:
+
     std::optional<uint32_t> req_id;
     std::optional<uint32_t> number;
     
+
     // Field indexes
-        typedef enum {
+    typedef enum {
         REQ_ID_INDEX = 0,
         NUMBER_INDEX = 1,
     } Field;
-    static Result<Bytes> json_serialize(const PingRequest&);
-    static Result<PingRequest*> json_deserialize(const Bytes&);
-    static Result<Bytes> cbor_serialize(const PingRequest&);
-    static Result<PingRequest*> cbor_deserialize(const Bytes&);
-    static Result<Poly> to_poly(const PingRequest&);
-    static Result<PingRequest*> from_poly(const Poly&);
+
+    Bytes serialize() const;
+    PingRequest* deserialize(const Bytes& bytes);
+    std::string to_string() const;
 };
 
-
-
-class PingReply : public Msg {
+class PingReply : public Msg{
     MSG(PingReply);
     public:
+
     std::optional<uint32_t> req_id;
     std::optional<uint32_t> number;
     
+
     // Field indexes
-        typedef enum {
+    typedef enum {
         REQ_ID_INDEX = 0,
         NUMBER_INDEX = 1,
     } Field;
-    static Result<Bytes> json_serialize(const PingReply&);
-    static Result<PingReply*> json_deserialize(const Bytes&);
-    static Result<Bytes> cbor_serialize(const PingReply&);
-    static Result<PingReply*> cbor_deserialize(const Bytes&);
-    static Result<Poly> to_poly(const PingReply&);
-    static Result<PingReply*> from_poly(const Poly&);
+
+    Bytes serialize() const;
+    PingReply* deserialize(const Bytes& bytes);
+    std::string to_string() const;
 };
 
-
-
-class HoverboardEventRaw : public Msg {
+class HoverboardEventRaw : public Msg{
     MSG(HoverboardEventRaw);
     public:
+
     std::optional<int32_t> ctrl_mod;
     std::optional<int32_t> ctrl_typ;
     std::optional<int32_t> cur_mot_max;
@@ -394,8 +352,9 @@ class HoverboardEventRaw : public Msg {
     std::optional<int32_t> batv;
     std::optional<int32_t> temp;
     
+
     // Field indexes
-        typedef enum {
+    typedef enum {
         CTRL_MOD_INDEX = 0,
         CTRL_TYP_INDEX = 1,
         CUR_MOT_MAX_INDEX = 2,
@@ -443,19 +402,16 @@ class HoverboardEventRaw : public Msg {
         BATV_INDEX = 44,
         TEMP_INDEX = 45,
     } Field;
-    static Result<Bytes> json_serialize(const HoverboardEventRaw&);
-    static Result<HoverboardEventRaw*> json_deserialize(const Bytes&);
-    static Result<Bytes> cbor_serialize(const HoverboardEventRaw&);
-    static Result<HoverboardEventRaw*> cbor_deserialize(const Bytes&);
-    static Result<Poly> to_poly(const HoverboardEventRaw&);
-    static Result<HoverboardEventRaw*> from_poly(const Poly&);
+
+    Bytes serialize() const;
+    HoverboardEventRaw* deserialize(const Bytes& bytes);
+    std::string to_string() const;
 };
 
-
-
-class HoverboardEvent : public Msg {
+class HoverboardEvent : public Msg{
     MSG(HoverboardEvent);
     public:
+
     std::optional<int32_t> ctrl_mod;
     std::optional<int32_t> ctrl_typ;
     std::optional<int32_t> cur_mot_max;
@@ -503,8 +459,9 @@ class HoverboardEvent : public Msg {
     std::optional<float> batv;
     std::optional<float> temp;
     
+
     // Field indexes
-        typedef enum {
+    typedef enum {
         CTRL_MOD_INDEX = 1,
         CTRL_TYP_INDEX = 2,
         CUR_MOT_MAX_INDEX = 3,
@@ -552,90 +509,81 @@ class HoverboardEvent : public Msg {
         BATV_INDEX = 45,
         TEMP_INDEX = 46,
     } Field;
-    static Result<Bytes> json_serialize(const HoverboardEvent&);
-    static Result<HoverboardEvent*> json_deserialize(const Bytes&);
-    static Result<Bytes> cbor_serialize(const HoverboardEvent&);
-    static Result<HoverboardEvent*> cbor_deserialize(const Bytes&);
-    static Result<Poly> to_poly(const HoverboardEvent&);
-    static Result<HoverboardEvent*> from_poly(const Poly&);
+
+    Bytes serialize() const;
+    HoverboardEvent* deserialize(const Bytes& bytes);
+    std::string to_string() const;
 };
 
-
-
-class HoverboardRequest : public Msg {
+class HoverboardRequest : public Msg{
     MSG(HoverboardRequest);
     public:
+
     std::optional<uint32_t> req_id;
     std::optional<int32_t> speed;
     std::optional<int32_t> steer;
     
+
     // Field indexes
-        typedef enum {
+    typedef enum {
         REQ_ID_INDEX = 0,
         SPEED_INDEX = 1,
         STEER_INDEX = 2,
     } Field;
-    static Result<Bytes> json_serialize(const HoverboardRequest&);
-    static Result<HoverboardRequest*> json_deserialize(const Bytes&);
-    static Result<Bytes> cbor_serialize(const HoverboardRequest&);
-    static Result<HoverboardRequest*> cbor_deserialize(const Bytes&);
-    static Result<Poly> to_poly(const HoverboardRequest&);
-    static Result<HoverboardRequest*> from_poly(const Poly&);
+
+    Bytes serialize() const;
+    HoverboardRequest* deserialize(const Bytes& bytes);
+    std::string to_string() const;
 };
 
-
-
-class HoverboardReply : public Msg {
+class HoverboardReply : public Msg{
     MSG(HoverboardReply);
     public:
+
     std::optional<uint32_t> req_id;
     std::optional<int32_t> error_code;
     std::optional<std::string> message;
     
+
     // Field indexes
-        typedef enum {
+    typedef enum {
         REQ_ID_INDEX = 0,
         ERROR_CODE_INDEX = 1,
         MESSAGE_INDEX = 2,
     } Field;
-    static Result<Bytes> json_serialize(const HoverboardReply&);
-    static Result<HoverboardReply*> json_deserialize(const Bytes&);
-    static Result<Bytes> cbor_serialize(const HoverboardReply&);
-    static Result<HoverboardReply*> cbor_deserialize(const Bytes&);
-    static Result<Poly> to_poly(const HoverboardReply&);
-    static Result<HoverboardReply*> from_poly(const Poly&);
+
+    Bytes serialize() const;
+    HoverboardReply* deserialize(const Bytes& bytes);
+    std::string to_string() const;
 };
 
-
-
-class TouchPoint : public Msg {
+class TouchPoint : public Msg{
     MSG(TouchPoint);
     public:
+
     std::optional<bool> active;
     std::optional<int32_t> id;
     std::optional<int32_t> x;
     std::optional<int32_t> y;
     
+
     // Field indexes
-        typedef enum {
+    typedef enum {
         ACTIVE_INDEX = 4,
         ID_INDEX = 1,
         X_INDEX = 2,
         Y_INDEX = 3,
     } Field;
-    static Result<Bytes> json_serialize(const TouchPoint&);
-    static Result<TouchPoint*> json_deserialize(const Bytes&);
-    static Result<Bytes> cbor_serialize(const TouchPoint&);
-    static Result<TouchPoint*> cbor_deserialize(const Bytes&);
-    static Result<Poly> to_poly(const TouchPoint&);
-    static Result<TouchPoint*> from_poly(const Poly&);
+
+    Bytes serialize() const;
+    TouchPoint* deserialize(const Bytes& bytes);
+    std::string to_string() const;
 };
 
-
-
-class Ps4Event : public Msg {
+class Ps4Event : public Msg{
     MSG(Ps4Event);
     public:
+
     std::optional<bool> button_left;
     std::optional<bool> button_right;
     std::optional<bool> button_up;
@@ -670,8 +618,9 @@ class Ps4Event : public Msg {
     std::optional<std::string> debug;
     std::optional<int32_t> temp;
     
+
     // Field indexes
-        typedef enum {
+    typedef enum {
         BUTTON_LEFT_INDEX = 1,
         BUTTON_RIGHT_INDEX = 2,
         BUTTON_UP_INDEX = 3,
@@ -706,19 +655,16 @@ class Ps4Event : public Msg {
         DEBUG_INDEX = 31,
         TEMP_INDEX = 32,
     } Field;
-    static Result<Bytes> json_serialize(const Ps4Event&);
-    static Result<Ps4Event*> json_deserialize(const Bytes&);
-    static Result<Bytes> cbor_serialize(const Ps4Event&);
-    static Result<Ps4Event*> cbor_deserialize(const Bytes&);
-    static Result<Poly> to_poly(const Ps4Event&);
-    static Result<Ps4Event*> from_poly(const Poly&);
+
+    Bytes serialize() const;
+    Ps4Event* deserialize(const Bytes& bytes);
+    std::string to_string() const;
 };
 
-
-
-class Ps4Request : public Msg {
+class Ps4Request : public Msg{
     MSG(Ps4Request);
     public:
+
     std::optional<uint32_t> req_id;
     std::optional<int32_t> rumble_small;
     std::optional<int32_t> rumble_large;
@@ -728,8 +674,9 @@ class Ps4Request : public Msg {
     std::optional<int32_t> led_flash_on;
     std::optional<int32_t> led_flash_off;
     
+
     // Field indexes
-        typedef enum {
+    typedef enum {
         REQ_ID_INDEX = 0,
         RUMBLE_SMALL_INDEX = 1,
         RUMBLE_LARGE_INDEX = 2,
@@ -739,19 +686,16 @@ class Ps4Request : public Msg {
         LED_FLASH_ON_INDEX = 6,
         LED_FLASH_OFF_INDEX = 7,
     } Field;
-    static Result<Bytes> json_serialize(const Ps4Request&);
-    static Result<Ps4Request*> json_deserialize(const Bytes&);
-    static Result<Bytes> cbor_serialize(const Ps4Request&);
-    static Result<Ps4Request*> cbor_deserialize(const Bytes&);
-    static Result<Poly> to_poly(const Ps4Request&);
-    static Result<Ps4Request*> from_poly(const Poly&);
+
+    Bytes serialize() const;
+    Ps4Request* deserialize(const Bytes& bytes);
+    std::string to_string() const;
 };
 
-
-
-class CameraEvent : public Msg {
+class CameraEvent : public Msg{
     MSG(CameraEvent);
     public:
+
     std::optional<int32_t> width;
     std::optional<int32_t> height;
     std::optional<std::string> format;
@@ -759,8 +703,9 @@ class CameraEvent : public Msg {
     std::optional<bool> led;
     std::optional<int32_t> quality;
     
+
     // Field indexes
-        typedef enum {
+    typedef enum {
         WIDTH_INDEX = 1,
         HEIGHT_INDEX = 2,
         FORMAT_INDEX = 3,
@@ -768,92 +713,83 @@ class CameraEvent : public Msg {
         LED_INDEX = 5,
         QUALITY_INDEX = 6,
     } Field;
-    static Result<Bytes> json_serialize(const CameraEvent&);
-    static Result<CameraEvent*> json_deserialize(const Bytes&);
-    static Result<Bytes> cbor_serialize(const CameraEvent&);
-    static Result<CameraEvent*> cbor_deserialize(const Bytes&);
-    static Result<Poly> to_poly(const CameraEvent&);
-    static Result<CameraEvent*> from_poly(const Poly&);
+
+    Bytes serialize() const;
+    CameraEvent* deserialize(const Bytes& bytes);
+    std::string to_string() const;
 };
 
-
-
-class CameraRequest : public Msg {
+class CameraRequest : public Msg{
     MSG(CameraRequest);
     public:
+
     std::optional<uint32_t> req_id;
     std::optional<bool> led;
     std::optional<std::string> capture_tcp_destination;
     std::optional<int32_t> quality;
     
+
     // Field indexes
-        typedef enum {
+    typedef enum {
         REQ_ID_INDEX = 0,
         LED_INDEX = 1,
         CAPTURE_TCP_DESTINATION_INDEX = 2,
         QUALITY_INDEX = 4,
     } Field;
-    static Result<Bytes> json_serialize(const CameraRequest&);
-    static Result<CameraRequest*> json_deserialize(const Bytes&);
-    static Result<Bytes> cbor_serialize(const CameraRequest&);
-    static Result<CameraRequest*> cbor_deserialize(const Bytes&);
-    static Result<Poly> to_poly(const CameraRequest&);
-    static Result<CameraRequest*> from_poly(const Poly&);
+
+    Bytes serialize() const;
+    CameraRequest* deserialize(const Bytes& bytes);
+    std::string to_string() const;
 };
 
-
-
-class CameraReply : public Msg {
+class CameraReply : public Msg{
     MSG(CameraReply);
     public:
+
     std::optional<uint32_t> req_id;
     std::optional<int32_t> error_code;
     std::optional<std::string> message;
     std::optional<Bytes> data;
     
+
     // Field indexes
-        typedef enum {
+    typedef enum {
         REQ_ID_INDEX = 0,
         ERROR_CODE_INDEX = 1,
         MESSAGE_INDEX = 2,
         DATA_INDEX = 3,
     } Field;
-    static Result<Bytes> json_serialize(const CameraReply&);
-    static Result<CameraReply*> json_deserialize(const Bytes&);
-    static Result<Bytes> cbor_serialize(const CameraReply&);
-    static Result<CameraReply*> cbor_deserialize(const Bytes&);
-    static Result<Poly> to_poly(const CameraReply&);
-    static Result<CameraReply*> from_poly(const Poly&);
+
+    Bytes serialize() const;
+    CameraReply* deserialize(const Bytes& bytes);
+    std::string to_string() const;
 };
 
-
-
-class LawnmowerManualEvent : public Msg {
+class LawnmowerManualEvent : public Msg{
     MSG(LawnmowerManualEvent);
     public:
+
     std::optional<int32_t> speed;
     std::optional<int32_t> steering;
     std::optional<bool> blade;
     
+
     // Field indexes
-        typedef enum {
+    typedef enum {
         SPEED_INDEX = 1,
         STEERING_INDEX = 2,
         BLADE_INDEX = 3,
     } Field;
-    static Result<Bytes> json_serialize(const LawnmowerManualEvent&);
-    static Result<LawnmowerManualEvent*> json_deserialize(const Bytes&);
-    static Result<Bytes> cbor_serialize(const LawnmowerManualEvent&);
-    static Result<LawnmowerManualEvent*> cbor_deserialize(const Bytes&);
-    static Result<Poly> to_poly(const LawnmowerManualEvent&);
-    static Result<LawnmowerManualEvent*> from_poly(const Poly&);
+
+    Bytes serialize() const;
+    LawnmowerManualEvent* deserialize(const Bytes& bytes);
+    std::string to_string() const;
 };
 
-
-
-class LawnmowerManualRequest : public Msg {
+class LawnmowerManualRequest : public Msg{
     MSG(LawnmowerManualRequest);
     public:
+
     std::optional<uint32_t> req_id;
     std::optional<float> speed;
     std::optional<float> steer;
@@ -864,8 +800,9 @@ class LawnmowerManualRequest : public Msg {
     std::optional<bool> start_auto_mode;
     std::optional<bool> stop_auto_mode;
     
+
     // Field indexes
-        typedef enum {
+    typedef enum {
         REQ_ID_INDEX = 0,
         SPEED_INDEX = 1,
         STEER_INDEX = 2,
@@ -876,42 +813,37 @@ class LawnmowerManualRequest : public Msg {
         START_AUTO_MODE_INDEX = 7,
         STOP_AUTO_MODE_INDEX = 8,
     } Field;
-    static Result<Bytes> json_serialize(const LawnmowerManualRequest&);
-    static Result<LawnmowerManualRequest*> json_deserialize(const Bytes&);
-    static Result<Bytes> cbor_serialize(const LawnmowerManualRequest&);
-    static Result<LawnmowerManualRequest*> cbor_deserialize(const Bytes&);
-    static Result<Poly> to_poly(const LawnmowerManualRequest&);
-    static Result<LawnmowerManualRequest*> from_poly(const Poly&);
+
+    Bytes serialize() const;
+    LawnmowerManualRequest* deserialize(const Bytes& bytes);
+    std::string to_string() const;
 };
 
-
-
-class LawnmowerManualReply : public Msg {
+class LawnmowerManualReply : public Msg{
     MSG(LawnmowerManualReply);
     public:
+
     std::optional<uint32_t> req_id;
     std::optional<int32_t> error_code;
     std::optional<std::string> message;
     
+
     // Field indexes
-        typedef enum {
+    typedef enum {
         REQ_ID_INDEX = 0,
         ERROR_CODE_INDEX = 1,
         MESSAGE_INDEX = 2,
     } Field;
-    static Result<Bytes> json_serialize(const LawnmowerManualReply&);
-    static Result<LawnmowerManualReply*> json_deserialize(const Bytes&);
-    static Result<Bytes> cbor_serialize(const LawnmowerManualReply&);
-    static Result<LawnmowerManualReply*> cbor_deserialize(const Bytes&);
-    static Result<Poly> to_poly(const LawnmowerManualReply&);
-    static Result<LawnmowerManualReply*> from_poly(const Poly&);
+
+    Bytes serialize() const;
+    LawnmowerManualReply* deserialize(const Bytes& bytes);
+    std::string to_string() const;
 };
 
-
-
-class LawnmowerAutoEvent : public Msg {
+class LawnmowerAutoEvent : public Msg{
     MSG(LawnmowerAutoEvent);
     public:
+
     std::optional<bool> started;
     std::optional<bool> stopped;
     std::optional<bool> paused;
@@ -919,8 +851,9 @@ class LawnmowerAutoEvent : public Msg {
     std::optional<std::string> mode;
     std::optional<std::string> path;
     
+
     // Field indexes
-        typedef enum {
+    typedef enum {
         STARTED_INDEX = 1,
         STOPPED_INDEX = 2,
         PAUSED_INDEX = 3,
@@ -928,19 +861,16 @@ class LawnmowerAutoEvent : public Msg {
         MODE_INDEX = 5,
         PATH_INDEX = 6,
     } Field;
-    static Result<Bytes> json_serialize(const LawnmowerAutoEvent&);
-    static Result<LawnmowerAutoEvent*> json_deserialize(const Bytes&);
-    static Result<Bytes> cbor_serialize(const LawnmowerAutoEvent&);
-    static Result<LawnmowerAutoEvent*> cbor_deserialize(const Bytes&);
-    static Result<Poly> to_poly(const LawnmowerAutoEvent&);
-    static Result<LawnmowerAutoEvent*> from_poly(const Poly&);
+
+    Bytes serialize() const;
+    LawnmowerAutoEvent* deserialize(const Bytes& bytes);
+    std::string to_string() const;
 };
 
-
-
-class LawnmowerAutoRequest : public Msg {
+class LawnmowerAutoRequest : public Msg{
     MSG(LawnmowerAutoRequest);
     public:
+
     std::optional<uint32_t> req_id;
     std::optional<bool> start;
     std::optional<bool> stop;
@@ -949,8 +879,9 @@ class LawnmowerAutoRequest : public Msg {
     std::optional<std::string> mode;
     std::optional<std::string> path;
     
+
     // Field indexes
-        typedef enum {
+    typedef enum {
         REQ_ID_INDEX = 0,
         START_INDEX = 1,
         STOP_INDEX = 2,
@@ -959,44 +890,39 @@ class LawnmowerAutoRequest : public Msg {
         MODE_INDEX = 5,
         PATH_INDEX = 6,
     } Field;
-    static Result<Bytes> json_serialize(const LawnmowerAutoRequest&);
-    static Result<LawnmowerAutoRequest*> json_deserialize(const Bytes&);
-    static Result<Bytes> cbor_serialize(const LawnmowerAutoRequest&);
-    static Result<LawnmowerAutoRequest*> cbor_deserialize(const Bytes&);
-    static Result<Poly> to_poly(const LawnmowerAutoRequest&);
-    static Result<LawnmowerAutoRequest*> from_poly(const Poly&);
+
+    Bytes serialize() const;
+    LawnmowerAutoRequest* deserialize(const Bytes& bytes);
+    std::string to_string() const;
 };
 
-
-
-class LawnmowerStatus : public Msg {
+class LawnmowerStatus : public Msg{
     MSG(LawnmowerStatus);
     public:
+
     std::optional<int32_t> battery_level;
     std::optional<bool> blade_status;
     std::optional<std::string> current_mode;
     std::optional<std::string> error_message;
     
+
     // Field indexes
-        typedef enum {
+    typedef enum {
         BATTERY_LEVEL_INDEX = 1,
         BLADE_STATUS_INDEX = 2,
         CURRENT_MODE_INDEX = 3,
         ERROR_MESSAGE_INDEX = 4,
     } Field;
-    static Result<Bytes> json_serialize(const LawnmowerStatus&);
-    static Result<LawnmowerStatus*> json_deserialize(const Bytes&);
-    static Result<Bytes> cbor_serialize(const LawnmowerStatus&);
-    static Result<LawnmowerStatus*> cbor_deserialize(const Bytes&);
-    static Result<Poly> to_poly(const LawnmowerStatus&);
-    static Result<LawnmowerStatus*> from_poly(const Poly&);
+
+    Bytes serialize() const;
+    LawnmowerStatus* deserialize(const Bytes& bytes);
+    std::string to_string() const;
 };
 
-
-
-class MotorEvent : public Msg {
+class MotorEvent : public Msg{
     MSG(MotorEvent);
     public:
+
     std::optional<int32_t> motor_id;
     std::optional<float> temperature;
     std::optional<float> voltage;
@@ -1004,8 +930,9 @@ class MotorEvent : public Msg {
     std::optional<float> speed;
     std::optional<float> position;
     
+
     // Field indexes
-        typedef enum {
+    typedef enum {
         MOTOR_ID_INDEX = 1,
         TEMPERATURE_INDEX = 2,
         VOLTAGE_INDEX = 3,
@@ -1013,19 +940,16 @@ class MotorEvent : public Msg {
         SPEED_INDEX = 5,
         POSITION_INDEX = 6,
     } Field;
-    static Result<Bytes> json_serialize(const MotorEvent&);
-    static Result<MotorEvent*> json_deserialize(const Bytes&);
-    static Result<Bytes> cbor_serialize(const MotorEvent&);
-    static Result<MotorEvent*> cbor_deserialize(const Bytes&);
-    static Result<Poly> to_poly(const MotorEvent&);
-    static Result<MotorEvent*> from_poly(const Poly&);
+
+    Bytes serialize() const;
+    MotorEvent* deserialize(const Bytes& bytes);
+    std::string to_string() const;
 };
 
-
-
-class Max31855Event : public Msg {
+class Max31855Event : public Msg{
     MSG(Max31855Event);
     public:
+
     std::optional<float> thermocouple_c;
     std::optional<float> internal_c;
     std::optional<bool> fault;
@@ -1034,8 +958,9 @@ class Max31855Event : public Msg {
     std::optional<bool> short_to_vcc;
     std::optional<uint64_t> timestamp_ms;
     
+
     // Field indexes
-        typedef enum {
+    typedef enum {
         THERMOCOUPLE_C_INDEX = 1,
         INTERNAL_C_INDEX = 2,
         FAULT_INDEX = 3,
@@ -1044,19 +969,16 @@ class Max31855Event : public Msg {
         SHORT_TO_VCC_INDEX = 6,
         TIMESTAMP_MS_INDEX = 7,
     } Field;
-    static Result<Bytes> json_serialize(const Max31855Event&);
-    static Result<Max31855Event*> json_deserialize(const Bytes&);
-    static Result<Bytes> cbor_serialize(const Max31855Event&);
-    static Result<Max31855Event*> cbor_deserialize(const Bytes&);
-    static Result<Poly> to_poly(const Max31855Event&);
-    static Result<Max31855Event*> from_poly(const Poly&);
+
+    Bytes serialize() const;
+    Max31855Event* deserialize(const Bytes& bytes);
+    std::string to_string() const;
 };
 
-
-
-class HeatingRequest : public Msg {
+class HeatingRequest : public Msg{
     MSG(HeatingRequest);
     public:
+
     std::optional<uint32_t> req_id;
     std::optional<float> setpoint_c;
     std::optional<bool> enabled;
@@ -1065,8 +987,9 @@ class HeatingRequest : public Msg {
     std::optional<float> kd;
     std::optional<bool> reset_integral;
     
+
     // Field indexes
-        typedef enum {
+    typedef enum {
         REQ_ID_INDEX = 0,
         SETPOINT_C_INDEX = 1,
         ENABLED_INDEX = 2,
@@ -1075,19 +998,16 @@ class HeatingRequest : public Msg {
         KD_INDEX = 5,
         RESET_INTEGRAL_INDEX = 6,
     } Field;
-    static Result<Bytes> json_serialize(const HeatingRequest&);
-    static Result<HeatingRequest*> json_deserialize(const Bytes&);
-    static Result<Bytes> cbor_serialize(const HeatingRequest&);
-    static Result<HeatingRequest*> cbor_deserialize(const Bytes&);
-    static Result<Poly> to_poly(const HeatingRequest&);
-    static Result<HeatingRequest*> from_poly(const Poly&);
+
+    Bytes serialize() const;
+    HeatingRequest* deserialize(const Bytes& bytes);
+    std::string to_string() const;
 };
 
-
-
-class HeatingEvent : public Msg {
+class HeatingEvent : public Msg{
     MSG(HeatingEvent);
     public:
+
     std::optional<float> temperature_c;
     std::optional<float> setpoint_c;
     std::optional<float> output_pct;
@@ -1096,8 +1016,9 @@ class HeatingEvent : public Msg {
     std::optional<bool> fault;
     std::optional<uint64_t> timestamp_ms;
     
+
     // Field indexes
-        typedef enum {
+    typedef enum {
         TEMPERATURE_C_INDEX = 1,
         SETPOINT_C_INDEX = 2,
         OUTPUT_PCT_INDEX = 3,
@@ -1106,12 +1027,8 @@ class HeatingEvent : public Msg {
         FAULT_INDEX = 6,
         TIMESTAMP_MS_INDEX = 7,
     } Field;
-    static Result<Bytes> json_serialize(const HeatingEvent&);
-    static Result<HeatingEvent*> json_deserialize(const Bytes&);
-    static Result<Bytes> cbor_serialize(const HeatingEvent&);
-    static Result<HeatingEvent*> cbor_deserialize(const Bytes&);
-    static Result<Poly> to_poly(const HeatingEvent&);
-    static Result<HeatingEvent*> from_poly(const Poly&);
+
+    Bytes serialize() const;
+    HeatingEvent* deserialize(const Bytes& bytes);
+    std::string to_string() const;
 };
-
-

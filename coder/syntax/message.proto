@@ -4,32 +4,65 @@
 syntax = "proto3";
 package msgs;
 
-message Poly {
-  string typ = 1;
-  bytes data = 2;
+
+
+message UdpMessage { 
+  uint32 dst = 1; // logic destination, e.g. "motor", "camera", "ps4", "hoverboard" 
+  uint32 src = 2; // logic source, e.g. "controller", "sensor", "app"
+  uint32 msg_typ = 3;
+  uint32 req_id = 4; // for request/reply matching, 0 if not a request/reply
+  bytes payload = 5;
 }
 
-message UdpMessage {
-  string dst = 1;
-  string src = 2;
-  string typ = 3;
-  Poly msg = 4;
+message BrokerAnnouncement  {
+  // source ip, dst,src
+  string src_ip = 1; // source ip, e.g. "
 }
 
-message UdpMessageCbor {
-  uint32 dst = 1;
-  uint32 src = 2;
-  uint32 typ = 3;
-  Poly msg = 4;
+message DeviceAliveEvent {
+  string device_id = 1; // unique device id, e.g. "esp32_ebcd8f"
+  repeated string objects = 2; // objects that are alive, e.g. "motor", "camera", "ps4", "hoverboard"
+  repeated string subscribes = 3; // topics that broker will send
+  repeated string publishes = 4; // publishes on these topics
+  repeated string requests = 5; // requests thqt will be answered by device
+  repeated string replies = 6; // request/reply
+}     
+
+message BrokerSubscribeRequest {
+  string src_str = 1; // source string, e.g. "controller", "sensor", "app"
+  string dst_str = 2; // destination string, e.g. "motor", "camera", "ps4", "hoverboard"
+  string msg_typ_str = 3; // message type string, e.g. "motor_cmd", "camera_request", "ps4_event", "hoverboard_event"
+  uint32  src_id = 4; // source id, e.g. 1, 2, 3
+  uint32  dst_id = 5; // destination id, e.g. 1
+  uint32  msg_typ_id = 6; // message type id, e.g. 1, 2, 3
 }
 
-message AliveEvent {
-  repeated string subscribes = 1; // topics that broker will send
-  repeated string publishes = 2; // publishes on these topics
-  repeated string services = 3; // request/reply 
+message BrokerUnsubscribeRequest {
+  string src_str = 1; // source string, e.g. "controller", "sensor", "app"
+  string dst_str = 2; // destination string, e.g. "motor", "camera", "ps4", "hoverboard"
+  string msg_typ_str = 3; // message type string, e.g. "motor_cmd", "camera_request", "ps4_event", "hoverboard_event"
+  uint32  src_id = 4; // source id, e.g. 1, 2, 3
+  uint32  dst_id = 5; // destination id, e.g. 1
+  uint32  msg_typ_id = 6; // message type id, e.g. 1, 2, 3
 }
 
+message BrokerSubscribeReply {
+  int32 rc = 1; // return code, 0=ok, <0=error
+  string message = 2; // error message if rc<0
+}
 
+message BrokerEvent {
+  uint64 messages_routed = 1;
+  uint64 messages_dropped= 2;
+  uint32 dictionary_size = 3;
+  uint32 subscription_count = 4;
+  uint32 endpoint_count = 5;
+  uint64 uptime_secs = 6;
+}
+
+message BrokerRequest {
+  string add_word = 1; // add word to dictionary
+}
 
 enum LogLevel {
   DEBUG = 1;

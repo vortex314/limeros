@@ -370,25 +370,106 @@ public:
                 JsonObject out = dst.to<JsonObject>();
                 for (const auto &kv : static_cast<const ObjectNode *>(node_.get())->value)
                 {
+                    const char *key = kv.first.c_str();
                     if (kv.second.is_object())
                     {
-                        JsonObject slot = out[kv.first.c_str()].to<JsonObject>();
+                        JsonObject slot = out[key].to<JsonObject>();
                         kv.second.to_json(slot);
                     }
                     else if (kv.second.is_array())
                     {
-                        JsonArray slot = out[kv.first.c_str()].to<JsonArray>();
+                        JsonArray slot = out[key].to<JsonArray>();
                         kv.second.to_json(slot);
                     }
-                    else
+                    else if (kv.second.is_null())
                     {
-                        JsonVariant slot = out[kv.first.c_str()];
-                        kv.second.to_json(slot);
+                        out[key] = nullptr;
+                    }
+                    else if (kv.second.is_bool())
+                    {
+                        out[key] = kv.second.as_bool();
+                    }
+                    else if (kv.second.is_signed())
+                    {
+                        out[key] = kv.second.as_int64();
+                    }
+                    else if (kv.second.is_unsigned())
+                    {
+                        out[key] = kv.second.as_uint64();
+                    }
+                    else if (kv.second.is_float())
+                    {
+                        out[key] = kv.second.as_double();
+                    }
+                    else if (kv.second.is_string())
+                    {
+                        out[key] = kv.second.as_string();
                     }
                 }
                 break;
             }
         }
+    }
+
+    std::string to_string() const
+    {
+        if (is_string())
+        {
+            return as_string();
+        }
+        std::string result;
+        switch (type())
+        {
+            case Type::Null:
+                result = "null";
+                break;
+            case Type::Bool:
+                result = as_bool() ? "true" : "false";
+                break;
+            case Type::Signed:
+                result = std::to_string(as_int64());
+                break;
+            case Type::Unsigned:
+                result = std::to_string(as_uint64());
+                break;
+            case Type::Float:
+                result = std::to_string(as_double());
+                break;
+            case Type::Array:
+            {
+                result = "[";           
+                const auto &arr = as_array();
+                for (size_t i = 0; i < arr.size(); ++i)
+                {
+                    if (i > 0)                    {
+                        result += ",";  
+                    }
+                    result += arr[i].to_string();
+                }
+                result += "]";
+                break;
+            }
+            case Type::Object :
+            {
+                result = "{";
+                const auto &obj = as_object();
+                size_t count = 0;
+                for (const auto &kv : obj)
+                {
+                    if (count++ > 0)
+                    {
+                        result += ",";
+                    }
+                    result += "\"" + kv.first + "\":" + kv.second.to_string();
+                }
+                result += "}";
+                break;
+            }
+            default:
+                result = "";
+                break;  
+        }
+        return result;
     }
 
 private:

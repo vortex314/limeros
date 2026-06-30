@@ -8,6 +8,10 @@ default-run ="coder"
 name ="mermaid"
 path ="src/bin/mermaid.rs"
 
+[[bin]]
+name ="hcl_codegen"
+path ="src/bin/hcl_codegen.rs"
+
 [dependencies]
 protobuf-parser = "0.1.3"
 serde = { version = "1.0.228", features = ["derive"] }
@@ -20,6 +24,8 @@ log = "0.4.29"
 clap = { version = "4.5.53", features = ["derive"] }
 chrono = { version = "0.4", features = ["serde"] }
 fnv = "1.0.7"
+hcl-rs = "0.19"
+regex = "1"
 convert_case = "0.10.0"
 hidapi = "*"
 pest = "2.8.4"

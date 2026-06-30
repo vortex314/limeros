@@ -148,6 +148,7 @@ struct Field {
     repeated: bool,
     optional: bool,
     source_type: String,
+    field_id: u32,
 }
 
 #[derive(Serialize)]
@@ -244,13 +245,14 @@ fn convert_rust_types(fd: &FileDescriptor) -> Vec<Message> {
                         _ => false,
                     },
                     source_type: format!("{:?}", f.typ),
+                    field_id: fnv1a_32(&f.name.as_bytes()) as u32,
                 })
                 .collect();
 
             Message {
                 name: msg.name.clone(),
                 fields,
-                msg_id: fnv1a_16(&msg.name.as_bytes()) as u32,
+                msg_id: fnv1a_32(&msg.name.as_bytes()) as u32,
             }
         })
         .collect()
@@ -276,13 +278,14 @@ fn convert_cpp_types(fd: &FileDescriptor) -> Vec<Message> {
                         _ => false,
                     },
                     source_type: format!("{:?}", f.typ),
+                    field_id: fnv1a_32(&f.name.as_bytes()) as u32   ,
                 })
                 .collect();
 
             Message {
                 name: msg.name.clone(),
                 fields,
-                msg_id: fnv1a_16(&msg.name.as_bytes()) as u32,
+                msg_id: fnv1a_32(&msg.name.as_bytes()) as u32,
             }
         })
         .collect()
@@ -332,7 +335,7 @@ fn convert_enum_cpp_types(fd: &FileDescriptor) -> Vec<EnumType> {
 }
 
 use tera::{Context, Tera};
-/*
+
 fn fnv1a_32(data: &[u8]) -> u32 {
     const FNV_OFFSET_BASIS: u32 = 0x811c9dc5;
     const FNV_PRIME: u32 = 0x01000193;
@@ -342,7 +345,7 @@ fn fnv1a_32(data: &[u8]) -> u32 {
         hash = hash.wrapping_mul(FNV_PRIME);
     }
     hash
-}*/
+}
 
 fn fnv1a_16(data: &[u8]) -> u16 {
     const FNV_OFFSET_BASIS: u16 = 0x811c;

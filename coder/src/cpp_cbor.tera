@@ -5,6 +5,7 @@
 #include <optional>
 #include <cbor.h>
 #include <functional>
+#include <sstream>
 #include <msg.h>
 
 typedef std::vector<uint8_t> Bytes;
@@ -83,6 +84,28 @@ cbor_encode_int(&{{encoder}}, {{ field_name }});
     {{ field_name }} = static_cast<{{ field_type }}>(v);
 }
 {%- endif -%}
+{% endmacro %}
+
+{% macro to_string_any( stream, field_type, field_name) %}
+    {%- if field_type == "std::string" -%}
+{{stream}} << "\"" << {{field_name}} << "\""
+    {%- elif field_type == "Bytes" -%}
+{{stream}} << "Bytes[" << {{field_name}}.size() << "]"
+    {%- elif field_type == "uint32_t" -%}
+{{stream}} << {{field_name}}
+    {%- elif field_type == "int32_t" -%}
+{{stream}} << {{field_name}}
+    {%- elif field_type == "uint64_t" -%}
+{{stream}} << {{field_name}}
+    {%- elif field_type == "int64_t" -%}
+{{stream}} << {{field_name}}
+    {%- elif field_type == "float" or field_type == "double" -%}
+{{stream}} << {{field_name}}
+    {%- elif field_type == "bool" -%}
+{{stream}} << ({{field_name}} ? "true" : "false")
+    {%- else -%}
+{{stream}} << {{field_name}}
+    {%- endif -%}
 {% endmacro %}
 
 {% for en in enums %}
@@ -219,6 +242,35 @@ class {{ msg.name }} : public Msg{
         cbor_value_leave_container(&it, &mapIt);
 
         return msg;
+    }
+
+    std::string to_string() const {
+        std::ostringstream oss;
+        oss << "{{ msg.name }} {\n";
+        {%- for field in msg.fields %}
+        {%- if field.repeated %}
+        oss << "  {{ field.name }}: [";
+        for (size_t i = 0; i < {{ field.name }}.size(); i++) {
+            if (i > 0) oss << ", ";
+            {{ self::to_string_any(stream="oss", field_type=field.target_type, field_name=field.name ~ "[i]") }};
+        }
+        oss << "]\n";
+        {%- elif field.optional %}
+        if ({{ field.name }}) {
+            oss << "  {{ field.name }}: ";
+            {{ self::to_string_any(stream="oss", field_type=field.target_type, field_name=field.name ~ ".value()") }};
+            oss << "\n";
+        } else {
+            oss << "  {{ field.name }}: None\n";
+        }
+        {%- else %}
+        oss << "  {{ field.name }}: ";
+        {{ self::to_string_any(stream="oss", field_type=field.target_type, field_name=field.name) }};
+        oss << "\n";
+        {%- endif %}
+        {%- endfor %}
+        oss << "}";
+        return oss.str();
     }
 
 };

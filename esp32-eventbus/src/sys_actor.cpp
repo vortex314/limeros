@@ -12,7 +12,7 @@ SysActor::SysActor(const char *name) : Actor(name)
 
 void SysActor::on_start()
 {
-    AliveEvent *alive_event = new AliveEvent();
+    DeviceAliveEvent *alive_event = new DeviceAliveEvent();
     alive_event->publishes.push_back(SysEvent::name_value);
     emit(alive_event);
 }

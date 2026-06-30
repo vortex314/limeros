@@ -8,6 +8,7 @@
 #include <esp_wifi.h>
 #include <esp_coexist.h>
 #include <esp_event.h>
+#include "esp_mac.h"
 #include <nvs_flash.h>
 
 #include <actor.h>
@@ -29,6 +30,7 @@
 EventBus eventbus(200);
 Log logger;
 esp_err_t nvs_ota_init();
+char hostname[24];
 
 extern "C" void app_main()
 {
@@ -37,27 +39,31 @@ extern "C" void app_main()
 
   INFO("Free heap size: %ld ", esp_get_free_heap_size());
   INFO("Stack high water mark: %ld \n", uxTaskGetStackHighWaterMark(NULL));
+  // get the mac address for logging and mdns
+  uint8_t mac[6];
+  esp_err_t ret = esp_read_mac(mac, ESP_MAC_WIFI_STA);
+  INFO("Device MAC address: %02X:%02X:%02X:%02X:%02X:%02X", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+  snprintf(hostname, sizeof(hostname), "%s-%02X%02X%02X", DEVICE_NAME, mac[3], mac[4], mac[5]);
 
-  eventbus.register_actor(new WifiActor("wifi"));              // manage wifi connection, will block on start until connected
-  eventbus.register_actor(new SysActor("sys"));                // manage the system
-                                                               // eventbus.register_actor(new ZenohActor("zenoh", DEVICE_NAME)); // bridge the eventbus
-  eventbus.register_actor(new McActor("mc", DEVICE_NAME));     // multicast actor
-  eventbus.register_actor(new LedActor("led"));                // blink the led
-  eventbus.register_actor(new OtaActor("ota"));                // ota via tftp
-  eventbus.register_actor(new MdnsActor("mdns", DEVICE_NAME)); // mdns service
+  eventbus.register_actor(new WifiActor("wifi"));           // manage wifi connection, will block on start until connected
+  eventbus.register_actor(new SysActor("sys"));             // manage the system
+  eventbus.register_actor(new McActor("mc", hostname));     // multicast actor
+  eventbus.register_actor(new LedActor("led"));             // blink the led
+  eventbus.register_actor(new OtaActor("ota"));             // ota via tftp
+  eventbus.register_actor(new MdnsActor("mdns", hostname)); // mdns service
 #ifdef ENABLE_DESOLDERING
-  eventbus.register_actor(new Max31855Actor("heater", 500)); // MAX31855 + PID + SSR heating control
+  eventbus.register_actor(new Max31855Actor(hostname, 500)); // MAX31855 + PID + SSR heating control
 #endif
 #ifdef ENABLE_HOVERBOARD
   eventbus.register_actor(new HoverboardActor("hb")); // hoverboard interface
 #endif
   // debugging handler to log all eventbus traffic, comment for beauty
-  eventbus.register_handler([](const Envelope &env) // just log eventbus traffic
+  /*eventbus.register_handler([](const Envelope &env) // just log eventbus traffic
                             {
                               const char *src = env.src ? env.src->name() : "";
                               const char *dst = env.dst ? env.dst->name() : "";
                               INFO(" Event '%s' => '%s' : %s", src, dst, env.msg->type_name()); // comment for beauty
-                            });
+                            });*/
   eventbus.loop();
 }
 /*

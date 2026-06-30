@@ -1,13 +1,14 @@
 use std::sync::Arc;
-use anyhow::Result;
 
+use anyhow::Result;
 use dashmap::DashMap;
 use eframe::egui;
 use egui_plot::{Line, Plot, PlotPoints};
 
-use crate::my_window::MyWindow;
-
-use crate::MetricData;
+use crate::{
+    MetricData,
+    my_window::{FieldWindowContext, MyWindow, Supports, WindowRegistration},
+};
 
 pub(crate) struct WindowPlot {
     keys: Vec<String>,
@@ -18,13 +19,36 @@ pub(crate) struct WindowPlot {
 
 impl WindowPlot {
     pub fn new(keys: Vec<String>, graph_data: Arc<DashMap<String, MetricData>>) -> Self {
-        let window_name = keys.iter().cloned().collect::<Vec<String>>().join(", ");
+        let window_name = keys.join(", ");
         Self {
             keys,
             graph_data,
             window_name,
             open: true,
         }
+    }
+
+    pub fn supports_config() -> Supports {
+        Supports {
+            accepts_numeric_series: true,
+            ..Default::default()
+        }
+    }
+
+    pub fn registration() -> WindowRegistration {
+        WindowRegistration::field(
+            "plot",
+            "Plot series",
+            Self::supports_config,
+            |ctx: FieldWindowContext| {
+                let keys = if ctx.selected_keys.is_empty() {
+                    vec![ctx.key.clone()]
+                } else {
+                    ctx.selected_keys.clone()
+                };
+                Box::new(Self::new(keys, ctx.graph_data.clone()))
+            },
+        )
     }
 }
 
@@ -46,8 +70,8 @@ impl MyWindow for WindowPlot {
                 return Ok(());
             }
             let points = &metric_data.unwrap().points;
-            let plot_points: PlotPoints = PlotPoints::from(points.clone());
-            let line = Line::new(plot_points).name(key);
+            let plot_points: PlotPoints<'_> = PlotPoints::from(points.clone());
+            let line = Line::new(plot_points).name(key.clone());
             lines.push(line);
         }
 
@@ -65,5 +89,9 @@ impl MyWindow for WindowPlot {
                     });
             });
         Ok(())
+    }
+
+    fn supports(&self) -> Option<Supports> {
+        Some(Self::supports_config())
     }
 }

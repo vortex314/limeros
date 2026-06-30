@@ -192,7 +192,7 @@ Result<HoverboardEventRaw *> HoverboardActor::parse_info_msg(const Bytes &input)
          printf("%02X ", input[i]);
      }
      printf("\n");*/
-    return HoverboardEventRaw::cbor_deserialize(input);
+    return HoverboardEventRaw::deserialize(input);
 }
 
 HoverboardActor::~HoverboardActor()
@@ -229,7 +229,7 @@ void HoverboardActor::handle_uart_bytes(const Bytes &data)
             DEBUG("COBS frame received (%d bytes)", uart_read_buffer.size());
             (void)cobs_decode(uart_read_buffer)
                 .and_then(check_crc)
-                .and_then(parse_info_msg)
+                .and_then(HoverboardEventRaw::deserialize)
                 .and_then([&](HoverboardEventRaw *info)
                           {
                             HoverboardEvent* event = new HoverboardEvent();

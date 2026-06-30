@@ -1,6 +1,6 @@
 use clap::Parser;
 use limeros::{
-    TypedUdpMessage, UdpMessage, UdpMessageHandler, UdpNode, logger, msgs::{PingReply, PingRequest, SysEvent, TypedMessage}
+    UdpMessage, UdpMessageHandler, UdpNode, logger, msgs::{Msg, PingReply, PingRequest, SysEvent}
 };
 use log::info;
 use std::{sync::Arc, time::Duration};
@@ -9,13 +9,13 @@ use tokio::time::sleep;
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
 struct Args {
-    #[arg(short = 'm', long, default_value_t = ("239.0.0.1:50000".to_string()))]
+    #[arg(short = 'm', long, default_value = "239.0.0.1:50000")]
     multicast_addr: String,
 
     #[arg(short = 'u', long, default_value_t = 50001)]
     unicast_port: u16,
 
-    #[arg(short = 'n', long, default_value_t = ("client".to_string()))]
+    #[arg(short = 'n', long, default_value = "client")]
     node_name: String,
 
     #[arg(short = 'f', long, default_value_t = 2)]
@@ -32,25 +32,34 @@ struct Handler {
 impl UdpMessageHandler for Handler {
     
     async fn handle(& self, udp_message: & UdpMessage) -> anyhow::Result<()> {
-        match udp_message.typ.as_deref() {
-            Some(SysEvent::MSG_TYPE) => {
-                let typed_msg = TypedUdpMessage::<SysEvent>::from(udp_message.clone())?;
-                info!("Generic Handler received SysEvent: {:?} ", typed_msg);
-            },
-            Some(PingReply::MSG_TYPE) => {
-                let typed_msg = TypedUdpMessage::<PingReply>::from(udp_message.clone())?;
-                info!("Generic Handler received PingReply: {:?} ", typed_msg);
-                self.node.send_msg_to(
-                    typed_msg.src.as_deref().unwrap_or("unknown"),
-                    PingRequest {
-                        number: typed_msg.payload.as_ref().and_then(|p| p.number).map(|n| n + 1),
-                        ..Default::default()
-                    },
-                ).await;
-            },
+        match udp_message.msg_typ {
+            Some(id) if id == SysEvent::ID => {
+                if let Some(payload) = udp_message.payload.as_ref() {
+                    let msg = SysEvent::deserialize(payload)?;
+                    info!("Generic Handler received SysEvent: {:?}", msg);
+                }
+            }
+            Some(id) if id == PingReply::ID => {
+                if let Some(payload) = udp_message.payload.as_ref() {
+                    let msg = PingReply::deserialize(payload)?;
+                    info!("Generic Handler received PingReply: {:?}", msg);
+
+                    if let Some(src) = udp_message.src {
+                        self.node
+                            .send_msg_to(
+                                src,
+                                PingRequest {
+                                    number: msg.number.map(|n| n + 1),
+                                    ..Default::default()
+                                },
+                            )
+                            .await;
+                    }
+                }
+            }
             Some(other) => {
                 info!("Generic Handler received unknown message type: {} ", other);
-            },
+            }
             None => {
                 info!("Generic Handler received message with no type ");
             }
@@ -69,7 +78,7 @@ async fn main() -> anyhow::Result<()> {
         args.multicast_addr.clone().as_str(),
     )
     .await?;
-    node.add_subscription(SysEvent::MSG_TYPE).await;
+    node.add_subscription(SysEvent::ID).await;
     let handler = Handler { node: node.clone() };      
     node.add_generic_handler(handler).await;
 
@@ -106,7 +115,7 @@ async fn main() -> anyhow::Result<()> {
         })
         .await;
         node.send_msg_to(
-            "esp1",
+            limeros::fnv1a_32("esp1"),
             PingRequest {
                 number: Some(42),
                 ..Default::default()

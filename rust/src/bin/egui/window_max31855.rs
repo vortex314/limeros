@@ -3,19 +3,22 @@ use std::{sync::Arc, time::Instant};
 use anyhow::Result;
 use eframe::egui;
 use ehmi::Bar;
-use limeros::{Msg,
-    UdpMessage, UdpNode,
-    msgs::{Max31855Event, TypedMessage},
+use limeros::{
+    Msg, TypedMessage, UdpMessage, UdpNode,
+    msgs::{Max31855Event},
 };
-use limeros::msgs::TypedMessage as _;
 use tokio::sync::mpsc::{Receiver, Sender};
 
-use crate::{my_window::MyWindow, widget_alive::WidgetAlive};
+use crate::{
+    my_window::{EndpointWindowContext, MyWindow, Supports, WindowRegistration},
+    widget_alive::WidgetAlive,
+};
 
-const MAX_UPDATE_INTERVAL_MS: u128 = 10000;
+const MAX_UPDATE_INTERVAL_MS: u128 = 10_000;
 
 pub struct WindowMax31855 {
-    node: Arc<UdpNode>,
+    _node: Arc<UdpNode>,
+    source: String,
     open: bool,
     last_update: Instant,
     thermocouple_c: f32,
@@ -24,16 +27,18 @@ pub struct WindowMax31855 {
     open_circuit: bool,
     short_to_gnd: bool,
     short_to_vcc: bool,
-    sender: Sender<UdpMessage>,
+    _sender: Sender<UdpMessage>,
     receiver: Receiver<UdpMessage>,
 }
 
 impl WindowMax31855 {
-    pub fn new(node: Arc<UdpNode>) -> Self {
+    pub fn new(node: Arc<UdpNode>, source: impl Into<String>) -> Self {
+        let source = source.into();
         let (sender, receiver) = tokio::sync::mpsc::channel(100);
         node.add_sender(sender.clone());
         Self {
-            node,
+            _node: node,
+            source,
             open: true,
             last_update: Instant::now(),
             thermocouple_c: 0.0,
@@ -42,18 +47,37 @@ impl WindowMax31855 {
             open_circuit: false,
             short_to_gnd: false,
             short_to_vcc: false,
-            sender,
+            _sender: sender,
             receiver,
         }
     }
 
+    pub fn supports_config() -> Supports {
+        Supports {
+            subscribes: vec![Max31855Event::NAME.to_string()],
+            ..Default::default()
+        }
+    }
+
+    pub fn registration() -> WindowRegistration {
+        WindowRegistration::endpoint(
+            "max31855",
+            "Max31855",
+            Self::supports_config,
+            |ctx: EndpointWindowContext| Box::new(Self::new(ctx.node, ctx.source)),
+        )
+    }
+
     fn handle_event(&mut self) {
         while let Ok(udp_msg) = self.receiver.try_recv() {
-            if udp_msg.typ.as_deref() != Some(Max31855Event::MSG_TYPE) {
+            if udp_msg.src.as_deref() != Some(&self.source)
+                || udp_msg.typ.as_deref() != Some(Max31855Event::MSG_TYPE)
+            {
                 continue;
             }
-            if let Some(payload) = udp_msg.msg {
-                if let Ok(event) = Max31855Event::from_value(payload) {
+
+            if let Some(payload) = udp_msg.msg.as_ref() {
+                if let Ok(event) = Max31855Event::from_value(payload.clone()) {
                     self.last_update = Instant::now();
                     event.thermocouple_c.map(|v| self.thermocouple_c = v);
                     event.internal_c.map(|v| self.internal_c = v);
@@ -67,9 +91,7 @@ impl WindowMax31855 {
     }
 
     fn ui(&mut self, ui: &mut egui::Ui) {
-        let alive = Instant::now()
-            .duration_since(self.last_update)
-            .as_millis()
+        let alive = Instant::now().duration_since(self.last_update).as_millis()
             < MAX_UPDATE_INTERVAL_MS;
         ui.add(WidgetAlive::new(alive));
 
@@ -123,7 +145,7 @@ impl MyWindow for WindowMax31855 {
     fn show(&mut self, ui: &mut egui::Ui) -> Result<()> {
         self.handle_event();
         let mut open = self.open;
-        egui::Window::new(self.name())
+        egui::Window::new(format!("{} [{}]", self.name(), self.source))
             .open(&mut open)
             .resizable([true, true])
             .default_size([300.0, 200.0])
@@ -137,5 +159,9 @@ impl MyWindow for WindowMax31855 {
 
     fn is_closed(&self) -> bool {
         !self.open
+    }
+
+    fn supports(&self) -> Option<Supports> {
+        Some(Self::supports_config())
     }
 }

@@ -4,107 +4,67 @@ use log::{debug, error, info};
 use serde::Serialize;
 use std::net::SocketAddr;
 use std::sync::Arc;
-use std::time::{Duration};
+use std::time::Duration;
 use tokio::net::UdpSocket;
 use tokio::sync::{mpsc, Mutex};
 use tokio::task::JoinHandle;
 
+pub mod broker;
 pub mod eventbus;
 pub mod logger;
 pub mod msgs;
-use msgs::TypedMessage;
 
-pub use crate::msgs::{AliveEvent, Msg, UdpMessage};
+use crate::broker::fnv1a_32;
+use crate::msgs::DeviceAliveEvent;
+pub use crate::msgs::{ Msg, UdpMessage};
 
 pub mod scout;
-pub use scout::Scout;
 pub use scout::Endpoint;
-
-
-#[derive(Debug, Clone)]
-pub struct TypedUdpMessage<T> where T: TypedMessage {
-    pub src: Option<String>,
-    pub dst: Option<String>,
-    pub typ: Option<String>,
-    pub payload: Option<T>,
-}
-
-impl<T> TypedUdpMessage<T> where T: TypedMessage+Msg {
-    pub fn from(udp_message: UdpMessage) -> Result<Self> {
-        if T::MSG_TYPE != udp_message.typ.as_deref().unwrap_or("") {
-            return Err(anyhow::anyhow!("Message type mismatch"));
-        }
-        Ok(
-        TypedUdpMessage {
-            src: udp_message.src,
-            dst: udp_message.dst,
-            typ: udp_message.typ,
-            payload: udp_message.msg.map(|p| T::from_value(p).ok()).flatten(),
-        })  
-    }
-}
-
-#[async_trait::async_trait]
-pub trait MessageHandler: Send + Sync {
-    async fn handle(&self, source: &str, payload: &[u8]) -> anyhow::Result<()>;
-}
-
-pub struct HandlerWrapper<T, F> {
-    callback: F,
-    _marker: std::marker::PhantomData<T>,
-}
-
-impl<T, F> HandlerWrapper<T, F> {
-    pub fn new(callback: F) -> Self {
-        Self {
-            callback,
-            _marker: std::marker::PhantomData,
-        }
-    }
-}
+pub use scout::Scout;
 
 #[async_trait::async_trait]
 pub trait UdpMessageHandler: Send + Sync {
     async fn handle(&self, udp_message: &UdpMessage) -> anyhow::Result<()>;
 }
-/* 
-pub struct UdpHandlerWrapper<T, F> {
-    callback: F,
-    message_types: Vec<String>,
-    sources: Vec<String>,
-    destination: String,
-    _marker: std::marker::PhantomData<T>,
-}
 
-impl<T, F> UdpHandlerWrapper<T, F> {
-    pub fn new(destination: String, callback: F) -> Self {
-        Self {
-            callback,
-            message_types: vec![],
-            sources: vec![],
-            destination,
-            _marker: std::marker::PhantomData,
-        }
-    }
-
-    pub fn filter(mut self, message_types: Vec<String>, sources: Vec<String>) -> Self {
-        self.message_types = message_types;
-        self.sources = sources;
-        self
-    }
-}
-    */
-
-#[async_trait::async_trait]
-impl<T, F, Fut> MessageHandler for HandlerWrapper<T, F>
+struct HandlerWrapper<T, F, Fut>
 where
-    T: TypedMessage + Msg,
-    F: Fn(String, T) -> Fut + Send + Sync + 'static,
+    T: Msg,
+    F: Fn(u32, T) -> Fut + Send + Sync,
     Fut: std::future::Future<Output = ()> + Send,
 {
-    async fn handle(&self, source: &str, payload: &[u8]) -> anyhow::Result<()> {
-        let msg: T = T::json_deserialize(&payload.to_vec())?;
-        (self.callback)(source.to_string(), msg).await;
+    callback: F,
+    _phantom: std::marker::PhantomData<(T, Fut)>,
+}
+
+impl<T, F, Fut> HandlerWrapper<T, F, Fut>
+where
+    T: Msg + for<'de> serde::Deserialize<'de>,
+    F: Fn(u32, T) -> Fut + Send + Sync + 'static,
+    Fut: std::future::Future<Output = ()> + Send + 'static,
+{
+    fn new(callback: F) -> Self {
+        HandlerWrapper {
+            callback,
+            _phantom: std::marker::PhantomData,
+        }
+    }
+}
+
+#[async_trait::async_trait]
+impl<T, F, Fut> UdpMessageHandler for HandlerWrapper<T, F, Fut>
+where
+    T: Msg + for<'de> serde::Deserialize<'de> + Send + Sync,
+    F: Fn(u32, T) -> Fut + Send + Sync,
+    Fut: std::future::Future<Output = ()> + Send + Sync,
+{
+    async fn handle(&self, udp_message: &UdpMessage) -> anyhow::Result<()> {
+        let src = udp_message.src.unwrap_or_default();
+        if let Some(ref msg_data) = udp_message.payload {
+            if let Ok(msg) = T::from_bytes(msg_data) {
+                (self.callback)(src, msg).await;
+            }
+        }
         Ok(())
     }
 }
@@ -115,12 +75,12 @@ pub struct UdpNode {
     unicast_socket: Arc<UdpSocket>,
     my_id: Arc<Mutex<String>>,
     my_subscriptions: Arc<Mutex<Vec<String>>>,
-    handlers: Arc<DashMap<String, Box<dyn MessageHandler>>>,
+    handlers: Arc<DashMap<u32, Box<dyn UdpMessageHandler>>>,
     /// Maps Peer ID -> (Data Address, Last Seen)
     tx_queue_sender: mpsc::Sender<UdpMessage>,
     tx_queue_receiver: Arc<Mutex<mpsc::Receiver<UdpMessage>>>,
     generic_handlers: Arc<Mutex<Vec<Box<dyn UdpMessageHandler>>>>,
-    generic_senders : Arc<Mutex<Vec<mpsc::Sender<UdpMessage>>>>,
+    generic_senders: Arc<Mutex<Vec<mpsc::Sender<UdpMessage>>>>,
     tasks: Mutex<Vec<JoinHandle<()>>>,
 }
 
@@ -179,21 +139,23 @@ impl UdpNode {
                 interval.tick().await;
 
                 // 1. Send Heartbeat
-                let mut alive = AliveEvent::default();
+                let mut alive = DeviceAliveEvent::default();
                 let my_id = my_id.lock().await;
                 let my_subscriptions = my_subscriptions.lock().await;
-                alive.subscribes = Some(my_subscriptions.clone());
+                alive.subscribes = Vec::new(); // For now, we don't send subscriptions in the AliveEvent
+        //        alive.src = fnv1a_32(&my_id.clone());
 
-                if let Ok(payload) = alive.to_value() {
-                    let packet = UdpMessage {
-                        src: Some(my_id.clone()),
+                if let Ok(payload) = alive.to_bytes() {
+                    let udp_message = UdpMessage {
+                        src: Some(fnv1a_32(&my_id)),
                         dst: None,
-                        typ: Some(AliveEvent::MSG_TYPE.to_string()),
-                        msg: Some(payload),
+                        msg_typ: Some(DeviceAliveEvent::ID),
+                        req_id: None,
+                        payload: Some(payload),
                     };
                     // We send this via our standard TX queue, aiming at the Multicast Addr
                     debug!("MC Send AliveEvent {:?}", alive);
-                    let data = UdpMessage::json_serialize(&packet).unwrap();
+                    let data = udp_message.to_bytes().unwrap_or_default();
                     let _ = unicast_socket.send_to(&data, &node.multicast_addr).await;
                 }
             }
@@ -206,10 +168,10 @@ impl UdpNode {
         tokio::spawn(async move {
             while let Some(udp_message) = tx_queue_receiver.lock().await.recv().await {
                 let target = if let Some(dst_endpoint) = &udp_message.dst {
-                    if let Some(addr) = node.multicast_scout.endpoint_to_addr(dst_endpoint) {
+                    if let Some(addr) = node.multicast_scout.endpoint_to_addr(*dst_endpoint) {
                         debug!(
                             "UC Send {:?} to {:?} @ {:?}",
-                            udp_message.typ, dst_endpoint, addr
+                            udp_message.msg_typ, dst_endpoint, addr
                         );
 
                         addr
@@ -221,7 +183,7 @@ impl UdpNode {
                     info!("No destination endpoint specified");
                     continue;
                 };
-                if let Ok(data) = udp_message.json_serialize() {
+                if let Ok(data) = udp_message.to_bytes() {
                     if let Err(e) = send_socket.send_to(&data, target).await {
                         error!("Send error: {}", e);
                     }
@@ -233,13 +195,30 @@ impl UdpNode {
     fn start_unicast_receiver(node: Arc<Self>) -> JoinHandle<()> {
         let generic_handlers = node.generic_handlers.clone();
         let recv_socket = node.unicast_socket.clone();
-    //    let handlers = node.handlers.clone();
+        let typed_handlers = node.handlers.clone();
         tokio::spawn(async move {
             let mut buf = [0u8; 65535];
             loop {
-                if let Ok((len, addr)) = recv_socket.recv_from(&mut buf).await {
+                if let Ok((len, _addr)) = recv_socket.recv_from(&mut buf).await {
                     let data: Vec<u8> = buf[..len].to_vec();
-                    if let Ok(packet) = UdpMessage::json_deserialize(&data) {
+                    if let Ok(packet) = UdpMessage::from_bytes(&data) {
+                        // ── typed handlers (on::<T>) ─────────────────
+                        if let Some(ref typ) = packet.msg_typ {
+                            if typed_handlers.contains_key(typ) {
+                                let h = typed_handlers.clone();
+                                let t = typ.clone();
+                                let pkt = packet.clone();
+                                tokio::spawn(async move {
+                                    if let Some(handler) = h.get(&t) {
+                                        if let Err(e) = handler.handle(&pkt).await {
+                                            error!("Typed handler error: {}", e);
+                                        }
+                                    }
+                                });
+                            }
+                        }
+
+                        // ── generic handlers (UdpMessageHandler) ────
                         let gen_handlers = generic_handlers.clone();
                         let handlers_guard = gen_handlers.lock().await;
                         for i in 0..handlers_guard.len() {
@@ -256,11 +235,11 @@ impl UdpNode {
                         }
                         drop(handlers_guard);
                         for sender in node.generic_senders.lock().await.iter() {
-                            let _ = sender.send(packet.clone()).await;
+                            let p = packet.clone();
+                            let _ = sender.send(p).await;
                         }
-                        
                     } else {
-                        info!("Failed to decode JSON packet from {}", addr);
+                        error!("Failed to deserialize UdpMessage from {} bytes", len);
                     }
                 }
             }
@@ -269,36 +248,37 @@ impl UdpNode {
 
     pub async fn send_event<T>(&self, event: T)
     where
-        T: TypedMessage + Msg + Serialize,
+        T: Msg ,
     {
         let udp_message = UdpMessage {
-            src: Some(self.my_id.lock().await.clone()),
-            dst: Some("broker".to_string()),
-            typ: Some(T::MSG_TYPE.to_string()),
-            msg: Some(event.to_value().unwrap()),
+            src: Some(fnv1a_32(&self.my_id.lock().await.clone())),
+            dst: Some(fnv1a_32("broker")),
+            msg_typ: Some(T::ID),
+            req_id: None,
+            payload: Some(event.to_bytes().unwrap()),
         };
         self.tx_queue_sender.send(udp_message).await.unwrap()
     }
 
     pub async fn send_msg_to<T>(&self, dst: &str, msg: T)
     where
-        T: TypedMessage + Msg + Serialize,
+        T: Msg ,
     {
         let udp_message = UdpMessage {
-            src: Some(self.my_id.lock().await.clone()),
-            dst: Some(dst.to_string()),
-            typ: Some(T::MSG_TYPE.to_string()),
-            msg: Some(msg.to_value().unwrap()),
+            src: Some(fnv1a_32(&self.my_id.lock().await.clone())),
+            dst: Some(fnv1a_32(dst)),
+            msg_typ: Some(T::ID),
+            req_id: None,
+            payload: Some(msg.to_bytes().unwrap()),
         };
         self.tx_queue_sender.send(udp_message).await.unwrap()
     }
-// add a generic U
-    pub fn add_handler<H>(&self, typ: &str, handler: H)
+    // add a generic U
+    pub fn add_handler<H>(&self, typ: u32, handler: H)
     where
-        H: MessageHandler + 'static,
+        H: UdpMessageHandler + 'static,
     {
-        self.handlers
-            .insert(typ.to_string(), Box::new(handler));
+        self.handlers.insert(typ, Box::new(handler));
     }
 
     pub fn add_sender(&self, sender: mpsc::Sender<UdpMessage>) {
@@ -310,29 +290,30 @@ impl UdpNode {
 
     pub fn on<T, F, Fut>(&self, callback: F)
     where
-        T: TypedMessage + Msg,
-        F: Fn(String, T) -> Fut + Send + Sync + 'static,
-        Fut: std::future::Future<Output = ()> + Send,
+        T: Msg + for<'de> serde::Deserialize<'de> + Send + Sync + 'static,
+        F: Fn(u32, T) -> Fut + Send + Sync + 'static,
+        Fut: std::future::Future<Output = ()> + Send + Sync + 'static,
     {
         self.handlers.insert(
-            T::MSG_TYPE.to_string(),
+            T::ID,
             Box::new(HandlerWrapper::new(callback)),
         );
     }
 
-    pub async fn send_typed<T: TypedMessage + Msg + Serialize>(
+    pub async fn send_typed<T:  Msg>(
         &self,
         src: &str,
         dest_id: &str,
         msg: T,
     ) -> anyhow::Result<()> {
-        let payload = msg.to_value()?;
+        let payload = msg.to_bytes()?;
 
         let packet = UdpMessage {
-            src: Some(src.to_string()),
-            dst: Some(dest_id.to_string()),
-            typ: Some(T::MSG_TYPE.to_string()),
-            msg: Some(payload),
+            src: Some(fnv1a_32(src)),
+            dst: Some(fnv1a_32(dest_id)),
+            msg_typ: Some(T::ID),
+            req_id: None,
+            payload: Some(payload),
         };
 
         self.tx_queue_sender
@@ -357,7 +338,7 @@ impl UdpNode {
         self.multicast_scout.subscriptions.clone()
     }
 
-    pub async fn get_endpoints(&self) -> Arc<DashMap<String, Endpoint>> {
+    pub async fn get_endpoints(&self) -> Arc<DashMap<u32, Endpoint>> {
         self.multicast_scout.endpoints.clone()
     }
 
@@ -375,5 +356,3 @@ impl UdpNode {
         }
     }
 }
-
-

@@ -1,23 +1,21 @@
-use std::ops::RangeInclusive;
-use std::sync::Arc;
+use std::{ops::RangeInclusive, sync::Arc};
 
 use anyhow::Result;
 use dashmap::DashMap;
 use eframe::egui;
-use egui_plot::{Line, Plot, PlotPoints};
 use ehmi::Gauge;
-use log::info;
 
-use crate::my_window::{ MyWindow};
-
-use crate::{MetricData, Record};
+use crate::{
+    Record,
+    my_window::{FieldWindowContext, MyWindow, Supports, WindowRegistration},
+};
 
 pub(crate) struct WindowGauge {
     key: String,
     cache: Arc<DashMap<String, Record>>,
     window_name: String,
     range: RangeInclusive<f64>,
-    open : bool,
+    open: bool,
 }
 
 impl WindowGauge {
@@ -27,17 +25,33 @@ impl WindowGauge {
             key,
             cache,
             window_name,
-            range: std::f64::MAX..=std::f64::MIN,
-            open : true,
+            range: f64::MAX..=f64::MIN,
+            open: true,
         }
+    }
+
+    pub fn supports_config() -> Supports {
+        Supports {
+            accepts_numeric_series: true,
+            ..Default::default()
+        }
+    }
+
+    pub fn registration() -> WindowRegistration {
+        WindowRegistration::field(
+            "gauge",
+            "Gauge",
+            Self::supports_config,
+            |ctx: FieldWindowContext| Box::new(Self::new(ctx.key, ctx.cache)),
+        )
     }
 
     fn adjust_range(&mut self, new_value: f64) {
         if new_value < *self.range.start() {
-            self.range = (new_value)..=(self.range.end().clone());
+            self.range = new_value..=*self.range.end();
         }
         if new_value > *self.range.end() {
-            self.range = (self.range.start().clone())..=(new_value);
+            self.range = *self.range.start()..=new_value;
         }
         if self.range.end() == self.range.start() {
             let mid = (self.range.start() + self.range.end()) / 2.0;
@@ -69,12 +83,16 @@ impl MyWindow for WindowGauge {
             .show(ui.ctx(), |ui| {
                 ui.vertical_centered(|ui| {
                     ui.add(Gauge::new(numeric_value as f32).range(self.range.clone()))
-                })
+                });
             });
         Ok(())
     }
 
     fn is_closed(&self) -> bool {
         !self.open
+    }
+
+    fn supports(&self) -> Option<Supports> {
+        Some(Self::supports_config())
     }
 }

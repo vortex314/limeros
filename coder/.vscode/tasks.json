@@ -33,7 +33,7 @@
                 "--input", "syntax/message.proto",
                 "--output", "../esp32-eventbus/src",
                 "--lang", "cpp",
-                "--format", "mix"
+                "--format", "cbor"
             ],
             "group": {
                 "kind": "build",
@@ -87,7 +87,7 @@
                 "--input", "syntax/message.proto",
                 "--output", "../rust/src",
                 "--lang", "rust",
-                "--format", "mix"
+                "--format", "cbor"
             ],
             "group": {
                 "kind": "build",

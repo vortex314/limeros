@@ -49,7 +49,7 @@ void Max31855Actor::on_start()
         timer_stop(_timer_poll);
         return;
     }
-    AliveEvent *alive_event = new AliveEvent();
+    DeviceAliveEvent *alive_event = new DeviceAliveEvent();
     alive_event->publishes.push_back(Max31855Event::name_value);
     alive_event->publishes.push_back(HeatingEvent::name_value);
     alive_event->subscribes.push_back(Max31855Read::name_value);
@@ -288,7 +288,7 @@ void Max31855Actor::control()
     event->short_to_vcc = short_to_vcc;
     event->timestamp_ms = esp_timer_get_time() / 1000;
 
-    INFO("MAX31855 tc=%.2fC cj=%.2fC fault=%d oc=%d scg=%d scv=%d",
+    DEBUG("MAX31855 tc=%.2fC cj=%.2fC fault=%d oc=%d scg=%d scv=%d",
          thermocouple_c,
          internal_c,
          fault,

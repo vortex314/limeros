@@ -1,0 +1,98 @@
+// Auto-generated from robot.hcl — do not edit by hand.
+// Every field is `std::optional<T>`; missing fields serialize as CBOR null.
+// Messages are encoded as CBOR arrays (positional, not keyed by name).
+// Uses tinycbor for CBOR encoding/decoding.
+
+#pragma once
+
+#include <cbor.h>
+#include <cstdint>
+#include <optional>
+#include <string>
+
+{% macro encode_field(field) %}
+{%- if field.cpp_type == "uint32_t" %}
+            err = cbor_encode_uint(&arrayEncoder, (uint64_t){{ field.name }}.value());
+{%- elif field.cpp_type == "int32_t" %}
+            err = cbor_encode_int(&arrayEncoder, (int64_t){{ field.name }}.value());
+{%- elif field.cpp_type == "uint64_t" %}
+            err = cbor_encode_uint(&arrayEncoder, {{ field.name }}.value());
+{%- elif field.cpp_type == "int64_t" %}
+            err = cbor_encode_int(&arrayEncoder, {{ field.name }}.value());
+{%- elif field.cpp_type == "float" %}
+            err = cbor_encode_float(&arrayEncoder, {{ field.name }}.value());
+{%- elif field.cpp_type == "std::string" %}
+            err = cbor_encode_text_string(&arrayEncoder,
+                {{ field.name }}.value().c_str(),
+                {{ field.name }}.value().size());
+{%- elif field.cpp_type == "bool" %}
+            err = cbor_encode_boolean(&arrayEncoder, {{ field.name }}.value());
+{%- endif %}
+{%- endmacro encode_field %}
+
+{% macro decode_field(field) %}
+{%- if field.cpp_type == "uint32_t" %}
+                    { uint64_t _v; cbor_value_get_uint(&array, &_v); msg.{{ field.name }} = (uint32_t)_v; }
+{%- elif field.cpp_type == "int32_t" %}
+                    { int64_t _v; cbor_value_get_int(&array, &_v); msg.{{ field.name }} = (int32_t)_v; }
+{%- elif field.cpp_type == "uint64_t" %}
+                    cbor_value_get_uint(&array, &msg.{{ field.name }}.emplace());
+{%- elif field.cpp_type == "int64_t" %}
+                    cbor_value_get_int(&array, &msg.{{ field.name }}.emplace());
+{%- elif field.cpp_type == "float" %}
+                    cbor_value_get_float(&array, &msg.{{ field.name }}.emplace());
+{%- elif field.cpp_type == "std::string" %}
+                    { char* _buf; size_t _len; cbor_value_dup_text_string(&array, &_buf, &_len, nullptr); msg.{{ field.name }} = std::string(_buf, _len); free(_buf); }
+{%- elif field.cpp_type == "bool" %}
+                    { bool _v; cbor_value_get_boolean(&array, &_v); msg.{{ field.name }} = _v; }
+{%- endif %}
+{%- endmacro decode_field %}
+
+{% for msg in messages %}
+struct {{ msg.name }} {
+{%- for field in msg.fields %}
+{%- if field.description %}
+    /// {{ field.description }}
+{%- endif %}
+    std::optional<{{ field.cpp_type }}> {{ field.name }};
+{%- endfor %}
+
+    /// Serialize this message into a CBOR array as a child of `parentEncoder`.
+    CborError toCbor(CborEncoder& parentEncoder) const {
+        CborEncoder arrayEncoder;
+        CborError err = cbor_encoder_create_array(
+            &parentEncoder, &arrayEncoder, {{ msg.fields | length }});
+        if (err != CborNoError) return err;
+{%- for field in msg.fields %}
+        if ({{ field.name }}.has_value()) {
+{{ self::encode_field(field=field) }}
+        } else {
+            err = cbor_encode_null(&arrayEncoder);
+        }
+        if (err != CborNoError) return err;
+{%- endfor %}
+        return cbor_encoder_close_container(&parentEncoder, &arrayEncoder);
+    }
+
+    /// Deserialize a {{ msg.name }} from a CBOR array value.
+    static {{ msg.name }} fromCbor(CborValue& it) {
+        {{ msg.name }} msg;
+        CborValue array;
+        if (cbor_value_is_container(&it) &&
+            cbor_value_enter_container(&it, &array) == CborNoError)
+        {
+{%- for field in msg.fields %}
+            if (!cbor_value_at_end(&array)) {
+                if (!cbor_value_is_null(&array)) {
+{{ self::decode_field(field=field) }}
+                }
+                cbor_value_advance(&array);
+            }
+{%- endfor %}
+            cbor_value_leave_container(&it, &array);
+        }
+        return msg;
+    }
+};
+
+{% endfor %}
