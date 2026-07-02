@@ -34,6 +34,8 @@ pub struct RobotConfig {
     pub model: String,
     /// Multicast port for the robot.
     pub multicast_port: u16,
+    /// Multicast address for the robot.
+    pub multicast_addr: Option<String>,
     /// Optional human-readable description.
     pub description: Option<String>,
     /// Named devices, keyed by label.
@@ -48,7 +50,6 @@ impl RobotConfig {
     ///
     /// Returns `None` if the referenced interface is not defined.
     pub fn resolve_interface(&self, interface_ref: &str) -> Option<&InterfaceConfig> {
-        // Strip a leading `interface.` namespace prefix if present.
         let key = interface_ref.strip_prefix("interface.").unwrap_or(interface_ref);
         self.interfaces.get(key)
     }
@@ -63,7 +64,8 @@ impl RobotConfig {
     ) -> Option<&InterfaceConfig> {
         let device = self.devices.get(device_name)?;
         let endpoint = device.endpoints.get(endpoint_name)?;
-        self.resolve_interface(&endpoint.interface_ref)
+        let interface_ref = endpoint.interfaces.first()?;
+        self.resolve_interface(interface_ref)
     }
 }
 
@@ -80,9 +82,20 @@ pub struct DeviceConfig {
 /// An endpoint on a device, referencing an interface.
 #[derive(Debug, Clone)]
 pub struct EndpointConfig {
-    /// Dotted-path reference to an interface (e.g. `"interface.HoverboardDrive"`).
-    pub interface_ref: String,
+    /// Dotted-path references to interfaces (e.g. `"interface.System"`).
+    pub interfaces: Vec<String>,
+    pub services: Vec<String>,
+    pub events: Vec<String>,
+    pub replies: Vec<String>,
+    pub subscribes: Vec<SubscribeConfig>,
     pub description: Option<String>,
+}
+
+#[derive(Debug, Clone)]
+pub struct SubscribeConfig {
+    pub src: Option<String>,
+    pub msg_type: Option<String>,
+    pub dst: Option<String>,
 }
 
 /// A message-based interface definition.
@@ -134,9 +147,28 @@ fn normalize_template_refs(input: &str) -> String {
     let re_dollar = Regex::new(r#"\$\s*\{\s*([^}]+)\s*\}"#).unwrap();
     let s = re_dollar.replace_all(input, "$1").to_string();
 
+    // Step 1b: Normalize inline object entries inside lists, e.g.
+    //   subscribes = [ { src="a" msg_type="X" dst=null } ]
+    // into a comma-delimited object so HCL parses it as an object literal.
+    let re_attr = Regex::new(r#"(\w+)\s*=\s*("[^"]*"|[^\s",}]+)"#).unwrap();
+    let re_list_obj = Regex::new(r#"\[\s*\{\s*([^{}\n]+)\s*\}\s*\]"#).unwrap();
+    let s = re_list_obj
+        .replace_all(&s, |caps: &regex::Captures| {
+            let body = caps.get(1).map(|m| m.as_str()).unwrap_or_default();
+            let attrs: Vec<String> = re_attr
+                .captures_iter(body)
+                .map(|c| format!("{} = {}", &c[1], &c[2]))
+                .collect();
+            if attrs.is_empty() {
+                caps.get(0).map(|m| m.as_str()).unwrap_or_default().to_string()
+            } else {
+                format!("[ {{ {} }} ]", attrs.join(", "))
+            }
+        })
+        .to_string();
+
     // Step 2: Expand inline multi-attribute blocks.
     //   field "x" { type = "u32" description = "..." }
-    // becomes:
     //   field "x" {
     //     type = "u32"
     //     description = "..."
@@ -185,15 +217,28 @@ pub fn parse_robot_body(body: &Body) -> anyhow::Result<RobotConfig> {
 
     let inner = robot_block.body();
 
+    let mut interfaces = parse_labeled_blocks(inner, "interface", parse_interface)?;
+    let root_messages = parse_labeled_blocks(inner, "message", parse_message)?;
+    if !root_messages.is_empty() {
+        interfaces.insert(
+            "_root".to_string(),
+            InterfaceConfig {
+                description: Some("Synthetic interface for top-level robot messages".to_string()),
+                messages: root_messages,
+            },
+        );
+    }
+
     Ok(RobotConfig {
         model: get_attr_string(inner, "model")?,
         description: get_attr_optional(inner, "description"),
         devices: parse_labeled_blocks(inner, "device", parse_device)?,
-        interfaces: parse_labeled_blocks(inner, "interface", parse_interface)?,
+        interfaces,
         name,
         multicast_port: get_attr_optional(inner, "multicast_port")
             .and_then(|s| s.parse::<u16>().ok())
-            .unwrap_or(0),    
+            .unwrap_or(0),
+        multicast_addr: get_attr_optional(inner, "multicast_addr"),
     })
 }
 
@@ -219,7 +264,11 @@ fn parse_endpoint(block: &Block) -> anyhow::Result<(String, EndpointConfig)> {
     Ok((
         name,
         EndpointConfig {
-            interface_ref: get_attr_string(body, "interface")?,
+            interfaces: get_attr_list_strings(body, "interfaces"),
+            services: get_attr_list_strings(body, "services"),
+            events: get_attr_list_strings(body, "events"),
+            replies: get_attr_list_strings(body, "replies"),
+            subscribes: get_attr_subscribes(body, "subscribes"),
             description: get_attr_optional(body, "description"),
         },
     ))
@@ -236,6 +285,7 @@ fn parse_interface(block: &Block) -> anyhow::Result<(String, InterfaceConfig)> {
         },
     ))
 }
+
 
 fn parse_message(block: &Block) -> anyhow::Result<(String, MessageConfig)> {
     let name = label(block);
@@ -305,6 +355,49 @@ fn get_attr_string(body: &Body, key: &str) -> anyhow::Result<String> {
         .find(|a| &*a.key == key)
         .and_then(|a| expr_to_string(&a.expr))
         .ok_or_else(|| anyhow::anyhow!("missing attribute '{key}'"))
+}
+
+/// Read an optional attribute as a list of strings.
+fn get_attr_list_strings(body: &Body, key: &str) -> Vec<String> {
+    match body.attributes().find(|a| &*a.key == key).map(|a| &a.expr) {
+        Some(Expression::Array(items)) => items.iter().filter_map(expr_to_string).collect(),
+        Some(expr) => expr_to_string(expr).map(|s| vec![s]).unwrap_or_default(),
+        None => Vec::new(),
+    }
+}
+
+fn get_attr_subscribes(body: &Body, key: &str) -> Vec<SubscribeConfig> {
+    let Some(expr) = body.attributes().find(|a| &*a.key == key).map(|a| &a.expr) else {
+        return Vec::new();
+    };
+
+    let Expression::Array(items) = expr else {
+        return Vec::new();
+    };
+
+    items
+        .iter()
+        .filter_map(|item| {
+            let Expression::Object(obj) = item else {
+                return None;
+            };
+            let mut src: Option<String> = None;
+            let mut msg_type: Option<String> = None;
+            let mut dst: Option<String> = None;
+
+            for (k, v) in obj.iter() {
+                let value = expr_to_string(v);
+                match k.to_string().as_str() {
+                    "src" => src = value.filter(|s| s != "null"),
+                    "msg_type" => msg_type = value.filter(|s| s != "null"),
+                    "dst" => dst = value.filter(|s| s != "null"),
+                    _ => {}
+                }
+            }
+
+            Some(SubscribeConfig { src, msg_type, dst })
+        })
+        .collect()
 }
 
 /// Convert an HCL [`Expression`] into a plain Rust `String`.

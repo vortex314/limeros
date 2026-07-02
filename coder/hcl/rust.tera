@@ -1,13 +1,22 @@
 // Auto-generated from robot.hcl — do not edit by hand.
 // Every field is `Option<T>`; missing fields serialize as CBOR null.
 // Messages are encoded as CBOR arrays (positional, not keyed by name).
+use serde_tuple::{Deserialize_tuple, Serialize_tuple};
 
-use serde::{Deserialize, Serialize};
+pub trait BytesSerde<T> {
+    fn from_bytes(data: &[u8]) -> Option<T> where T : Sized + serde::de::DeserializeOwned {
+        cbor2::from_reader(data).ok()
+    }
+    fn to_bytes(&self) -> Option<Vec<u8>> where Self : serde::Serialize {
+        cbor2::to_vec(self).ok()
+    }
+}
 
-pub static const MULTICAST_PORT : i16 = {{ robot.multicast_port }};
+pub const MULTICAST_PORT : u16 = {{ robot.multicast_port }};
+pub const MULTICAST_ADDR : &str = "{{ robot.multicast_addr }}";
 
-{% for device in devices   %}
-pub static const {{ device.name | upper }}_ID: u32 = {{ device.id }};
+{% for endpoint in endpoints %}
+pub const {{ endpoint.name | upper }}_ID: u32 = {{ endpoint.id }};
 {% endfor %}
 
 
@@ -18,7 +27,7 @@ impl {{ msg.name }} {
     pub const NAME: &'static str = "{{ msg.name }}";
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone,Serialize_tuple,Deserialize_tuple)]
 pub struct {{ msg.name }} {
 {%- for field in msg.fields %}
 {%- if field.description %}
@@ -28,29 +37,6 @@ pub struct {{ msg.name }} {
 {%- endfor %}
 }
 
-impl serde::Serialize for {{ msg.name }} {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        use serde::ser::SerializeSeq;
-        let mut seq = serializer.serialize_seq(Some({{ msg.fields | length }}))?;
-{%- for field in msg.fields %}
-        seq.serialize_element(&self.{{ field.name }})?;
-{%- endfor %}
-        seq.end()
-    }
-}
-
-#[derive(Deserialize)]
-struct {{ msg.name }}SerdeHelper({%- for field in msg.fields -%}Option<{{ field.rust_type }}>{% if not loop.last %}, {% endif %}{%- endfor -%});
-
-impl From<{{ msg.name }}SerdeHelper> for {{ msg.name }} {
-    fn from(h: {{ msg.name }}SerdeHelper) -> Self {
-        let ({% for field in msg.fields %}{{ field.name }}{% if not loop.last %}, {% endif %}{% endfor %}) = ({% for field in msg.fields %}h.{{ field.index }}{% if not loop.last %}, {% endif %}{% endfor %});
-        {{ msg.name }} {
-{%- for field in msg.fields %}
-            {{ field.name }},
-{%- endfor %}
-        }
-    }
-}
+impl BytesSerde<{{ msg.name }}> for {{ msg.name }} {}
 
 {% endfor %}

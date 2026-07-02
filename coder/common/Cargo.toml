@@ -1,0 +1,28 @@
+[package]
+name = "common"
+version = "0.1.0"
+edition = "2024"
+
+
+[dependencies]
+serde = { version = "1.0.228", features = ["derive"] }
+serde_tuple ="*"
+cbor2 ="*"
+tera = "1.20.1"
+tera-text-filters = "1.0.0"
+anyhow = "1.0.103"
+env_logger = "0.11.8"
+log = "0.4.29"
+clap = { version = "4.5.53", features = ["derive"] }
+chrono = { version = "0.4", features = ["serde"] }
+fnv = "1.0.7"
+hcl-rs = "0.19"
+regex = "1.12.4"
+convert_case = "0.11.0"
+hidapi = "2.6.6"
+pest = "2.8.4"
+pest_derive = "2.8.4"
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "net"] }
+
+[build-dependencies]
+prost-build = "0.14.1"

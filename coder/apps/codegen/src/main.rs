@@ -6,33 +6,20 @@
 
 use anyhow::Context;
 use clap::Parser;
-use coder::{load_robot_config, DeviceConfig, MessageConfig, RobotConfig};
+use common::{load_robot_config, DeviceConfig, MessageConfig, RobotConfig, SubscribeConfig,fnv1a_32};
 use serde::Serialize;
 use tera::{Context as TeraContext, Tera};
 
-fn fnv1a_32(s: &str) -> u32 {
-    // 1. Initialize the hash with the 32-bit offset basis
-    let mut hash: u32 = 2166136261;
-    
-    // 2. Process each byte of the string
-    for byte in s.as_bytes() {
-        // XOR the lower 8 bits of the hash with the byte
-        hash ^= *byte as u32;
-        // Multiply by the FNV prime (wrapping_mul prevents overflow panics in debug mode)
-        hash = hash.wrapping_mul(16777619);
-    }
-    
-    hash
-}
+
 
 #[derive(Parser)]
 #[command(about = "Generate code from an HCL robot config")]
 struct Args {
     /// Path to the HCL robot config
-    #[arg(short = 'i', long, default_value = "hcl/robot.hcl")]
+    #[arg(short = 'i', long, default_value = "../../hcl/robot.hcl")]
     input: String,
     /// Output file
-    #[arg(short = 'o', long, default_value = "src/generated.rs")]
+    #[arg(short = 'o', long, default_value = "../../generated/src/generated.rs")]
     output: String,
     /// Tera template name (from hcl/*.tera)
     #[arg(short = 't', long, default_value = "rust.tera")]
@@ -45,8 +32,8 @@ fn main() -> anyhow::Result<()> {
         .with_context(|| format!("failed to load {}", args.input))?;
 
     let ctx = build_template_context(&cfg)?;
-    let tera = Tera::new("hcl/*.tera")
-        .with_context(|| "failed to load templates from hcl/*.tera")?;
+    let tera = Tera::new("../../hcl/*.tera")
+        .with_context(|| "failed to load templates from ../../hcl/*.tera")?;
     let code = tera
         .render(&args.template, &ctx)
         .with_context(|| format!("template rendering failed for {}", args.template))?;
@@ -72,13 +59,17 @@ struct TemplateCtx {
     robot: RobotCtx,
     messages: Vec<MessageCtx>,
     devices: Vec<DeviceCtx>,
+    endpoints: Vec<EndpointCtx>,
 }
 
 #[derive(Serialize)]
 struct RobotCtx {
     name: String,
     id: u32,
+    model: String,
+    description: String,
     multicast_port: u16,
+    multicast_addr: String,
 }
 
 #[derive(Serialize)]
@@ -91,11 +82,22 @@ struct DeviceCtx {
     endpoints: Vec<EndpointCtx>,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Clone)]
 struct EndpointCtx {
     name: String,
-    interface_ref: String,
+    id: u32,
+    device_name: String,
+    const_name: String,
+    interfaces: Vec<String>,
+    subscribes: Vec<SubscribeCtx>,
     description: String,
+}
+
+#[derive(Serialize, Clone)]
+struct SubscribeCtx {
+    src: String,
+    msg_type: String,
+    dst: String,
 }
 
 #[derive(Serialize)]
@@ -111,12 +113,14 @@ struct FieldCtx {
     rust_type: String,
     cpp_type: String,
     description: String,
+    unit: String,
     index: usize,
 }
 
 fn build_template_context(cfg: &RobotConfig) -> anyhow::Result<TeraContext> {
     let mut messages: Vec<MessageCtx> = Vec::new();
     let mut devices: Vec<DeviceCtx> = Vec::new();
+    let mut endpoints: Vec<EndpointCtx> = Vec::new();
 
     let mut iface_names: Vec<&String> = cfg.interfaces.keys().collect();
     iface_names.sort();
@@ -132,17 +136,24 @@ fn build_template_context(cfg: &RobotConfig) -> anyhow::Result<TeraContext> {
     let mut dev_names: Vec<&String> = cfg.devices.keys().collect();
     dev_names.sort();
     for dev_name in dev_names {
-        devices.push(device_to_ctx(dev_name, &cfg.devices[dev_name]));
+        let dev_ctx = device_to_ctx(dev_name, &cfg.devices[dev_name]);
+        endpoints.extend(dev_ctx.endpoints.iter().cloned());
+        devices.push(dev_ctx);
     }
+    endpoints.sort_by(|a, b| a.const_name.cmp(&b.const_name));
 
     let template_ctx = TemplateCtx {
         robot: RobotCtx {
             name: cfg.name.clone(),
             id: fnv1a_32(&cfg.name),
+            model: cfg.model.clone(),
+            description: cfg.description.clone().unwrap_or_default(),
             multicast_port: cfg.multicast_port,
+            multicast_addr: cfg.multicast_addr.clone().unwrap_or("224.0.0.1".to_string()),
         },
         messages,
         devices,
+        endpoints,
     };
     let ctx = TeraContext::from_serialize(&template_ctx)?;
     Ok(ctx)
@@ -155,9 +166,14 @@ fn device_to_ctx(name: &str, dev: &DeviceConfig) -> DeviceCtx {
         .into_iter()
         .map(|ep_name| {
             let ep = &dev.endpoints[ep_name];
+            let endpoint_key = format!("{}.{}", name, ep_name);
             EndpointCtx {
                 name: ep_name.clone(),
-                interface_ref: ep.interface_ref.clone(),
+                id: fnv1a_32(&endpoint_key),
+                device_name: name.to_string(),
+                const_name: format!("{}_{}", to_const_ident(name), to_const_ident(ep_name)),
+                interfaces: ep.interfaces.clone(),
+                subscribes: ep.subscribes.iter().map(subscribe_to_ctx).collect(),
                 description: ep.description.clone().unwrap_or_default(),
             }
         })
@@ -170,6 +186,14 @@ fn device_to_ctx(name: &str, dev: &DeviceConfig) -> DeviceCtx {
         mac: dev.mac.clone().unwrap_or_default(),
         mdns: dev.mdns.clone().unwrap_or_default(),
         endpoints,
+    }
+}
+
+fn subscribe_to_ctx(sub: &SubscribeConfig) -> SubscribeCtx {
+    SubscribeCtx {
+        src: sub.src.clone().unwrap_or_default(),
+        msg_type: sub.msg_type.clone().unwrap_or_default(),
+        dst: sub.dst.clone().unwrap_or_default(),
     }
 }
 
@@ -191,6 +215,7 @@ fn message_to_ctx(name: &str, msg: &MessageConfig) -> anyhow::Result<MessageCtx>
                     "std::string".to_string()
                 }),
             description: f.description.clone().unwrap_or_default(),
+            unit: f.unit.clone().unwrap_or_default(),
             index: i,
         })
         .collect();
@@ -214,6 +239,7 @@ fn hcl_type_to_rust(hcl: &str) -> anyhow::Result<String> {
         "string" => "String",
         "bool" => "bool",
         "enum" => "i32",
+        "bytes" => "Vec<u8>",
         other => anyhow::bail!("unknown HCL type: {other}"),
     };
     Ok(rust.to_string())
@@ -229,6 +255,7 @@ fn hcl_type_to_cpp(hcl: &str) -> anyhow::Result<String> {
         "string" => "std::string",
         "bool" => "bool",
         "enum" => "int32_t",
+        "bytes" => "std::vector<uint8_t>",
         other => anyhow::bail!("unknown HCL type: {other}"),
     };
     Ok(cpp.to_string())
@@ -250,4 +277,23 @@ fn to_pascal(s: &str) -> String {
         }
     }
     out
+}
+
+fn to_const_ident(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    let mut prev_sep = true;
+    for ch in s.chars() {
+        if ch.is_ascii_alphanumeric() {
+            if ch.is_ascii_lowercase() {
+                out.push(ch.to_ascii_uppercase());
+            } else {
+                out.push(ch);
+            }
+            prev_sep = false;
+        } else if !prev_sep {
+            out.push('_');
+            prev_sep = true;
+        }
+    }
+    out.trim_end_matches('_').to_string()
 }
