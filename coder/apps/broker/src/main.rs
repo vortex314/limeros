@@ -1,13 +1,21 @@
 use anyhow::{Context, Result};
 use clap::Parser;
+use dashmap::DashMap;
 use fnv::FnvHasher;
-use std::collections::{HashMap, HashSet};
+use log::{info, warn};
+use std::collections::HashSet;
 use std::hash::{Hash, Hasher};
 use std::net::{Ipv4Addr, SocketAddr};
+use std::sync::Arc;
 use tokio::net::UdpSocket;
+use tokio::sync::Mutex;
+use tokio::sync::mpsc::{Receiver, Sender};
 
-use common::{RobotConfig, load_robot_config};
-use generated::{BROKER_ID, BytesSerde, EndpointAnnounce, UdpMessage, generated};
+use common::base_message::{BytesSerde, EndpointAnnounceReply, UdpMessage};
+use common::node::UdpNode;
+use common::{RobotConfig, load_robot_config, logger};
+use generated::{BROKER_ID, generated};
+use common::base_message::{EndpointAnnounce};
 
 #[derive(Parser, Debug)]
 #[command(about = "Multicast UDP broker receiver")]
@@ -91,14 +99,7 @@ fn matches_subscription(msg: &UdpMessage, sub: &Subscription) -> bool {
     src_ok && typ_ok && dst_ok
 }
 
-fn decode_endpoint_announce(payload: Option<&[u8]>) -> Option<EndpointAnnounce> {
-    let data = payload?;
-    Some(EndpointAnnounce::from_bytes(data)?)
-}
 
-fn decode_udp_message(packet: &[u8]) -> Option<UdpMessage> {
-    Some(UdpMessage::from_bytes(packet)?)
-}
 
 fn target_ids(msg: &UdpMessage, subscriptions: &[Subscription]) -> HashSet<u32> {
     subscriptions
@@ -108,117 +109,166 @@ fn target_ids(msg: &UdpMessage, subscriptions: &[Subscription]) -> HashSet<u32> 
         .collect()
 }
 
-struct Node {
-    id: u32,
-    udp_addr: Option<SocketAddr>,
-    mc_addr: SocketAddr,
-    udp_socket: Option<UdpSocket>,
-    mc_socket: Option<UdpSocket>,
+struct Broker {
+    node: Arc<UdpNode>,
+    subscriptions: Vec<Subscription>,
+    known_endpoints: DashMap<u32, KnownEndpoint>,
+    rx_message: Mutex<Receiver<MetaMessage>>,
+    tx_message: Sender<MetaMessage>,
 }
 
-impl Node {
-    fn new(id: u32, mc_addr: SocketAddr) -> Self {
-        Node {
-            id,
-            udp_addr: None,
-            mc_addr,
-            udp_socket: None,
-            mc_socket: None,
+struct MetaMessage {
+    msg: UdpMessage,
+    src_addr: SocketAddr,
+}
+
+impl Broker {
+    fn new(node: UdpNode, subscriptions: Vec<Subscription>) -> Self {
+        let node = Arc::new(node);
+        let (tx_message, rx_message) = tokio::sync::mpsc::channel(100);
+
+        Broker {
+            node,
+            subscriptions,
+            known_endpoints: DashMap::new(),
+            rx_message: Mutex::new(rx_message),
+            tx_message,
         }
     }
-    async fn bind_udp(&mut self, bind_addr: &str) -> Result<()> {
-        let socket = UdpSocket::bind(bind_addr)
+
+    async fn handle_multicast_packet(&self, packet: &[u8], addr: SocketAddr) -> Result<()> {
+        let udp_message = UdpMessage::from_bytes(packet)?;
+        if udp_message.msg_type == Some(EndpointAnnounce::ID) {
+            let payload = udp_message.payload.ok_or_else(|| anyhow::anyhow!("Missing payload"))?;
+            let announce = EndpointAnnounce::from_bytes(&payload)?;
+            if let Some(endpoint_id) = announce.endpoint_id {
+                self.known_endpoints.insert(
+                    endpoint_id,
+                    KnownEndpoint {
+                        announce: announce.clone(),
+                        addr,
+                    },
+                );
+            }
+            let reply_payload = EndpointAnnounceReply {
+                broker_id: Some(BROKER_ID),
+                endpoint_name: None,
+                device_name: None,
+                description: None,
+            }
+            .to_bytes()?;
+            let reply_message = UdpMessage {
+                src: Some(BROKER_ID),
+                dst: Some(udp_message.src.unwrap_or(0)),
+                msg_type: Some(EndpointAnnounceReply::ID),
+                req_id: udp_message.req_id,
+                payload: Some(reply_payload),
+            };
+            self.node.send_unicast(&reply_message.to_bytes()?, addr).await?;
+        }
+
+        Ok(())
+    }
+
+    async fn handle_udp_packet(&self, packet: &[u8], addr: SocketAddr) -> Result<()> {
+        let udp_message = UdpMessage::from_bytes(packet)?;
+        self.tx_message
+            .send(MetaMessage {
+                msg: udp_message,
+                src_addr: addr,
+            })
             .await
-            .with_context(|| format!("failed to bind UDP socket to {}", bind_addr))?;
-        self.udp_addr = Some(socket.local_addr()?);
-        self.udp_socket = Some(socket);
+            .map_err(|e| anyhow::anyhow!("Failed to send message to channel: {}", e))?;
         Ok(())
     }
 
-    async fn join_multicast(&mut self, group: Ipv4Addr) -> Result<()> {
-        if let Some(socket) = &self.udp_socket {
-            socket
-                .join_multicast_v4(group, Ipv4Addr::UNSPECIFIED)
-                .with_context(|| format!("failed to join multicast group {}", group))?;
-            self.mc_socket = Some(*socket.clone());
+    pub async fn run(self: Arc<Self>) {
+        let self_mc = Arc::clone(&self);
+        let node_mc: Arc<UdpNode> = Arc::clone(&self.node);
+        // spawn multicast receive loop
+        let t1 = tokio::spawn(async move {
+            loop {
+                let mut buf = vec![0_u8; 64 * 1024];
+                let (len, addr) = match node_mc.receive_multicast(&mut buf).await {
+                    Ok(v) => v,
+                    Err(e) => {
+                        warn!("Error receiving multicast packet: {:?}", e);
+                        continue;
+                    }
+                };
+                let packet = &buf[..len];
+
+                if let Err(e) = self_mc.handle_multicast_packet(&packet, addr).await {
+                    warn!("Error handling multicast packet from {}: {:?}", addr, e);
+                }
+            }
+        });
+
+        let self_udp = Arc::clone(&self);
+        let node_udp: Arc<UdpNode> = Arc::clone(&self.node);
+        // spawn unicast receive loop
+        let t2 = tokio::spawn(async move {
+            loop {
+                let mut buf = vec![0_u8; 64 * 1024];
+                let r: Result<(usize, SocketAddr)> = node_udp.receive_unicast(&mut buf).await;
+                if r.is_err() {
+                    warn!("Error receiving UDP packet: {:?}", r.err());
+                    continue;
+                }
+                let (len, addr) = r.unwrap();
+                let packet = &buf[..len];
+                if let Err(e) = self_udp.handle_udp_packet(packet, addr).await {
+                    warn!("Error handling UDP packet from {}: {:?}", addr, e);
+                }
+            }
+        });
+
+        let self_pub = Arc::clone(&self);
+        // spawn publisher task to forward messages to subscribed endpoints
+        let t3 = tokio::spawn(async move {
+            let mut rx = self_pub.rx_message.lock().await;
+            while let Some(meta) = rx.recv().await {
+                let target_ids = target_ids(&meta.msg, &self_pub.subscriptions);
+                for endpoint_id in target_ids {
+                    if let Some(target) = self_pub.known_endpoints.get(&endpoint_id) {
+                        if let Err(e) = self
+                            .node
+                            .send_unicast(&meta.msg.to_bytes().unwrap(), target.addr)
+                            .await
+                        {
+                            warn!(
+                                "forward to endpoint {} at ({:?}) failed: {}",
+                                endpoint_id, target.addr, e
+                            );
+                        }
+                    } else {
+                        warn!(
+                            "no known endpoint address for destination id {}",
+                            endpoint_id
+                        );
+                    }
+                }
+            }
+        });
+        // wait one of termonation t1,t2,t3
+        tokio::select! {
+            _ = t1 => {
+                warn!("Multicast receive loop terminated");
+            }
+            _ = t2 => {
+                warn!("Unicast receive loop terminated");
+            }
+            _ = t3 => {
+                warn!("Publisher task terminated");
+            }
         }
-        Ok(())
     }
-
-    async fn send_multicast(&self, data: &[u8]) -> Result<()> {
-        if let Some(socket) = &self.mc_socket {
-            socket
-                .send_to(data, self.mc_addr)
-                .await
-                .with_context(|| format!("failed to send multicast to {}", self.mc_addr))?;
-        }
-        Ok(())
-    }
-
-    async fn send_udp(&self, data: &[u8], addr: SocketAddr) -> Result<()> {
-        if let Some(socket) = &self.udp_socket {
-            socket
-                .send_to(data, addr)
-                .await
-                .with_context(|| format!("failed to send UDP to {}", addr))?;
-        }
-        Ok(())
-    }
-
-    async fn receive_udp(&self, buf: &mut [u8]) -> Result<(usize, SocketAddr)> {
-        if let Some(socket) = &self.udp_socket {
-            let (len, addr) = socket
-                .recv_from(buf)
-                .await
-                .with_context(|| "failed to receive UDP packet")?;
-            Ok((len, addr))
-        } else {
-            Err(anyhow::anyhow!("UDP socket is not bound"))
-        }
-    }
-
-    async fn receive_multicast(&self, buf: &mut [u8]) -> Result<(usize, SocketAddr)> {
-        if let Some(socket) = &self.mc_socket {
-            let (len, addr) = socket
-                .recv_from(buf)
-                .await
-                .with_context(|| "failed to receive multicast packet")?;
-            Ok((len, addr))
-        } else {
-            Err(anyhow::anyhow!("Multicast socket is not joined"))
-        }
-    }
-}
-
-async fn my_broker_loop(node: &mut Node, subscriptions: &[Subscription]) -> Result<UdpMessage> {
-    let mut announce_buf = vec![0_u8; 64 * 1024];
-    let mut route_buf = vec![0_u8; 64 * 1024];
-    let last_msg: Result<UdpMessage> ;
-
-    tokio::select! {
-        recv = node.receive_multicast(&mut announce_buf) => {
-            let (len, addr) = recv?;
-
-            println!("Received multicast packet of length {} from {}", len, addr);
-            // Process the multicast packet here
-            // update known endpoints, forward to subscribed endpoints, etc.
-            let packet = &announce_buf[..len];
-            last_msg = UdpMessage::from_bytes(packet).ok_or_else(|| anyhow::anyhow!("Failed to decode multicast packet"));
-    }
-        recv = node.receive_udp(&mut route_buf) => {
-            let (len, addr) = recv?;
-            println!("Received UDP packet of length {} from {}", len, addr);
-            // Process the UDP packet here
-            // check subscriptions and forward
-            let packet = &route_buf[..len];
-            last_msg = UdpMessage::from_bytes(packet).ok_or_else(|| anyhow::anyhow!("Failed to decode route packet"));
-    }
-        }
-    last_msg
 }
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    logger::init();
+    info!("Starting broker...");
     let args = Args::parse();
 
     let cfg =
@@ -226,111 +276,20 @@ async fn main() -> Result<()> {
 
     let port = args.port.unwrap_or(generated::MULTICAST_PORT as u16);
     let bind_addr = format!("{}:{}", args.bind, port);
-    let group: Ipv4Addr = args.group.parse().context("invalid multicast group")?;
+    let mc_addr_str = cfg
+        .multicast_addr
+        .clone()
+        .unwrap_or("225.0.0.0".to_string());
+    let group: Ipv4Addr = mc_addr_str
+        .parse()
+        .with_context(|| format!("failed to parse multicast address {}", mc_addr_str))?;
+    info!("Using multicast group {} and port {}", group, port);
 
-    let node = Node::new(BROKER_ID, SocketAddr::new(group.into(), port));
+    let mut node = UdpNode::new(BROKER_ID, SocketAddr::new(group.into(), port));
+    node.bind_unicast  ().await?;
+    node.bind_multicast().await?;
+    let broker = Arc::new(Broker::new(node, parse_subscriptions(&cfg)));
 
-    let multicast_socket = UdpSocket::bind(&bind_addr)
-        .await
-        .with_context(|| format!("failed to bind {}", bind_addr))?;
-    multicast_socket
-        .join_multicast_v4(group, Ipv4Addr::UNSPECIFIED)
-        .context("failed to join multicast group")?;
-
-    // Routing traffic is handled on an independent UDP socket bound to a random local port.
-    let route_socket = UdpSocket::bind(format!("{}:0", args.bind))
-        .await
-        .context("failed to bind routing udp socket")?;
-    let route_local = route_socket
-        .local_addr()
-        .context("failed to read routing socket local addr")?;
-
-    let subscriptions = parse_subscriptions(&cfg);
-    let mut known_endpoints: HashMap<u32, KnownEndpoint> = HashMap::new();
-    let mut seen_ids: HashSet<u32> = HashSet::new();
-    let endpoint_announce_id = generated::EndpointAnnounce::ID;
-
-    println!(
-        "announce socket={} (group {}), route socket={}, subscriptions={}",
-        bind_addr,
-        group,
-        route_local,
-        subscriptions.len()
-    );
-
-    let mut announce_buf = vec![0_u8; 64 * 1024];
-    let mut route_buf = vec![0_u8; 64 * 1024];
-
-    loop {
-        tokio::select! {
-            recv = multicast_socket.recv_from(&mut announce_buf) => {
-                let (len, peer): (usize, SocketAddr) = recv?;
-                let packet = &announce_buf[..len];
-                let msg: UdpMessage = match decode_udp_message(packet) {
-                    Some(v) => v,
-                    None => {
-                        eprintln!("drop invalid announce packet from {}", peer);
-                        continue;
-                    }
-                };
-
-                if msg.msg_type == Some(endpoint_announce_id) {
-                    if let Some(announce) = decode_endpoint_announce(msg.payload.as_deref()) {
-                        if let Some(endpoint_id) = announce.endpoint_id {
-                            known_endpoints.insert(
-                                endpoint_id,
-                                KnownEndpoint {
-                                    announce: announce.clone(),
-                                    addr: peer,
-                                },
-                            );
-                            if seen_ids.insert(endpoint_id) {
-                                println!(
-                                    "endpoint announce id={} name={:?} device={:?} addr={}",
-                                    endpoint_id, announce.endpoint_name, announce.device_name, peer
-                                );
-                            }
-                        }
-                    }
-                }
-            }
-            recv = route_socket.recv_from(&mut route_buf) => {
-                let (len, peer): (usize, SocketAddr) = recv?;
-                let packet = &route_buf[..len];
-                let msg: UdpMessage = match decode_udp_message(packet) {
-                    Some(v) => v,
-                    None => {
-                        eprintln!("drop invalid route packet from {}", peer);
-                        continue;
-                    }
-                };
-
-                if msg.msg_type == Some(endpoint_announce_id) {
-                    // Announce traffic must be handled on multicast socket only.
-                    continue;
-                }
-
-                let target_ids = target_ids(&msg, &subscriptions);
-                if !target_ids.is_empty() {
-                    println!(
-                        "route src={:?} dst={:?} type={:?} req_id={:?}",
-                        msg.src, msg.dst, msg.msg_type, msg.req_id
-                    );
-                }
-
-                for endpoint_id in target_ids {
-                    if let Some(target) = known_endpoints.get(&endpoint_id) {
-                        if let Err(e) = route_socket.send_to(packet, target.addr).await {
-                            eprintln!(
-                                "forward to endpoint {} at {} ({:?}) failed: {}",
-                                endpoint_id, target.addr, target.announce.endpoint_name, e
-                            );
-                        }
-                    } else {
-                        eprintln!("no known endpoint address for destination id {}", endpoint_id);
-                    }
-                }
-            }
-        }
-    }
+    broker.run().await;
+    Ok(())
 }

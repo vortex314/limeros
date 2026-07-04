@@ -2,7 +2,9 @@
 // Every field is `Option<T>`; missing fields serialize as CBOR null.
 // Messages are encoded as CBOR arrays (positional, not keyed by name).
 use serde_tuple::{Deserialize_tuple, Serialize_tuple};
+use common::base_message::BytesSerde;
 
+/*
 pub trait BytesSerde<T> {
     fn from_bytes(data: &[u8]) -> Option<T> where T : Sized + serde::de::DeserializeOwned {
         cbor2::from_reader(data).ok()
@@ -11,6 +13,7 @@ pub trait BytesSerde<T> {
         cbor2::to_vec(self).ok()
     }
 }
+*/
 
 pub const MULTICAST_PORT : u16 = {{ robot.multicast_port }};
 pub const MULTICAST_ADDR : &str = "{{ robot.multicast_addr }}";

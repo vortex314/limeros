@@ -4,12 +4,25 @@
     "version": "2.0.0",
     "tasks": [
         {
-            "label":" Mermaid Generate",
+            "label":"Broker",
             "type": "shell",
             "command": "~/.cargo/bin/cargo",
             "args": [
                 "run", "--bin",
-                "mermaid"
+                "broker"
+            ],
+            "group": {
+                "kind": "build",
+ //               "isDefault": true   
+            }
+        },
+        {
+            "label":"Pinger",
+            "type": "shell",
+            "command": "~/.cargo/bin/cargo",
+            "args": [
+                "run", "--bin",
+                "pinger"
             ],
             "group": {
                 "kind": "build",

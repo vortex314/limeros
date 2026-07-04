@@ -212,21 +212,6 @@ robot "ronald" {
     field "build_date" { type = "string" }
   }
 
-  message EndpointAnnounce { // appears on multicast when a new endpoint is available
-    description = "Announce message for endpoints"
-    field "endpoint_id" { type = "uint32" }
-    field "endpoint_name" { type = "string" }
-    field "device_name" { type = "string" }
-    field "description" { type = "string" }
-  }
-
-  message EndpointAnnounceReply { // is send as a reply to EndpointAnnounce, on ip port and addr of the sender
-    description = "Reply message for endpoint announce"
-    field "broker_id" { type = "uint32" }
-    field "endpoint_name" { type = "string" }
-    field "device_name" { type = "string" }
-    field "description" { type = "string" }
-  }
 
   message PingRequest { // is send as a reply to EndpointAnnounce, on ip port and addr of the sender
     description = "Ping request message"
@@ -238,11 +223,5 @@ robot "ronald" {
     field "req_id" { type = "uint32" }
   }
 
-  message UdpMessage {
-    field "src" { type = "uint32" "description" = "Endpoint ID of the sender" }
-    field "dst" { type = "uint32" "description" = "Endpoint ID of the receiver" }
-    field "msg_type" { type = "uint32" "description" = "Type of the message" }
-    field "req_id" { type = "uint32" "description" = "Request ID for matching request/reply" }
-    field "payload" { type = "bytes" "description" = "Payload of the message" }
-  }
+
 }

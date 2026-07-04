@@ -3,6 +3,7 @@ members = [
     "common",
     "apps/broker",
     "apps/codegen",
+    "apps/pinger",
     "generated",
 ]
 resolver="2"

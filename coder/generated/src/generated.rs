@@ -2,15 +2,7 @@
 // Every field is `Option<T>`; missing fields serialize as CBOR null.
 // Messages are encoded as CBOR arrays (positional, not keyed by name).
 use serde_tuple::{Deserialize_tuple, Serialize_tuple};
-
-pub trait BytesSerde<T> {
-    fn from_bytes(data: &[u8]) -> Option<T> where T : Sized + serde::de::DeserializeOwned {
-        cbor2::from_reader(data).ok()
-    }
-    fn to_bytes(&self) -> Option<Vec<u8>> where Self : serde::Serialize {
-        cbor2::to_vec(self).ok()
-    }
-}
+use common::base_message::BytesSerde;
 
 pub const MULTICAST_PORT : u16 = 50000;
 pub const MULTICAST_ADDR : &str = "224.0.0.1";
@@ -25,42 +17,6 @@ pub const LOGGER_ID: u32 = 3862246649;
 pub const MOWER_ID: u32 = 2050343113;
 
 pub const PS4_ID: u32 = 2501583945;
-
-
-
-
-
-impl EndpointAnnounce {
-    pub const ID: u32 = 2371693343;
-    pub const NAME: &'static str = "EndpointAnnounce";
-}
-
-#[derive(Debug, Clone,Serialize_tuple,Deserialize_tuple)]
-pub struct EndpointAnnounce {
-    pub endpoint_id: Option<u32>,
-    pub endpoint_name: Option<String>,
-    pub device_name: Option<String>,
-    pub description: Option<String>,
-}
-
-impl BytesSerde<EndpointAnnounce> for EndpointAnnounce {}
-
-
-
-impl EndpointAnnounceReply {
-    pub const ID: u32 = 3238220441;
-    pub const NAME: &'static str = "EndpointAnnounceReply";
-}
-
-#[derive(Debug, Clone,Serialize_tuple,Deserialize_tuple)]
-pub struct EndpointAnnounceReply {
-    pub broker_id: Option<u32>,
-    pub endpoint_name: Option<String>,
-    pub device_name: Option<String>,
-    pub description: Option<String>,
-}
-
-impl BytesSerde<EndpointAnnounceReply> for EndpointAnnounceReply {}
 
 
 
@@ -353,22 +309,5 @@ pub struct SysRequest {
 
 impl BytesSerde<SysRequest> for SysRequest {}
 
-
-
-impl UdpMessage {
-    pub const ID: u32 = 1293877827;
-    pub const NAME: &'static str = "UdpMessage";
-}
-
-#[derive(Debug, Clone,Serialize_tuple,Deserialize_tuple)]
-pub struct UdpMessage {
-    pub src: Option<u32>,
-    pub dst: Option<u32>,
-    pub msg_type: Option<u32>,
-    pub req_id: Option<u32>,
-    pub payload: Option<Vec<u8>>,
-}
-
-impl BytesSerde<UdpMessage> for UdpMessage {}
 
 
