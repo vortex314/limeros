@@ -2,6 +2,8 @@ use anyhow::{Context, Result};
 use log::{info, warn};
 use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
 use tokio::net::UdpSocket;
+
+use crate::base_message::show_cbor_bytes;
 pub struct UdpNode {
     id: u32,
     udp_addr: Option<SocketAddr>,
@@ -57,7 +59,7 @@ impl UdpNode {
     }
 
     pub async fn send_multicast(&self, data: &[u8]) -> Result<()> {
-        info!("Sending multicast message to {}: {:?}", self.mc_addr, data);
+        info!("Sending multicast message to {}: {}", self.mc_addr, show_cbor_bytes(data));
         if let Some(socket) = &self.udp_socket {
             socket
                 .send_to(data, self.mc_addr)
@@ -101,7 +103,7 @@ impl UdpNode {
                 .recv_from(buf)
                 .await
                 .with_context(|| "failed to receive multicast packet")?;
-            info!("Received multicast packet from {}: {:?}", addr, &buf[..len]);
+            info!("Received multicast packet from {}: {}", addr, show_cbor_bytes(&buf[..len]));
             Ok((len, addr))
         } else {
             Err(anyhow::anyhow!("Multicast socket is not joined"))

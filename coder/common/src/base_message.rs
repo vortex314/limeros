@@ -10,6 +10,12 @@ pub trait BytesSerde<T> {
     }
 }
 
+pub fn show_cbor_bytes(bytes: &[u8]) -> String {
+    cbor2::from_slice::<cbor2::Value>(bytes)
+        .map(|v| format!("{:?}", v))
+        .unwrap_or_else(|_| format!("Invalid CBOR: {:?}", bytes))
+}
+
 impl UdpMessage {
     pub const ID: u32 = 1293877827;
     pub const NAME: &'static str = "UdpMessage";
@@ -51,9 +57,6 @@ impl EndpointAnnounceReply {
 #[derive(Debug, Clone,Serialize_tuple,Deserialize_tuple)]
 pub struct EndpointAnnounceReply {
     pub broker_id: Option<u32>,
-    pub endpoint_name: Option<String>,
-    pub device_name: Option<String>,
-    pub description: Option<String>,
 }
 
 impl BytesSerde<EndpointAnnounceReply> for EndpointAnnounceReply {}

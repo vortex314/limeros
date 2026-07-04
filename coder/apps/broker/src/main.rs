@@ -122,6 +122,12 @@ struct MetaMessage {
     src_addr: SocketAddr,
 }
 
+fn show_cbor_bytes(bytes: &[u8]) -> String {
+    cbor2::from_slice::<cbor2::Value>(bytes)
+        .map(|v| format!("{:?}", v))
+        .unwrap_or_else(|_| format!("Invalid CBOR: {:?}", bytes))
+}
+
 impl Broker {
     fn new(node: UdpNode, subscriptions: Vec<Subscription>) -> Self {
         let node = Arc::new(node);
@@ -152,9 +158,6 @@ impl Broker {
             }
             let reply_payload = EndpointAnnounceReply {
                 broker_id: Some(BROKER_ID),
-                endpoint_name: None,
-                device_name: None,
-                description: None,
             }
             .to_bytes()?;
             let reply_message = UdpMessage {

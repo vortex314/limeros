@@ -8,6 +8,7 @@ edition = "2024"
 common = { path = "../../common" }
 generated = { path = "../../generated" }
 serde = { version = "1.0.228", features = ["derive"] }
+cbor2="*"
 anyhow = "1.0.103"
 env_logger = "0.11.8"
 log = "0.4.29"
