@@ -2,7 +2,7 @@ use anyhow::{Context, Result};
 use clap::Parser;
 use dashmap::DashMap;
 use fnv::FnvHasher;
-use log::{info, warn};
+use log::{debug, info, warn};
 use std::collections::HashSet;
 use std::hash::{Hash, Hasher};
 use std::net::{Ipv4Addr, SocketAddr};
@@ -11,10 +11,10 @@ use tokio::net::UdpSocket;
 use tokio::sync::Mutex;
 use tokio::sync::mpsc::{Receiver, Sender};
 
-use common::base_message::{BytesSerde, EndpointAnnounceReply, UdpMessage};
+use common::base_message::{Msg, EndpointAnnounceReply, UdpMessage};
 use common::node::UdpNode;
 use common::{RobotConfig, load_robot_config, logger};
-use generated::{BROKER_ID, generated};
+use generated::generated;
 use common::base_message::{EndpointAnnounce};
 
 #[derive(Parser, Debug)]
@@ -102,17 +102,23 @@ fn matches_subscription(msg: &UdpMessage, sub: &Subscription) -> bool {
 
 
 fn target_ids(msg: &UdpMessage, subscriptions: &[Subscription]) -> HashSet<u32> {
-    subscriptions
+
+    let mut hash_set:   HashSet<u32> = subscriptions
         .iter()
         .filter(|s| matches_subscription(msg, s))
         .filter_map(|s| s.dst)
-        .collect()
+        .collect();
+    if msg.dst.is_some() {
+        hash_set.insert(msg.dst.unwrap());
+    } ;
+    hash_set
 }
 
 struct Broker {
     node: Arc<UdpNode>,
     subscriptions: Vec<Subscription>,
     known_endpoints: DashMap<u32, KnownEndpoint>,
+    dynamic_subscriptions: DashMap<u32, Vec<Subscription>>,
     rx_message: Mutex<Receiver<MetaMessage>>,
     tx_message: Sender<MetaMessage>,
 }
@@ -120,6 +126,7 @@ struct Broker {
 struct MetaMessage {
     msg: UdpMessage,
     src_addr: SocketAddr,
+    raw: Vec<u8>,
 }
 
 fn show_cbor_bytes(bytes: &[u8]) -> String {
@@ -137,6 +144,7 @@ impl Broker {
             node,
             subscriptions,
             known_endpoints: DashMap::new(),
+            dynamic_subscriptions: DashMap::new(),
             rx_message: Mutex::new(rx_message),
             tx_message,
         }
@@ -144,7 +152,8 @@ impl Broker {
 
     async fn handle_multicast_packet(&self, packet: &[u8], addr: SocketAddr) -> Result<()> {
         let udp_message = UdpMessage::from_bytes(packet)?;
-        if udp_message.msg_type == Some(EndpointAnnounce::ID) {
+        let udp_message_clone = udp_message.clone();
+        if udp_message.msg_type == Some(EndpointAnnounce::id()) {
             let payload = udp_message.payload.ok_or_else(|| anyhow::anyhow!("Missing payload"))?;
             let announce = EndpointAnnounce::from_bytes(&payload)?;
             if let Some(endpoint_id) = announce.endpoint_id {
@@ -157,17 +166,27 @@ impl Broker {
                 );
             }
             let reply_payload = EndpointAnnounceReply {
-                broker_id: Some(BROKER_ID),
+                broker_id: Some(generated::BROKER_ID),
             }
             .to_bytes()?;
             let reply_message = UdpMessage {
-                src: Some(BROKER_ID),
+                src: Some(generated::BROKER_ID),
                 dst: Some(udp_message.src.unwrap_or(0)),
-                msg_type: Some(EndpointAnnounceReply::ID),
+                msg_type: Some(EndpointAnnounceReply::id()),
                 req_id: udp_message.req_id,
                 payload: Some(reply_payload),
             };
             self.node.send_unicast(&reply_message.to_bytes()?, addr).await?;
+
+            // Also forward the announce to subscribers via the publisher channel
+            self.tx_message
+                .send(MetaMessage {
+                    msg: udp_message_clone,
+                    src_addr: addr,
+                    raw: packet.to_vec(),
+                })
+                .await
+                .map_err(|e| anyhow::anyhow!("Failed to forward announce to channel: {}", e))?;
         }
 
         Ok(())
@@ -175,10 +194,53 @@ impl Broker {
 
     async fn handle_udp_packet(&self, packet: &[u8], addr: SocketAddr) -> Result<()> {
         let udp_message = UdpMessage::from_bytes(packet)?;
+        // Handle dynamic subscribe requests
+        if udp_message.msg_type == Some(generated::BrokerSubscribeRequest::id()) {
+            if let Some(payload) = &udp_message.payload {
+                if let Ok(sub_req) = generated::BrokerSubscribeRequest::from_bytes(payload) {
+                    let endpoint_id = udp_message.src.unwrap_or(0);
+                    let sub = Subscription {
+                        src: sub_req.src,
+                        msg_type: sub_req.msg_type,
+                        dst: None, // target is the DashMap key, not a msg.dst filter
+                    };
+                    self.dynamic_subscriptions
+                        .entry(endpoint_id)
+                        .or_default()
+                        .push(sub);
+                    info!(
+                        "Dynamic subscribe from endpoint {}: src={:?} msg_type={:?}",
+                        endpoint_id, sub_req.src, sub_req.msg_type
+                    );
+
+                    // Replay known endpoint announces to the new subscriber
+                    for entry in self.known_endpoints.iter() {
+                        let ep_id = *entry.key();
+                        if ep_id == endpoint_id {
+                            continue;
+                        }
+                        if let Ok(announce_bytes) = entry.value().announce.to_bytes() {
+                            let fwd = UdpMessage {
+                                src: Some(ep_id),
+                                dst: Some(endpoint_id),
+                                msg_type: Some(EndpointAnnounce::id()),
+                                req_id: None,
+                                payload: Some(announce_bytes),
+                            };
+                            if let Ok(pkt) = fwd.to_bytes() {
+                                let _ = self.node.send_unicast(&pkt, addr).await;
+                            }
+                        }
+                    }
+                }
+            }
+            return Ok(()); // don't forward subscribe requests
+        }
         self.tx_message
             .send(MetaMessage {
                 msg: udp_message,
                 src_addr: addr,
+                raw: packet.to_vec(),
             })
             .await
             .map_err(|e| anyhow::anyhow!("Failed to send message to channel: {}", e))?;
@@ -213,6 +275,7 @@ impl Broker {
         let t2 = tokio::spawn(async move {
             loop {
                 let mut buf = vec![0_u8; 64 * 1024];
+                debug!("Waiting to receive unicast packet on unicast  ....");
                 let r: Result<(usize, SocketAddr)> = node_udp.receive_unicast(&mut buf).await;
                 if r.is_err() {
                     warn!("Error receiving UDP packet: {:?}", r.err());
@@ -231,12 +294,24 @@ impl Broker {
         let t3 = tokio::spawn(async move {
             let mut rx = self_pub.rx_message.lock().await;
             while let Some(meta) = rx.recv().await {
-                let target_ids = target_ids(&meta.msg, &self_pub.subscriptions);
+                let mut target_ids = target_ids(&meta.msg, &self_pub.subscriptions);
+                // Also include dynamic subscriptions that match
+                // Skip sub.dst comparison — the DashMap key IS the target endpoint,
+                // and sub.dst is not a message filter for dynamic subs.
+                for dyn_subs in self_pub.dynamic_subscriptions.iter() {
+                    if dyn_subs.value().iter().any(|s| {
+                        let src_ok = s.src.is_none() || s.src == meta.msg.src;
+                        let typ_ok = s.msg_type.is_none() || s.msg_type == meta.msg.msg_type;
+                        src_ok && typ_ok
+                    }) {
+                        target_ids.insert(*dyn_subs.key());
+                    }
+                }
                 for endpoint_id in target_ids {
                     if let Some(target) = self_pub.known_endpoints.get(&endpoint_id) {
                         if let Err(e) = self
                             .node
-                            .send_unicast(&meta.msg.to_bytes().unwrap(), target.addr)
+                            .send_unicast(&meta.raw, target.addr)
                             .await
                         {
                             warn!(
@@ -288,8 +363,8 @@ async fn main() -> Result<()> {
         .with_context(|| format!("failed to parse multicast address {}", mc_addr_str))?;
     info!("Using multicast group {} and port {}", group, port);
 
-    let mut node = UdpNode::new(BROKER_ID, SocketAddr::new(group.into(), port));
-    node.bind_unicast  ().await?;
+    let mut node = UdpNode::new(generated::BROKER_ID, SocketAddr::new(group.into(), port));
+    node.bind_unicast_with_port(50001).await?;
     node.bind_multicast().await?;
     let broker = Arc::new(Broker::new(node, parse_subscriptions(&cfg)));
 

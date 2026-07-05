@@ -1,14 +1,25 @@
-use serde_tuple::{Deserialize_tuple, Serialize_tuple};
 use anyhow::{Context, Result};
+use serde_tuple::{Deserialize_tuple, Serialize_tuple};
 
-pub trait BytesSerde<T> {
-    fn from_bytes(data: &[u8]) -> Result<T> where T : Sized + serde::de::DeserializeOwned {
+use cbor2;
+
+pub trait Msg<T> {
+    fn from_bytes(data: &[u8]) -> Result<T>
+    where
+        T: Sized + serde::de::DeserializeOwned,
+    {
         cbor2::from_reader(data).context("Failed to deserialize from CBOR")
     }
-    fn to_bytes(&self) -> Result<Vec<u8>> where Self : serde::Serialize {
+    fn to_bytes(&self) -> Result<Vec<u8>>
+    where
+        Self: serde::Serialize,
+    {
         cbor2::to_vec(self).context("Failed to serialize to CBOR")
     }
+    fn id() -> u32;
+    fn name() -> &'static str;
 }
+
 
 pub fn show_cbor_bytes(bytes: &[u8]) -> String {
     cbor2::from_slice::<cbor2::Value>(bytes)
@@ -16,12 +27,16 @@ pub fn show_cbor_bytes(bytes: &[u8]) -> String {
         .unwrap_or_else(|_| format!("Invalid CBOR: {:?}", bytes))
 }
 
-impl UdpMessage {
-    pub const ID: u32 = 1293877827;
-    pub const NAME: &'static str = "UdpMessage";
+impl Msg<UdpMessage> for UdpMessage {
+    fn id() -> u32 {
+        1293877827
+    }
+    fn name() -> &'static str {
+        "UdpMessage"
+    }
 }
 
-#[derive(Debug, Clone,Serialize_tuple,Deserialize_tuple)]
+#[derive(Debug, Clone, Serialize_tuple, Deserialize_tuple)]
 pub struct UdpMessage {
     pub src: Option<u32>,
     pub dst: Option<u32>,
@@ -30,34 +45,34 @@ pub struct UdpMessage {
     pub payload: Option<Vec<u8>>,
 }
 
-impl BytesSerde<UdpMessage> for UdpMessage {}
 
-
-
-
-impl EndpointAnnounce {
-    pub const ID: u32 = 2371693343;
-    pub const NAME: &'static str = "EndpointAnnounce";
+impl Msg<EndpointAnnounce> for EndpointAnnounce {
+    fn id() -> u32 {
+        2371693343
+    }
+    fn name() -> &'static str {
+        "EndpointAnnounce"
+    }
 }
 
-#[derive(Debug, Clone,Serialize_tuple,Deserialize_tuple)]
+#[derive(Debug, Clone, Serialize_tuple, Deserialize_tuple)]
 pub struct EndpointAnnounce {
     pub endpoint_id: Option<u32>,
+    pub endpoint_name: Option<String>,
 }
 
-impl BytesSerde<EndpointAnnounce> for EndpointAnnounce {}
 
-
-
-impl EndpointAnnounceReply {
-    pub const ID: u32 = 3238220441;
-    pub const NAME: &'static str = "EndpointAnnounceReply";
+impl Msg<EndpointAnnounceReply> for EndpointAnnounceReply {
+    fn id() -> u32 {
+        3238220441
+    }
+    fn name() -> &'static str {
+        "EndpointAnnounceReply"
+    }
 }
 
-#[derive(Debug, Clone,Serialize_tuple,Deserialize_tuple)]
+#[derive(Debug, Clone, Serialize_tuple, Deserialize_tuple)]
 pub struct EndpointAnnounceReply {
     pub broker_id: Option<u32>,
 }
-
-impl BytesSerde<EndpointAnnounceReply> for EndpointAnnounceReply {}
 

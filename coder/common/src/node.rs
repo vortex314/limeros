@@ -1,10 +1,9 @@
 use anyhow::{Context, Result};
-use log::{info, warn};
+use log::{debug, info};
 use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
 use tokio::net::UdpSocket;
-
-use crate::base_message::show_cbor_bytes;
 pub struct UdpNode {
+    #[allow(dead_code)]
     id: u32,
     udp_addr: Option<SocketAddr>,
     mc_addr: SocketAddr,
@@ -39,6 +38,18 @@ impl UdpNode {
         Ok(())
     }
 
+    pub async fn bind_unicast_with_port(&mut self,port:u16) -> Result<()> {
+        // create UDP socket and bind to any port on all interfaces
+        let socket = UdpSocket::bind(("0.0.0.0", port))
+            .await
+            .with_context(|| format!("failed to bind UDP socket to 0.0.0.0:{}", port))?;
+
+        self.udp_addr = Some(socket.local_addr()?);
+        info!("UDP socket bound to {}", self.udp_addr.unwrap());
+        self.udp_socket = Some(socket);
+        Ok(())
+    }
+
     pub async fn bind_multicast(&mut self) -> Result<()> {
         // create multicast socket and bind to the specified address
         let listen_addr = SocketAddrV4::new(Ipv4Addr::UNSPECIFIED, self.mc_addr.port());
@@ -59,7 +70,7 @@ impl UdpNode {
     }
 
     pub async fn send_multicast(&self, data: &[u8]) -> Result<()> {
-        info!("Sending multicast message to {}: {}", self.mc_addr, show_cbor_bytes(data));
+        debug!("Sending multicast message to {}: [{} bytes]", self.mc_addr, data.len());
         if let Some(socket) = &self.udp_socket {
             socket
                 .send_to(data, self.mc_addr)
@@ -70,7 +81,7 @@ impl UdpNode {
     }
 
     pub async fn send_unicast(&self, data: &[u8], addr: SocketAddr) -> Result<()> {
-        info!("Sending unicast message to {}: {:?}", addr, data);
+        debug!("Sending unicast message to {}: [{}]", addr, data.len());
         if let Some(socket) = &self.udp_socket {
             socket
                 .send_to(data, addr)
@@ -94,7 +105,7 @@ impl UdpNode {
 
     pub async fn receive_multicast(&self, buf: &mut [u8]) -> Result<(usize, SocketAddr)> {
         if let Some(socket) = &self.mc_socket {
-            info!(
+            debug!(
                 "Waiting to receive multicast packet on {} {} ....",
                 self.mc_addr,
                 socket.local_addr()?
@@ -103,10 +114,22 @@ impl UdpNode {
                 .recv_from(buf)
                 .await
                 .with_context(|| "failed to receive multicast packet")?;
-            info!("Received multicast packet from {}: {}", addr, show_cbor_bytes(&buf[..len]));
+            debug!("Received multicast packet from {}: [{} bytes]", addr, len);
             Ok((len, addr))
         } else {
             Err(anyhow::anyhow!("Multicast socket is not joined"))
         }
+    }
+
+    pub async fn close(&mut self) -> Result<()> {
+        if self.udp_socket.is_some() {
+            info!("UDP socket closed");
+            self.udp_socket = None;
+        }
+        if self.mc_socket.is_some() {
+            info!("Multicast socket closed");
+            self.mc_socket = None;
+        }
+        Ok(())
     }
 }

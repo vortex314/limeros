@@ -1,14 +1,14 @@
 use anyhow::{Context, Result};
 use clap::Parser;
-use common::base_message::{BytesSerde, UdpMessage};
+use common::base_message::{Msg, UdpMessage};
 use common::{endpoint, fnv::fnv1a_32, logger, node::UdpNode};
-use generated::{BROKER_ID,generated};
-use log::{info, warn};
+use generated::generated;
+use log::{debug, info, warn};
+use tokio::join;
 use std::{
     net::{Ipv4Addr, SocketAddr},
-    time::Duration,
+    sync::Arc,
 };
-use common::base_message::{EndpointAnnounce, EndpointAnnounceReply};
 
 #[derive(Parser, Debug)]
 #[command(about = "Pinger endpoint announce client")]
@@ -49,16 +49,68 @@ async fn main() -> Result<()> {
 
     let endpoint_id = fnv1a_32(&args.endpoint);
 
-    let port = 50000; // Use the generated MULTICAST_PORT constant
-    let mc_addr_str = "224.0.0.1"; // Use the generated MULTICAST_ADDR constant
-   let group: Ipv4Addr = mc_addr_str
+    let port = args.port.unwrap_or(generated::MULTICAST_PORT as u16);
+    let mc_addr_str = &args.group;
+    let group: Ipv4Addr = mc_addr_str
         .parse()
         .with_context(|| format!("failed to parse multicast address {}", mc_addr_str))?;
-    let mut node = UdpNode::new(endpoint_id, SocketAddr::new(group.into(), port));
+    let node = UdpNode::new(endpoint_id, SocketAddr::new(group.into(), port));
 
-    let mut pinger = endpoint::Endpoint::new(endpoint_id, node);
+    let mut pinger = endpoint::Endpoint::new_from_name(&args.endpoint, node);
     pinger.bind().await?;
     pinger.broker_handshake().await?;
+    let pinger = Arc::new(pinger);
+    let pinger1 = pinger.clone();
 
+        let t1 = tokio::spawn(async move {
+            loop {
+            let ping_request = generated::PingRequest {
+                req_id: Some(1),
+                timestamp: Some(chrono::Utc::now().timestamp_millis() as u64),
+            };
+            let udp_message = UdpMessage {
+                src: Some(endpoint_id),
+                dst: Some(endpoint_id),
+                msg_type: Some(generated::PingRequest::id()),
+                req_id: ping_request.req_id,
+                payload: Some(ping_request.to_bytes().unwrap()),
+            };
+            pinger1.send(udp_message).await.unwrap();
+            debug!("Sent PingRequest to broker");
+            tokio::time::sleep(std::time::Duration::from_secs(1)).await
+            }
+
+        });
+
+        let t2 = tokio::spawn(async move {
+            loop {
+                let (reply, addr) = pinger.receive().await.unwrap();
+                if reply.msg_type == Some(generated::PingRequest::id()) {
+                    let ping_request = generated::PingRequest::from_bytes(&reply.payload.unwrap()).unwrap();
+                    debug!("Received PingRequest from broker at {}: {:?}", addr, ping_request);let ping_reply = generated::PingReply {
+                        req_id: ping_request.req_id,
+                        timestamp: Some(chrono::Utc::now().timestamp_micros() as u64),
+                    };
+                    let reply_message = UdpMessage {
+                        src: Some(endpoint_id),
+                        dst: Some(reply.src.unwrap_or(0)),
+                        msg_type: Some(generated::PingReply::id()),
+                        req_id: ping_reply.req_id,
+                        payload: Some(ping_reply.to_bytes().unwrap()),
+                    };
+                    let _ = pinger.send(reply_message).await;
+                } else if reply.msg_type == Some(generated::PingReply::id()) {
+                    let ping_reply = generated::PingReply::from_bytes(&reply.payload.unwrap()).unwrap();
+                    debug!("Received PingReply from broker at {}: {:?}", addr, ping_reply);
+                    let delta_ts = chrono::Utc::now().timestamp_micros() as u64 - ping_reply.timestamp.unwrap_or(0);
+                    info!("Ping round-trip time: {} µs", delta_ts);
+                } else {
+                    warn!("Received unexpected message type from broker: {:?}", reply);
+                }
+            }
+        });
+
+        let r = join!(t1, t2);
+        info!("Pinger tasks completed: {:?}", r);
     Ok(())
 }

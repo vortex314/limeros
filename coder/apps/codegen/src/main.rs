@@ -24,6 +24,8 @@ struct Args {
     /// Tera template name (from hcl/*.tera)
     #[arg(short = 't', long, default_value = "rust.tera")]
     template: String,
+    #[arg(short = 'd', long, default_value = "hcl")]
+    template_dir: String,
 }
 
 fn main() -> anyhow::Result<()> {
@@ -31,18 +33,18 @@ fn main() -> anyhow::Result<()> {
     let cfg = load_robot_config(&args.input)
         .with_context(|| format!("failed to load {}", args.input))?;
 
-    let ctx = build_template_context(&cfg)?;
-    let tera = Tera::new("../../hcl/*.tera")
-        .with_context(|| "failed to load templates from ../../hcl/*.tera")?;
+    let tera_context = build_template_context(&cfg)?;
+    let tera = Tera::new(&format!("{}/{}", &args.template_dir, "*.tera"))
+        .with_context(|| format!("failed to load templates from {}", &args.template_dir))?;
     let code = tera
-        .render(&args.template, &ctx)
+        .render(&args.template, &tera_context)
         .with_context(|| format!("template rendering failed for {}", args.template))?;
 
     std::fs::write(&args.output, &code)
         .with_context(|| format!("failed to write {}", args.output))?;
 
-    let msg_count = ctx.get("messages").and_then(|v| v.as_array()).map(|a| a.len()).unwrap_or(0);
-    let dev_count = ctx.get("devices").and_then(|v| v.as_array()).map(|a| a.len()).unwrap_or(0);
+    let msg_count = tera_context.get("messages").and_then(|v| v.as_array()).map(|a| a.len()).unwrap_or(0);
+    let dev_count = tera_context.get("devices").and_then(|v| v.as_array()).map(|a| a.len()).unwrap_or(0);
     eprintln!(
         "Wrote {} messages, {} devices to {}",
         msg_count, dev_count, args.output
@@ -166,10 +168,9 @@ fn device_to_ctx(name: &str, dev: &DeviceConfig) -> DeviceCtx {
         .into_iter()
         .map(|ep_name| {
             let ep = &dev.endpoints[ep_name];
-            let endpoint_key = format!("{}.{}", name, ep_name);
             EndpointCtx {
                 name: ep_name.clone(),
-                id: fnv1a_32(&endpoint_key),
+                id: fnv1a_32(&ep_name),
                 device_name: name.to_string(),
                 const_name: format!("{}_{}", to_const_ident(name), to_const_ident(ep_name)),
                 interfaces: ep.interfaces.clone(),

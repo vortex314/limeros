@@ -4,29 +4,67 @@
     "version": "2.0.0",
     "tasks": [
         {
-            "label":"Broker",
+            "label": "Broker",
             "type": "shell",
             "command": "~/.cargo/bin/cargo",
             "args": [
-                "run", "--bin",
+                "run",
+                "--bin",
                 "broker"
             ],
             "group": {
                 "kind": "build",
- //               "isDefault": true   
+                //               "isDefault": true   
             }
         },
         {
-            "label":"Pinger",
+            "label": "Pinger",
             "type": "shell",
             "command": "~/.cargo/bin/cargo",
             "args": [
-                "run", "--bin",
+                "run",
+                "--bin",
                 "pinger"
             ],
             "group": {
                 "kind": "build",
- //               "isDefault": true   
+                //               "isDefault": true   
+            }
+        },
+        {
+            "label": "Sniffer",
+            "type": "shell",
+            "command": "~/.cargo/bin/cargo",
+            "args": [
+                "run",
+                "--bin",
+                "sniffer"
+            ],
+            "group": {
+                "kind": "build",
+                //               "isDefault": true   
+            }
+        },
+                {
+            "label": "Codegen",
+            "type": "shell",
+            "command": "~/.cargo/bin/cargo", // note: full path to the cargo
+            "args": [
+                "run",
+                "--bin",
+                "codegen",
+                "--",
+                "-i",
+                "hcl/robot.hcl",
+                "-d",
+                "hcl",
+                "-t",
+                "rust.tera",
+                "-o",
+                "generated/src/generated.rs"],
+            "group": {
+                "kind": "build",
+                //               "isDefault": true   
             }
         },
         {
@@ -43,46 +81,24 @@
             "args": [
                 "run",
                 "--",
-                "--input", "syntax/message.proto",
-                "--output", "../esp32-eventbus/src",
-                "--lang", "cpp",
-                "--format", "cbor"
+                "--input",
+                "syntax/message.proto",
+                "--output",
+                "../esp32-eventbus/src",
+                "--lang",
+                "cpp",
+                "--format",
+                "cbor"
             ],
             "group": {
                 "kind": "build",
                 "isDefault": false
             },
             "presentation": {
-                "clear": true                        // <-- this line
+                "clear": true // <-- this line
             }
         },
-        {
-            "label": "Bluepad32",
-            "type": "shell",
-            "options": {
-                "cwd": "${workspaceFolder}",
-                "env": {
-                    "RUST_BACKTRACE": "full",
-                    "ZENOH_PLUGINS_PATH": "/home/lieven/workspace/zenoh/target/release/",
-                }
-            },
-            "command": "~/.cargo/bin/cargo", // note: full path to the cargo
-            "args": [
-                "run",
-                "--",
-                "--input", "syntax/message.proto",
-                "--output", "../../bluepad32/examples/esp32/main",
-                "--lang", "cpp",
-                "--format", "json"
-            ],
-            "group": {
-                "kind": "build",
-                "isDefault": false
-            },
-            "presentation": {
-                "clear": true                        // <-- this line
-            }
-        },
+
         {
             "label": "Rust MC Limeros",
             "type": "shell",
@@ -97,17 +113,21 @@
             "args": [
                 "run",
                 "--",
-                "--input", "syntax/message.proto",
-                "--output", "../rust/src",
-                "--lang", "rust",
-                "--format", "cbor"
+                "--input",
+                "syntax/message.proto",
+                "--output",
+                "../rust/src",
+                "--lang",
+                "rust",
+                "--format",
+                "cbor"
             ],
             "group": {
                 "kind": "build",
                 "isDefault": false
             },
             "presentation": {
-                "clear": true                        // <-- this line
+                "clear": true // <-- this line
             }
         },
         {
@@ -124,17 +144,21 @@
             "args": [
                 "run",
                 "--",
-                "--input", "syntax/message.proto",
-                "--output", "../zenoh-linux-eventbus-rs/src",
-                "--lang", "rust",
-                "--format", "json"
+                "--input",
+                "syntax/message.proto",
+                "--output",
+                "../zenoh-linux-eventbus-rs/src",
+                "--lang",
+                "rust",
+                "--format",
+                "json"
             ],
             "group": {
                 "kind": "build",
                 "isDefault": false
             },
             "presentation": {
-                "clear": true                        // <-- this line
+                "clear": true // <-- this line
             }
         },
         {
@@ -151,17 +175,21 @@
             "args": [
                 "run",
                 "--",
-                "--input", "syntax/message.proto",
-                "--output", "../zenoh-ps4-linux/src",
-                "--lang", "rust",
-                "--format", "json"
+                "--input",
+                "syntax/message.proto",
+                "--output",
+                "../zenoh-ps4-linux/src",
+                "--lang",
+                "rust",
+                "--format",
+                "json"
             ],
             "group": {
                 "kind": "build",
                 "isDefault": false
             },
             "presentation": {
-                "clear": true                        // <-- this line
+                "clear": true // <-- this line
             }
         }
     ]

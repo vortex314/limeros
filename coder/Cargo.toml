@@ -4,6 +4,8 @@ members = [
     "apps/broker",
     "apps/codegen",
     "apps/pinger",
+    "apps/sniffer",
+    "apps/tui_sniffer",
     "generated",
 ]
 resolver="2"

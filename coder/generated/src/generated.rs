@@ -2,28 +2,48 @@
 // Every field is `Option<T>`; missing fields serialize as CBOR null.
 // Messages are encoded as CBOR arrays (positional, not keyed by name).
 use serde_tuple::{Deserialize_tuple, Serialize_tuple};
-use common::base_message::BytesSerde;
+use common::base_message::Msg;
 
 pub const MULTICAST_PORT : u16 = 50000;
 pub const MULTICAST_ADDR : &str = "224.0.0.1";
 
 
-pub const BROKER_ID: u32 = 1261903363;
+pub const BROKER_ID: u32 = 2490238132;
 
-pub const HOVERBOARD_ID: u32 = 126669173;
+pub const HOVERBOARD_ID: u32 = 1152836275;
 
-pub const LOGGER_ID: u32 = 3862246649;
+pub const LOGGER_ID: u32 = 2753177333;
 
-pub const MOWER_ID: u32 = 2050343113;
+pub const MOWER_ID: u32 = 1092332049;
 
-pub const PS4_ID: u32 = 2501583945;
+pub const PINGER_ID: u32 = 1295055938;
+
+pub const PS4_ID: u32 = 360195552;
+
+pub const SNIFFER_ID: u32 = 836480628;
+
+pub const TUI_SNIFFER_ID: u32 = 3577618233;
 
 
 
-impl HoverboardEvent {
-    pub const ID: u32 = 104988481;
-    pub const NAME: &'static str = "HoverboardEvent";
+
+
+#[derive(Debug, Clone,Serialize_tuple,Deserialize_tuple)]
+pub struct BrokerSubscribeRequest {
+    pub src: Option<u32>,
+    pub msg_type: Option<u32>,
 }
+
+impl Msg<BrokerSubscribeRequest> for BrokerSubscribeRequest {
+    fn id() -> u32 {
+        3190208493
+    }
+    fn name() -> &'static str {
+        "BrokerSubscribeRequest"
+    }
+}
+
+
 
 #[derive(Debug, Clone,Serialize_tuple,Deserialize_tuple)]
 pub struct HoverboardEvent {
@@ -121,14 +141,16 @@ pub struct HoverboardEvent {
     pub temp: Option<f32>,
 }
 
-impl BytesSerde<HoverboardEvent> for HoverboardEvent {}
-
-
-
-impl HoverboardReply {
-    pub const ID: u32 = 2095960949;
-    pub const NAME: &'static str = "HoverboardReply";
+impl Msg<HoverboardEvent> for HoverboardEvent {
+    fn id() -> u32 {
+        104988481
+    }
+    fn name() -> &'static str {
+        "HoverboardEvent"
+    }
 }
+
+
 
 #[derive(Debug, Clone,Serialize_tuple,Deserialize_tuple)]
 pub struct HoverboardReply {
@@ -138,14 +160,16 @@ pub struct HoverboardReply {
     pub message: Option<String>,
 }
 
-impl BytesSerde<HoverboardReply> for HoverboardReply {}
-
-
-
-impl HoverboardRequest {
-    pub const ID: u32 = 2735870956;
-    pub const NAME: &'static str = "HoverboardRequest";
+impl Msg<HoverboardReply> for HoverboardReply {
+    fn id() -> u32 {
+        2095960949
+    }
+    fn name() -> &'static str {
+        "HoverboardReply"
+    }
 }
+
+
 
 #[derive(Debug, Clone,Serialize_tuple,Deserialize_tuple)]
 pub struct HoverboardRequest {
@@ -157,42 +181,52 @@ pub struct HoverboardRequest {
     pub steer: Option<i32>,
 }
 
-impl BytesSerde<HoverboardRequest> for HoverboardRequest {}
-
-
-
-impl PingReply {
-    pub const ID: u32 = 1594103907;
-    pub const NAME: &'static str = "PingReply";
+impl Msg<HoverboardRequest> for HoverboardRequest {
+    fn id() -> u32 {
+        2735870956
+    }
+    fn name() -> &'static str {
+        "HoverboardRequest"
+    }
 }
+
+
 
 #[derive(Debug, Clone,Serialize_tuple,Deserialize_tuple)]
 pub struct PingReply {
     pub req_id: Option<u32>,
+    /// Timestamp in milliseconds since epoch
+    pub timestamp: Option<u64>,
 }
 
-impl BytesSerde<PingReply> for PingReply {}
-
-
-
-impl PingRequest {
-    pub const ID: u32 = 31253678;
-    pub const NAME: &'static str = "PingRequest";
+impl Msg<PingReply> for PingReply {
+    fn id() -> u32 {
+        1594103907
+    }
+    fn name() -> &'static str {
+        "PingReply"
+    }
 }
+
+
 
 #[derive(Debug, Clone,Serialize_tuple,Deserialize_tuple)]
 pub struct PingRequest {
     pub req_id: Option<u32>,
+    /// Timestamp in milliseconds since epoch
+    pub timestamp: Option<u64>,
 }
 
-impl BytesSerde<PingRequest> for PingRequest {}
-
-
-
-impl Ps4Event {
-    pub const ID: u32 = 4282593576;
-    pub const NAME: &'static str = "Ps4Event";
+impl Msg<PingRequest> for PingRequest {
+    fn id() -> u32 {
+        31253678
+    }
+    fn name() -> &'static str {
+        "PingRequest"
+    }
 }
+
+
 
 #[derive(Debug, Clone,Serialize_tuple,Deserialize_tuple)]
 pub struct Ps4Event {
@@ -231,14 +265,16 @@ pub struct Ps4Event {
     pub temp: Option<i32>,
 }
 
-impl BytesSerde<Ps4Event> for Ps4Event {}
-
-
-
-impl Ps4Request {
-    pub const ID: u32 = 1992038561;
-    pub const NAME: &'static str = "Ps4Request";
+impl Msg<Ps4Event> for Ps4Event {
+    fn id() -> u32 {
+        4282593576
+    }
+    fn name() -> &'static str {
+        "Ps4Event"
+    }
 }
+
+
 
 #[derive(Debug, Clone,Serialize_tuple,Deserialize_tuple)]
 pub struct Ps4Request {
@@ -253,14 +289,16 @@ pub struct Ps4Request {
     pub led_flash_off: Option<i32>,
 }
 
-impl BytesSerde<Ps4Request> for Ps4Request {}
-
-
-
-impl SysEvent {
-    pub const ID: u32 = 924742914;
-    pub const NAME: &'static str = "SysEvent";
+impl Msg<Ps4Request> for Ps4Request {
+    fn id() -> u32 {
+        1992038561
+    }
+    fn name() -> &'static str {
+        "Ps4Request"
+    }
 }
+
+
 
 #[derive(Debug, Clone,Serialize_tuple,Deserialize_tuple)]
 pub struct SysEvent {
@@ -272,14 +310,16 @@ pub struct SysEvent {
     pub build_date: Option<String>,
 }
 
-impl BytesSerde<SysEvent> for SysEvent {}
-
-
-
-impl SysReply {
-    pub const ID: u32 = 2952492394;
-    pub const NAME: &'static str = "SysReply";
+impl Msg<SysEvent> for SysEvent {
+    fn id() -> u32 {
+        924742914
+    }
+    fn name() -> &'static str {
+        "SysEvent"
+    }
 }
+
+
 
 #[derive(Debug, Clone,Serialize_tuple,Deserialize_tuple)]
 pub struct SysReply {
@@ -289,14 +329,16 @@ pub struct SysReply {
     pub message: Option<String>,
 }
 
-impl BytesSerde<SysReply> for SysReply {}
-
-
-
-impl SysRequest {
-    pub const ID: u32 = 2966412411;
-    pub const NAME: &'static str = "SysRequest";
+impl Msg<SysReply> for SysReply {
+    fn id() -> u32 {
+        2952492394
+    }
+    fn name() -> &'static str {
+        "SysReply"
+    }
 }
+
+
 
 #[derive(Debug, Clone,Serialize_tuple,Deserialize_tuple)]
 pub struct SysRequest {
@@ -307,7 +349,13 @@ pub struct SysRequest {
     pub console: Option<String>,
 }
 
-impl BytesSerde<SysRequest> for SysRequest {}
-
+impl Msg<SysRequest> for SysRequest {
+    fn id() -> u32 {
+        2966412411
+    }
+    fn name() -> &'static str {
+        "SysRequest"
+    }
+}
 
 

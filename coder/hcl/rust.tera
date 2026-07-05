@@ -2,18 +2,7 @@
 // Every field is `Option<T>`; missing fields serialize as CBOR null.
 // Messages are encoded as CBOR arrays (positional, not keyed by name).
 use serde_tuple::{Deserialize_tuple, Serialize_tuple};
-use common::base_message::BytesSerde;
-
-/*
-pub trait BytesSerde<T> {
-    fn from_bytes(data: &[u8]) -> Option<T> where T : Sized + serde::de::DeserializeOwned {
-        cbor2::from_reader(data).ok()
-    }
-    fn to_bytes(&self) -> Option<Vec<u8>> where Self : serde::Serialize {
-        cbor2::to_vec(self).ok()
-    }
-}
-*/
+use common::base_message::Msg;
 
 pub const MULTICAST_PORT : u16 = {{ robot.multicast_port }};
 pub const MULTICAST_ADDR : &str = "{{ robot.multicast_addr }}";
@@ -25,11 +14,6 @@ pub const {{ endpoint.name | upper }}_ID: u32 = {{ endpoint.id }};
 
 {% for msg in messages %}
 
-impl {{ msg.name }} {
-    pub const ID: u32 = {{ msg.id }};
-    pub const NAME: &'static str = "{{ msg.name }}";
-}
-
 #[derive(Debug, Clone,Serialize_tuple,Deserialize_tuple)]
 pub struct {{ msg.name }} {
 {%- for field in msg.fields %}
@@ -40,6 +24,13 @@ pub struct {{ msg.name }} {
 {%- endfor %}
 }
 
-impl BytesSerde<{{ msg.name }}> for {{ msg.name }} {}
+impl Msg<{{ msg.name }}> for {{ msg.name }} {
+    fn id() -> u32 {
+        {{ msg.id }}
+    }
+    fn name() -> &'static str {
+        "{{ msg.name }}"
+    }
+}
 
 {% endfor %}

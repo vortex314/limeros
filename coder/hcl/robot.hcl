@@ -2,6 +2,7 @@ robot "ronald" {
   model          = "Limero-v1"
   description    = "Hoverboard lawn mower"
   multicast_port = 50000
+  broker_port   = 50001
   multicast_addr = "224.0.0.1"
 
   device "broker" {
@@ -13,6 +14,33 @@ robot "ronald" {
       services    = [$ { message.EndpointAnnounce }, $ { message.EndpointAnnounceReply }, $ { message.PingRequest }, $ { message.PingReply }]
       description = "Message broker for the hoverboard"
     }
+  }
+
+  device "pinger" {
+    description = "Pinger device for testing"
+    mac         = "00:1A:7D:DA:71:18"
+    mdns        = "pinger"
+
+    endpoint "pinger" {
+      services    = [$ { message.PingRequest }, $ { message.PingReply }]
+      description = "Pinger device for testing"
+    }
+  }
+
+  device "sniffer" {
+    description = "Sniffer device for all messages"
+    mac         = "00:1A:7D:DA:71:17"
+    mdns        = "sniffer"
+
+    endpoint "sniffer" {
+      subscribes  = [{ src = null msg_type = null dst = null }]
+    }
+
+    endpoint "tui_sniffer" {
+      description = "Sniffer device for all messages"
+      subscribes  = [{ src = null msg_type = null dst = null }]
+    }
+
   }
 
   device "hoverboard" {
@@ -216,12 +244,21 @@ robot "ronald" {
   message PingRequest { // is send as a reply to EndpointAnnounce, on ip port and addr of the sender
     description = "Ping request message"
     field "req_id" { type = "uint32" }
+    field "timestamp" { type = "uint64"  description = "Timestamp in milliseconds since epoch"}
   }
 
   message PingReply { // is send as a reply to EndpointAnnounce, on ip port and addr of the sender
     description = "Ping reply message"
     field "req_id" { type = "uint32" }
+    field "timestamp" { type = "uint64"  description = "Timestamp in milliseconds since epoch"}
   }
+
+  message BrokerSubscribeRequest {
+    description = "Subscribe to a message type from a source endpoint"
+    field "src" { type = "uint32" } // if no field is set, then subscribe to all sources
+    field "msg_type" { type = "uint32" } // if no field is set, then subscribe to all message types
+  }
+
 
 
 }

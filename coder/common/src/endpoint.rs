@@ -1,10 +1,9 @@
-use std::io::ErrorKind::AddrInUse;
-
-use tokio::net::unix::SocketAddr;
+use std::sync::Arc;
+use tokio::sync::Mutex;
 use tokio::time::sleep;
 use std::time::Duration;
 
-use crate::base_message::{BytesSerde, EndpointAnnounce, EndpointAnnounceReply, UdpMessage};
+use crate::base_message::{Msg, EndpointAnnounce, EndpointAnnounceReply, UdpMessage};
 use crate::node::UdpNode;
 use crate::fnv::fnv1a_32;
 use anyhow::Result;
@@ -12,25 +11,22 @@ use log::{info, warn};
 
 pub struct Endpoint {
     id: u32,
+    name: String,
     node: UdpNode,
-    broker_addr: Option<core::net::SocketAddr>,
+    broker_addr: Arc<Mutex<Option<std::net::SocketAddr>>>,
 }
 
 impl Endpoint {
-    pub fn new(id: u32, node: UdpNode) -> Self {
-        Endpoint {
-            id,
-            node,
-            broker_addr: None,
-        }
-    }
+
 
     pub fn new_from_name(name: &str, node: UdpNode) -> Self {
         let id = fnv1a_32(name);
+        info!("Creating Endpoint with name '{}' and id {}", name, id);
         Endpoint {
             id,
+            name: name.to_string(),
             node,
-            broker_addr: None,
+            broker_addr: Arc::new(Mutex::new(None)),
         }
     }
 
@@ -42,12 +38,13 @@ impl Endpoint {
         loop {
             let announce_payload = EndpointAnnounce {
                 endpoint_id: Some(self.id),
+                endpoint_name: Some(self.name.clone()),
             }
             .to_bytes()?;
             let udp_message = UdpMessage {
                 src: Some(self.id),
                 dst: None,
-                msg_type: Some(EndpointAnnounce::ID),
+                msg_type: Some(EndpointAnnounce::id()),
                 req_id: None,
                 payload: Some(announce_payload),
             };
@@ -59,10 +56,10 @@ impl Endpoint {
                 result = self.receive() => {
                     match result {
                         Ok((reply, addr)) => {
-                            if reply.msg_type == Some(EndpointAnnounceReply::ID) {
+                            if reply.msg_type == Some(EndpointAnnounceReply::id()) {
                                 let reply_payload = EndpointAnnounceReply::from_bytes(&reply.payload.unwrap())?;
                                 info!("Received EndpointAnnounceReply from broker: {:?}", reply_payload);
-                                self.broker_addr = Some(addr);
+                                self.broker_addr.lock().await.replace(addr);
                                 info!("Received EndpointAnnounceReply from broker {}",addr);
                                 break;
                             } else {
@@ -85,7 +82,7 @@ impl Endpoint {
         let envelope = UdpMessage {
             src: Some(self.id),
             dst: None,
-            msg_type: Some(EndpointAnnounce::ID),
+            msg_type: Some(EndpointAnnounce::id()),
             req_id: None,
             payload: Some(payload),
         };
@@ -93,26 +90,22 @@ impl Endpoint {
         self.node.send_multicast(&packet).await
     }
 
-    pub async fn receive(&mut self) -> Result<(UdpMessage, std::net::SocketAddr)> {
+    pub async fn receive(&self) -> Result<(UdpMessage, std::net::SocketAddr)> {
         let mut buf = [0u8; 1500];
         let (len, addr) = self.node.receive_unicast(&mut buf).await?;
         let packet = &buf[..len];
         if let Ok(message) = UdpMessage::from_bytes(packet) {
-            if message.msg_type == Some(EndpointAnnounceReply::ID) {
+            if message.msg_type == Some(EndpointAnnounceReply::id()) {
                 if let Ok(reply) =
                     EndpointAnnounceReply::from_bytes(message.payload.as_deref().unwrap_or(&[]))
                 {
                     info!("Received EndpointAnnounceReply from {}: {:?}", addr, reply);
-                    self.broker_addr = Some(addr);
+                    self.broker_addr.lock().await.replace(addr);
                 } else {
                     warn!("Failed to decode EndpointAnnounceReply from {}", addr);
                 }
                 Ok((message, addr))
             } else {
-                warn!(
-                    "Received unexpected message type from {}: {:?}",
-                    addr, message
-                );
                 Ok((message, addr))
             }
         } else {
@@ -125,7 +118,7 @@ impl Endpoint {
     }
 
     pub async fn send(&self, message: UdpMessage) -> Result<()> {
-        if let Some(broker_addr) = self.broker_addr {
+        if let Some(broker_addr) = *self.broker_addr.lock().await {
             let packet = message.to_bytes()?;
             self.node.send_unicast(&packet, broker_addr).await
         } else {
@@ -133,5 +126,9 @@ impl Endpoint {
                 "No broker address known, cannot send message"
             ))
         }
+    }
+
+    pub async fn close(&mut self) -> Result<()> {
+        self.node.close().await
     }
 }
