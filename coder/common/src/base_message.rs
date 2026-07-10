@@ -1,6 +1,4 @@
 use anyhow::{Context, Result};
-use serde_tuple::{Deserialize_tuple, Serialize_tuple};
-
 use cbor2;
 
 pub trait Msg<T> {
@@ -36,12 +34,17 @@ impl Msg<UdpMessage> for UdpMessage {
     }
 }
 
-#[derive(Debug, Clone, Serialize_tuple, Deserialize_tuple)]
+#[derive(Debug, Clone, PartialEq, cbor2::Cbor)]
 pub struct UdpMessage {
+    #[cbor(key = 0)]
     pub src: Option<u32>,
+    #[cbor(key = 1)]
     pub dst: Option<u32>,
+    #[cbor(key = 2)]
     pub msg_type: Option<u32>,
+    #[cbor(key = 3)]
     pub req_id: Option<u32>,
+    #[cbor(key = 4)]
     pub payload: Option<Vec<u8>>,
 }
 
@@ -55,9 +58,11 @@ impl Msg<EndpointAnnounce> for EndpointAnnounce {
     }
 }
 
-#[derive(Debug, Clone, Serialize_tuple, Deserialize_tuple)]
+#[derive(Debug, Clone, PartialEq, cbor2::Cbor)]
 pub struct EndpointAnnounce {
+    #[cbor(key = 0)]
     pub endpoint_id: Option<u32>,
+    #[cbor(key = 1)]
     pub endpoint_name: Option<String>,
 }
 
@@ -71,8 +76,9 @@ impl Msg<EndpointAnnounceReply> for EndpointAnnounceReply {
     }
 }
 
-#[derive(Debug, Clone, Serialize_tuple, Deserialize_tuple)]
+#[derive(Debug, Clone, PartialEq, cbor2::Cbor)]
 pub struct EndpointAnnounceReply {
+    #[cbor(key = 0)]
     pub broker_id: Option<u32>,
 }
 

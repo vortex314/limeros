@@ -54,7 +54,6 @@ typedef enum HbVar {
 
 class HoverboardEventRaw : public Msg 
 {
-    MSG(HoverboardEventRaw);
 public: 
     std::optional<int32_t> ctrl_mod;
     std::optional<int32_t> ctrl_typ;

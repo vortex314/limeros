@@ -1,7 +1,6 @@
 // Auto-generated from robot.hcl — do not edit by hand.
-// Every field is `Option<T>`; missing fields serialize as CBOR null.
-// Messages are encoded as CBOR arrays (positional, not keyed by name).
-use serde_tuple::{Deserialize_tuple, Serialize_tuple};
+// Every field is `Option<T>`.
+// Messages are encoded as CBOR maps keyed by field id.
 use common::base_message::Msg;
 
 pub const MULTICAST_PORT : u16 = 50000;
@@ -28,9 +27,11 @@ pub const TUI_SNIFFER_ID: u32 = 3577618233;
 
 
 
-#[derive(Debug, Clone,Serialize_tuple,Deserialize_tuple)]
+#[derive(Debug, Clone, PartialEq, cbor2::Cbor)]
 pub struct BrokerSubscribeRequest {
+    #[cbor(key = 0)]
     pub src: Option<u32>,
+    #[cbor(key = 1)]
     pub msg_type: Option<u32>,
 }
 
@@ -45,99 +46,145 @@ impl Msg<BrokerSubscribeRequest> for BrokerSubscribeRequest {
 
 
 
-#[derive(Debug, Clone,Serialize_tuple,Deserialize_tuple)]
+#[derive(Debug, Clone, PartialEq, cbor2::Cbor)]
 pub struct HoverboardEvent {
     /// 1:Voltage 2:Speed 3:Torque
+    #[cbor(key = 0)]
     pub ctrl_mod: Option<i32>,
     /// 0:Commutation 1:Sinusoidal 2:FOC
+    #[cbor(key = 1)]
     pub ctrl_typ: Option<i32>,
     /// Max phase current A
+    #[cbor(key = 2)]
     pub cur_mot_max: Option<i32>,
     /// Max motor RPM
+    #[cbor(key = 3)]
     pub rpm_mot_max: Option<i32>,
     /// Enable field weak 0:OFF 1:ON
+    #[cbor(key = 4)]
     pub fi_weak_ena: Option<i32>,
     /// Field weak high RPM
+    #[cbor(key = 5)]
     pub fi_weak_hi: Option<i32>,
     /// Field weak low RPM
+    #[cbor(key = 6)]
     pub fi_weak_lo: Option<i32>,
     /// Field weak max current A (FOC only)
+    #[cbor(key = 7)]
     pub fi_weak_max: Option<i32>,
     /// Max Phase Adv angle Deg (SIN only)
+    #[cbor(key = 8)]
     pub phase_adv_max_deg: Option<i32>,
     /// Input1 raw value
+    #[cbor(key = 9)]
     pub input1_raw: Option<i32>,
     /// Input1 type 0:Disabled, 1:Normal Pot, 2:Middle Resting Pot, 3:Auto-detect
+    #[cbor(key = 10)]
     pub input1_typ: Option<i32>,
     /// Input1 minimum value
+    #[cbor(key = 11)]
     pub input1_min: Option<i32>,
     /// Input1 middle value
+    #[cbor(key = 12)]
     pub input1_mid: Option<i32>,
     /// Input1 maximum value
+    #[cbor(key = 13)]
     pub input1_max: Option<i32>,
     /// Input1 command value
+    #[cbor(key = 14)]
     pub input1_cmd: Option<i32>,
     /// Input2 raw value
+    #[cbor(key = 15)]
     pub input2_raw: Option<i32>,
     /// Input2 type 0:Disabled, 1:Normal Pot, 2:Middle Resting Pot, 3:Auto-detect
+    #[cbor(key = 16)]
     pub input2_typ: Option<i32>,
     /// Input2 minimum value
+    #[cbor(key = 17)]
     pub input2_min: Option<i32>,
     /// Input2 middle value
+    #[cbor(key = 18)]
     pub input2_mid: Option<i32>,
     /// Input2 maximum value
+    #[cbor(key = 19)]
     pub input2_max: Option<i32>,
     /// Input2 command value
+    #[cbor(key = 20)]
     pub input2_cmd: Option<i32>,
     /// Input1 raw value
+    #[cbor(key = 21)]
     pub aux_input1_raw: Option<i32>,
     /// Input1 type 0:Disabled, 1:Normal Pot, 2:Middle Resting Pot, 3:Auto-detect
+    #[cbor(key = 22)]
     pub aux_input1_typ: Option<i32>,
     /// Input1 minimum value
+    #[cbor(key = 23)]
     pub aux_input1_min: Option<i32>,
     /// Input1 middle value
+    #[cbor(key = 24)]
     pub aux_input1_mid: Option<i32>,
     /// Input1 maximum value
+    #[cbor(key = 25)]
     pub aux_input1_max: Option<i32>,
     /// Input1 command value
+    #[cbor(key = 26)]
     pub aux_input1_cmd: Option<i32>,
     /// Input2 raw value
+    #[cbor(key = 27)]
     pub aux_input2_raw: Option<i32>,
     /// Input2 type 0:Disabled, 1:Normal Pot, 2:Middle Resting Pot, 3:Auto-detect
+    #[cbor(key = 28)]
     pub aux_input2_typ: Option<i32>,
     /// Input2 minimum value
+    #[cbor(key = 29)]
     pub aux_input2_min: Option<i32>,
     /// Input2 middle value
+    #[cbor(key = 30)]
     pub aux_input2_mid: Option<i32>,
     /// Input2 maximum value
+    #[cbor(key = 31)]
     pub aux_input2_max: Option<i32>,
     /// Input2 command value
+    #[cbor(key = 32)]
     pub aux_input2_cmd: Option<i32>,
     /// Total DC Link current A *100
+    #[cbor(key = 33)]
     pub dc_curr: Option<f32>,
     /// Right DC Link current A *100
+    #[cbor(key = 34)]
     pub rdc_curr: Option<f32>,
     /// Left DC Link current A *100
+    #[cbor(key = 35)]
     pub ldc_curr: Option<f32>,
     /// Left Motor Command RPM
+    #[cbor(key = 36)]
     pub cmdl: Option<i32>,
     /// Right Motor Command RPM
+    #[cbor(key = 37)]
     pub cmdr: Option<i32>,
     /// Motor Measured Avg RPM
+    #[cbor(key = 38)]
     pub spd_avg: Option<i32>,
     /// Left Motor Measured RPM
+    #[cbor(key = 39)]
     pub spdl: Option<i32>,
     /// Right Motor Measured RPM
+    #[cbor(key = 40)]
     pub spdr: Option<i32>,
     /// Rate *10
+    #[cbor(key = 41)]
     pub filter_rate: Option<i32>,
     /// Speed Coefficient *10
+    #[cbor(key = 42)]
     pub spd_coef: Option<i32>,
     /// Steer Coefficient *10
+    #[cbor(key = 43)]
     pub str_coef: Option<i32>,
     /// Calibrated Battery Voltage *100
+    #[cbor(key = 44)]
     pub batv: Option<f32>,
     /// Calibrated Temperature C *10
+    #[cbor(key = 45)]
     pub temp: Option<f32>,
 }
 
@@ -152,11 +199,14 @@ impl Msg<HoverboardEvent> for HoverboardEvent {
 
 
 
-#[derive(Debug, Clone,Serialize_tuple,Deserialize_tuple)]
+#[derive(Debug, Clone, PartialEq, cbor2::Cbor)]
 pub struct HoverboardReply {
     /// For request/reply matching, 0 if not a request/reply
+    #[cbor(key = 0)]
     pub req_id: Option<u32>,
+    #[cbor(key = 1)]
     pub error_code: Option<i32>,
+    #[cbor(key = 2)]
     pub message: Option<String>,
 }
 
@@ -171,13 +221,16 @@ impl Msg<HoverboardReply> for HoverboardReply {
 
 
 
-#[derive(Debug, Clone,Serialize_tuple,Deserialize_tuple)]
+#[derive(Debug, Clone, PartialEq, cbor2::Cbor)]
 pub struct HoverboardRequest {
     /// For request/reply matching, 0 if not a request/reply
+    #[cbor(key = 0)]
     pub req_id: Option<u32>,
     /// Speed command for the hoverboard
+    #[cbor(key = 1)]
     pub speed: Option<i32>,
     /// Steering command for the hoverboard
+    #[cbor(key = 2)]
     pub steer: Option<i32>,
 }
 
@@ -192,10 +245,12 @@ impl Msg<HoverboardRequest> for HoverboardRequest {
 
 
 
-#[derive(Debug, Clone,Serialize_tuple,Deserialize_tuple)]
+#[derive(Debug, Clone, PartialEq, cbor2::Cbor)]
 pub struct PingReply {
+    #[cbor(key = 0)]
     pub req_id: Option<u32>,
     /// Timestamp in milliseconds since epoch
+    #[cbor(key = 1)]
     pub timestamp: Option<u64>,
 }
 
@@ -210,10 +265,12 @@ impl Msg<PingReply> for PingReply {
 
 
 
-#[derive(Debug, Clone,Serialize_tuple,Deserialize_tuple)]
+#[derive(Debug, Clone, PartialEq, cbor2::Cbor)]
 pub struct PingRequest {
+    #[cbor(key = 0)]
     pub req_id: Option<u32>,
     /// Timestamp in milliseconds since epoch
+    #[cbor(key = 1)]
     pub timestamp: Option<u64>,
 }
 
@@ -228,40 +285,73 @@ impl Msg<PingRequest> for PingRequest {
 
 
 
-#[derive(Debug, Clone,Serialize_tuple,Deserialize_tuple)]
+#[derive(Debug, Clone, PartialEq, cbor2::Cbor)]
 pub struct Ps4Event {
+    #[cbor(key = 0)]
     pub button_left: Option<bool>,
+    #[cbor(key = 1)]
     pub button_right: Option<bool>,
+    #[cbor(key = 2)]
     pub button_up: Option<bool>,
+    #[cbor(key = 3)]
     pub button_down: Option<bool>,
+    #[cbor(key = 4)]
     pub button_square: Option<bool>,
+    #[cbor(key = 5)]
     pub button_cross: Option<bool>,
+    #[cbor(key = 6)]
     pub button_circle: Option<bool>,
+    #[cbor(key = 7)]
     pub button_triangle: Option<bool>,
+    #[cbor(key = 8)]
     pub button_left_shoulder: Option<bool>,
+    #[cbor(key = 9)]
     pub button_right_shoulder: Option<bool>,
+    #[cbor(key = 10)]
     pub button_left_trigger: Option<bool>,
+    #[cbor(key = 11)]
     pub button_right_trigger: Option<bool>,
+    #[cbor(key = 12)]
     pub button_left_joystick: Option<bool>,
+    #[cbor(key = 13)]
     pub button_right_joystick: Option<bool>,
+    #[cbor(key = 14)]
     pub button_share: Option<bool>,
+    #[cbor(key = 15)]
     pub button_options: Option<bool>,
+    #[cbor(key = 16)]
     pub button_touchpad: Option<bool>,
+    #[cbor(key = 17)]
     pub button_ps: Option<bool>,
+    #[cbor(key = 18)]
     pub axis_lx: Option<i32>,
+    #[cbor(key = 19)]
     pub axis_ly: Option<i32>,
+    #[cbor(key = 20)]
     pub axis_rx: Option<i32>,
+    #[cbor(key = 21)]
     pub axis_ry: Option<i32>,
+    #[cbor(key = 22)]
     pub gyro_x: Option<i32>,
+    #[cbor(key = 23)]
     pub gyro_y: Option<i32>,
+    #[cbor(key = 24)]
     pub gyro_z: Option<i32>,
+    #[cbor(key = 25)]
     pub accel_x: Option<i32>,
+    #[cbor(key = 26)]
     pub accel_y: Option<i32>,
+    #[cbor(key = 27)]
     pub accel_z: Option<i32>,
+    #[cbor(key = 28)]
     pub connected: Option<bool>,
+    #[cbor(key = 29)]
     pub battery_level: Option<i32>,
+    #[cbor(key = 30)]
     pub bluetooth: Option<bool>,
+    #[cbor(key = 31)]
     pub debug: Option<String>,
+    #[cbor(key = 32)]
     pub temp: Option<i32>,
 }
 
@@ -276,16 +366,24 @@ impl Msg<Ps4Event> for Ps4Event {
 
 
 
-#[derive(Debug, Clone,Serialize_tuple,Deserialize_tuple)]
+#[derive(Debug, Clone, PartialEq, cbor2::Cbor)]
 pub struct Ps4Request {
     /// For request/reply matching, 0 if not a request/reply
+    #[cbor(key = 0)]
     pub req_id: Option<u32>,
+    #[cbor(key = 1)]
     pub rumble_small: Option<i32>,
+    #[cbor(key = 2)]
     pub rumble_large: Option<i32>,
+    #[cbor(key = 3)]
     pub led_red: Option<i32>,
+    #[cbor(key = 4)]
     pub led_green: Option<i32>,
+    #[cbor(key = 5)]
     pub led_blue: Option<i32>,
+    #[cbor(key = 6)]
     pub led_flash_on: Option<i32>,
+    #[cbor(key = 7)]
     pub led_flash_off: Option<i32>,
 }
 
@@ -300,13 +398,19 @@ impl Msg<Ps4Request> for Ps4Request {
 
 
 
-#[derive(Debug, Clone,Serialize_tuple,Deserialize_tuple)]
+#[derive(Debug, Clone, PartialEq, cbor2::Cbor)]
 pub struct SysEvent {
+    #[cbor(key = 0)]
     pub utc: Option<u64>,
+    #[cbor(key = 1)]
     pub uptime: Option<u64>,
+    #[cbor(key = 2)]
     pub free_heap: Option<u64>,
+    #[cbor(key = 3)]
     pub flash: Option<u64>,
+    #[cbor(key = 4)]
     pub cpu_board: Option<String>,
+    #[cbor(key = 5)]
     pub build_date: Option<String>,
 }
 
@@ -321,11 +425,14 @@ impl Msg<SysEvent> for SysEvent {
 
 
 
-#[derive(Debug, Clone,Serialize_tuple,Deserialize_tuple)]
+#[derive(Debug, Clone, PartialEq, cbor2::Cbor)]
 pub struct SysReply {
     /// For request/reply matching, 0 if not a request/reply
+    #[cbor(key = 0)]
     pub req_id: Option<u32>,
+    #[cbor(key = 1)]
     pub rc: Option<i32>,
+    #[cbor(key = 2)]
     pub message: Option<String>,
 }
 
@@ -340,12 +447,16 @@ impl Msg<SysReply> for SysReply {
 
 
 
-#[derive(Debug, Clone,Serialize_tuple,Deserialize_tuple)]
+#[derive(Debug, Clone, PartialEq, cbor2::Cbor)]
 pub struct SysRequest {
     /// For request/reply matching, 0 if not a request/reply
+    #[cbor(key = 0)]
     pub req_id: Option<u32>,
+    #[cbor(key = 1)]
     pub set_time: Option<u64>,
+    #[cbor(key = 2)]
     pub reboot: Option<bool>,
+    #[cbor(key = 3)]
     pub console: Option<String>,
 }
 

@@ -1,6 +1,6 @@
 // Auto-generated from robot.hcl — do not edit by hand.
 // Every field is `std::optional<T>`; missing fields serialize as CBOR null.
-// Messages are encoded as CBOR arrays (positional, not keyed by name).
+// Messages are encoded as CBOR maps keyed by field id.
 // Uses tinycbor for CBOR encoding/decoding.
 
 #pragma once
@@ -10,41 +10,188 @@
 #include <optional>
 #include <string>
 
+ namespace msgs_detail {
+
+template <typename>
+inline constexpr bool always_false_v = false;
+
+inline CborError encodeValue(CborEncoder& encoder, uint32_t value) {
+    return cbor_encode_uint(&encoder, static_cast<uint64_t>(value));
+}
+
+inline CborError encodeValue(CborEncoder& encoder, int32_t value) {
+    return cbor_encode_int(&encoder, static_cast<int64_t>(value));
+}
+
+inline CborError encodeValue(CborEncoder& encoder, uint64_t value) {
+    return cbor_encode_uint(&encoder, value);
+}
+
+inline CborError encodeValue(CborEncoder& encoder, int64_t value) {
+    return cbor_encode_int(&encoder, value);
+}
+
+inline CborError encodeValue(CborEncoder& encoder, bool value) {
+    return cbor_encode_boolean(&encoder, value);
+}
+
+inline CborError encodeValue(CborEncoder& encoder, float value) {
+    return cbor_encode_float(&encoder, value);
+}
+
+inline CborError encodeValue(CborEncoder& encoder, const std::string& value) {
+    return cbor_encode_text_string(&encoder, value.c_str(), value.size());
+}
+
+template <typename T>
+inline CborError encodeOptional(CborEncoder& encoder,
+                                const std::optional<T>& value) {
+    if (!value.has_value()) {
+        return cbor_encode_null(&encoder);
+    }
+
+    if constexpr (std::is_same_v<T, uint32_t> ||
+                  std::is_same_v<T, int32_t> ||
+                  std::is_same_v<T, uint64_t> ||
+                  std::is_same_v<T, int64_t> ||
+                  std::is_same_v<T, bool> ||
+                  std::is_same_v<T, float> ||
+                  std::is_same_v<T, std::string>) {
+        return encodeValue(encoder, value.value());
+    } else {
+        static_assert(always_false_v<T>, "Unsupported encodeOptional<T> type");
+    }
+}
+
+inline CborError encodeOptionalUInt32(CborEncoder& encoder,
+                                      const std::optional<uint32_t>& value) {
+    return encodeOptional(encoder, value);
+}
+
+inline void decodeOptionalUInt32(CborValue& value,
+                                 std::optional<uint32_t>& out) {
+    if (!cbor_value_is_null(&value)) {
+        uint64_t v;
+        cbor_value_get_uint64(&value, &v);
+        out = static_cast<uint32_t>(v);
+    }
+}
+
+inline CborError encodeOptionalInt32(CborEncoder& encoder,
+                                     const std::optional<int32_t>& value) {
+    return encodeOptional(encoder, value);
+}
+
+inline void decodeOptionalInt32(CborValue& value,
+                                std::optional<int32_t>& out) {
+    if (!cbor_value_is_null(&value)) {
+        int64_t v;
+        cbor_value_get_int64(&value, &v);
+        out = static_cast<int32_t>(v);
+    }
+}
+
+inline CborError encodeOptionalUInt64(CborEncoder& encoder,
+                                      const std::optional<uint64_t>& value) {
+    return encodeOptional(encoder, value);
+}
+
+inline void decodeOptionalUInt64(CborValue& value,
+                                 std::optional<uint64_t>& out) {
+    if (!cbor_value_is_null(&value)) {
+        cbor_value_get_uint64(&value, &out.emplace());
+    }
+}
+
+inline CborError encodeOptionalInt64(CborEncoder& encoder,
+                                     const std::optional<int64_t>& value) {
+    return encodeOptional(encoder, value);
+}
+
+inline void decodeOptionalInt64(CborValue& value,
+                                std::optional<int64_t>& out) {
+    if (!cbor_value_is_null(&value)) {
+        cbor_value_get_int64(&value, &out.emplace());
+    }
+}
+
+inline CborError encodeOptionalBool(CborEncoder& encoder,
+                                    const std::optional<bool>& value) {
+    return encodeOptional(encoder, value);
+}
+
+inline void decodeOptionalBool(CborValue& value,
+                               std::optional<bool>& out) {
+    if (!cbor_value_is_null(&value)) {
+        bool v;
+        cbor_value_get_boolean(&value, &v);
+        out = v;
+    }
+}
+
+inline CborError encodeOptionalFloat(CborEncoder& encoder,
+                                     const std::optional<float>& value) {
+    return encodeOptional(encoder, value);
+}
+
+inline void decodeOptionalFloat(CborValue& value,
+                                std::optional<float>& out) {
+    if (!cbor_value_is_null(&value)) {
+        cbor_value_get_float(&value, &out.emplace());
+    }
+}
+
+inline CborError encodeOptionalString(CborEncoder& encoder,
+                                      const std::optional<std::string>& value) {
+    return encodeOptional(encoder, value);
+}
+
+inline void decodeOptionalString(CborValue& value,
+                                 std::optional<std::string>& out) {
+    if (!cbor_value_is_null(&value)) {
+        char* buf = nullptr;
+        size_t len = 0;
+        cbor_value_dup_text_string(&value, &buf, &len, nullptr);
+        out = std::string(buf, len);
+        free(buf);
+    }
+}
+
+} // namespace msgs_detail
+
 {% macro encode_field(field) %}
 {%- if field.cpp_type == "uint32_t" %}
-            err = cbor_encode_uint(&arrayEncoder, (uint64_t){{ field.name }}.value());
+            err = msgs_detail::encodeOptionalUInt32(mapEncoder, {{ field.name }});
 {%- elif field.cpp_type == "int32_t" %}
-            err = cbor_encode_int(&arrayEncoder, (int64_t){{ field.name }}.value());
+            err = msgs_detail::encodeOptionalInt32(mapEncoder, {{ field.name }});
 {%- elif field.cpp_type == "uint64_t" %}
-            err = cbor_encode_uint(&arrayEncoder, {{ field.name }}.value());
+            err = msgs_detail::encodeOptionalUInt64(mapEncoder, {{ field.name }});
 {%- elif field.cpp_type == "int64_t" %}
-            err = cbor_encode_int(&arrayEncoder, {{ field.name }}.value());
+            err = msgs_detail::encodeOptionalInt64(mapEncoder, {{ field.name }});
 {%- elif field.cpp_type == "float" %}
-            err = cbor_encode_float(&arrayEncoder, {{ field.name }}.value());
+            err = msgs_detail::encodeOptionalFloat(mapEncoder, {{ field.name }});
 {%- elif field.cpp_type == "std::string" %}
-            err = cbor_encode_text_string(&arrayEncoder,
-                {{ field.name }}.value().c_str(),
-                {{ field.name }}.value().size());
+            err = msgs_detail::encodeOptionalString(mapEncoder, {{ field.name }});
 {%- elif field.cpp_type == "bool" %}
-            err = cbor_encode_boolean(&arrayEncoder, {{ field.name }}.value());
+            err = msgs_detail::encodeOptionalBool(mapEncoder, {{ field.name }});
 {%- endif %}
 {%- endmacro encode_field %}
 
 {% macro decode_field(field) %}
 {%- if field.cpp_type == "uint32_t" %}
-                    { uint64_t _v; cbor_value_get_uint(&array, &_v); msg.{{ field.name }} = (uint32_t)_v; }
+                    msgs_detail::decodeOptionalUInt32(map, msg.{{ field.name }});
 {%- elif field.cpp_type == "int32_t" %}
-                    { int64_t _v; cbor_value_get_int(&array, &_v); msg.{{ field.name }} = (int32_t)_v; }
+                    msgs_detail::decodeOptionalInt32(map, msg.{{ field.name }});
 {%- elif field.cpp_type == "uint64_t" %}
-                    cbor_value_get_uint(&array, &msg.{{ field.name }}.emplace());
+                    msgs_detail::decodeOptionalUInt64(map, msg.{{ field.name }});
 {%- elif field.cpp_type == "int64_t" %}
-                    cbor_value_get_int(&array, &msg.{{ field.name }}.emplace());
+                    msgs_detail::decodeOptionalInt64(map, msg.{{ field.name }});
 {%- elif field.cpp_type == "float" %}
-                    cbor_value_get_float(&array, &msg.{{ field.name }}.emplace());
+                    msgs_detail::decodeOptionalFloat(map, msg.{{ field.name }});
 {%- elif field.cpp_type == "std::string" %}
-                    { char* _buf; size_t _len; cbor_value_dup_text_string(&array, &_buf, &_len, nullptr); msg.{{ field.name }} = std::string(_buf, _len); free(_buf); }
+                    msgs_detail::decodeOptionalString(map, msg.{{ field.name }});
 {%- elif field.cpp_type == "bool" %}
-                    { bool _v; cbor_value_get_boolean(&array, &_v); msg.{{ field.name }} = _v; }
+                    msgs_detail::decodeOptionalBool(map, msg.{{ field.name }});
 {%- endif %}
 {%- endmacro decode_field %}
 
@@ -57,39 +204,80 @@ struct {{ msg.name }} {
     std::optional<{{ field.cpp_type }}> {{ field.name }};
 {%- endfor %}
 
-    /// Serialize this message into a CBOR array as a child of `parentEncoder`.
+    /// Serialize this message into a CBOR map keyed by field id.
     CborError toCbor(CborEncoder& parentEncoder) const {
-        CborEncoder arrayEncoder;
-        CborError err = cbor_encoder_create_array(
-            &parentEncoder, &arrayEncoder, {{ msg.fields | length }});
+        size_t mapSize = 0;
+{%- for field in msg.fields %}
+        if ({{ field.name }}.has_value()) {
+            ++mapSize;
+        }
+{%- endfor %}
+
+        CborEncoder mapEncoder;
+        CborError err = cbor_encoder_create_map(
+            &parentEncoder, &mapEncoder, mapSize);
         if (err != CborNoError) return err;
 {%- for field in msg.fields %}
         if ({{ field.name }}.has_value()) {
+            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>({{ field.id }}));
+            if (err != CborNoError) return err;
 {{ self::encode_field(field=field) }}
-        } else {
-            err = cbor_encode_null(&arrayEncoder);
         }
         if (err != CborNoError) return err;
 {%- endfor %}
-        return cbor_encoder_close_container(&parentEncoder, &arrayEncoder);
+        return cbor_encoder_close_container(&parentEncoder, &mapEncoder);
     }
 
-    /// Deserialize a {{ msg.name }} from a CBOR array value.
+    /// Deserialize a {{ msg.name }} from a CBOR map value.
     static {{ msg.name }} fromCbor(CborValue& it) {
         {{ msg.name }} msg;
-        CborValue array;
+        CborValue map;
         if (cbor_value_is_container(&it) &&
-            cbor_value_enter_container(&it, &array) == CborNoError)
+            cbor_value_enter_container(&it, &map) == CborNoError)
         {
-{%- for field in msg.fields %}
-            if (!cbor_value_at_end(&array)) {
-                if (!cbor_value_is_null(&array)) {
-{{ self::decode_field(field=field) }}
+            while (!cbor_value_at_end(&map)) {
+                uint64_t key = 0;
+                if (cbor_value_is_unsigned_integer(&map)) {
+                    cbor_value_get_uint64(&map, &key);
+                } else if (cbor_value_is_integer(&map)) {
+                    int64_t signedKey = 0;
+                    cbor_value_get_int64(&map, &signedKey);
+                    if (signedKey < 0) {
+                        cbor_value_advance(&map);
+                        if (!cbor_value_at_end(&map)) {
+                            cbor_value_advance(&map);
+                        }
+                        continue;
+                    }
+                    key = static_cast<uint64_t>(signedKey);
+                } else {
+                    cbor_value_advance(&map);
+                    if (!cbor_value_at_end(&map)) {
+                        cbor_value_advance(&map);
+                    }
+                    continue;
                 }
-                cbor_value_advance(&array);
-            }
+
+                cbor_value_advance(&map);
+                if (cbor_value_at_end(&map)) {
+                    break;
+                }
+
+                switch (key) {
+{%- for field in msg.fields %}
+                    case {{ field.id }}:
+{{ self::decode_field(field=field) }}
+                        break;
 {%- endfor %}
-            cbor_value_leave_container(&it, &array);
+                    default:
+                        break;
+                }
+
+                if (!cbor_value_at_end(&map)) {
+                    cbor_value_advance(&map);
+                }
+            }
+            cbor_value_leave_container(&it, &map);
         }
         return msg;
     }

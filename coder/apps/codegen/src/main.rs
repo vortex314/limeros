@@ -112,6 +112,7 @@ struct MessageCtx {
 #[derive(Serialize)]
 struct FieldCtx {
     name: String,
+    id: u32,
     rust_type: String,
     cpp_type: String,
     description: String,
@@ -205,6 +206,7 @@ fn message_to_ctx(name: &str, msg: &MessageConfig) -> anyhow::Result<MessageCtx>
         .enumerate()
         .map(|(i, f)| FieldCtx {
             name: f.name.clone(),
+            id: f.id.unwrap_or(i as u32),
             rust_type: hcl_type_to_rust(&f.field_type)
                 .unwrap_or_else(|e| {
                     eprintln!("warning: {e}, falling back to String");

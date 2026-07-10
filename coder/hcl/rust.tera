@@ -1,7 +1,6 @@
 // Auto-generated from robot.hcl — do not edit by hand.
-// Every field is `Option<T>`; missing fields serialize as CBOR null.
-// Messages are encoded as CBOR arrays (positional, not keyed by name).
-use serde_tuple::{Deserialize_tuple, Serialize_tuple};
+// Every field is `Option<T>`.
+// Messages are encoded as CBOR maps keyed by field id.
 use common::base_message::Msg;
 
 pub const MULTICAST_PORT : u16 = {{ robot.multicast_port }};
@@ -14,12 +13,13 @@ pub const {{ endpoint.name | upper }}_ID: u32 = {{ endpoint.id }};
 
 {% for msg in messages %}
 
-#[derive(Debug, Clone,Serialize_tuple,Deserialize_tuple)]
+#[derive(Debug, Clone, PartialEq, cbor2::Cbor)]
 pub struct {{ msg.name }} {
 {%- for field in msg.fields %}
 {%- if field.description %}
     /// {{ field.description }}
 {%- endif %}
+    #[cbor(key = {{ field.id }})]
     pub {{ field.name }}: Option<{{ field.rust_type }}>,
 {%- endfor %}
 }

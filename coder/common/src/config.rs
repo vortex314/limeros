@@ -119,6 +119,8 @@ pub struct MessageConfig {
 pub struct FieldConfig {
     /// Field name (the HCL block label).
     pub name: String,
+    /// Optional explicit field id used for map-style serialization.
+    pub id: Option<u32>,
     /// HCL type string (e.g. `"uint32"`, `"float"`, `"string"`).
     pub field_type: String,
     pub description: Option<String>,
@@ -308,6 +310,7 @@ fn parse_field(block: &Block) -> anyhow::Result<FieldConfig> {
     let body = block.body();
     Ok(FieldConfig {
         name,
+        id: get_attr_u32_optional(body, "id"),
         field_type: get_attr_string(body, "type")?,
         description: get_attr_optional(body, "description"),
         unit: get_attr_optional(body, "unit"),
@@ -355,6 +358,14 @@ fn get_attr_string(body: &Body, key: &str) -> anyhow::Result<String> {
         .find(|a| &*a.key == key)
         .and_then(|a| expr_to_string(&a.expr))
         .ok_or_else(|| anyhow::anyhow!("missing attribute '{key}'"))
+}
+
+/// Read an optional attribute as a u32.
+fn get_attr_u32_optional(body: &Body, key: &str) -> Option<u32> {
+    body.attributes()
+        .find(|a| &*a.key == key)
+        .and_then(|a| expr_to_string(&a.expr))
+        .and_then(|s| s.parse::<u32>().ok())
 }
 
 /// Read an optional attribute as a list of strings.

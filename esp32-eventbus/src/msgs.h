@@ -1,589 +1,1586 @@
+// Auto-generated from robot.hcl — do not edit by hand.
+// Every field is `std::optional<T>`; missing fields serialize as CBOR null.
+// Messages are encoded as CBOR maps keyed by field id.
+// Uses tinycbor for CBOR encoding/decoding.
+
 #pragma once
-#include <string>
-#include <vector>
+
+#include <cbor.h>
 #include <cstdint>
 #include <optional>
-#include <cbor.h>
-#include <functional>
-#include <sstream>
-#include <msg.h>
+#include <string>
 
-typedef std::vector<uint8_t> Bytes;
+ namespace msgs_detail {
+
+template <typename>
+inline constexpr bool always_false_v = false;
+
+inline CborError encodeValue(CborEncoder& encoder, uint32_t value) {
+    return cbor_encode_uint(&encoder, static_cast<uint64_t>(value));
+}
+
+inline CborError encodeValue(CborEncoder& encoder, int32_t value) {
+    return cbor_encode_int(&encoder, static_cast<int64_t>(value));
+}
+
+inline CborError encodeValue(CborEncoder& encoder, uint64_t value) {
+    return cbor_encode_uint(&encoder, value);
+}
+
+inline CborError encodeValue(CborEncoder& encoder, int64_t value) {
+    return cbor_encode_int(&encoder, value);
+}
+
+inline CborError encodeValue(CborEncoder& encoder, bool value) {
+    return cbor_encode_boolean(&encoder, value);
+}
+
+inline CborError encodeValue(CborEncoder& encoder, float value) {
+    return cbor_encode_float(&encoder, value);
+}
+
+inline CborError encodeValue(CborEncoder& encoder, const std::string& value) {
+    return cbor_encode_text_string(&encoder, value.c_str(), value.size());
+}
+
+template <typename T>
+inline CborError encodeOptional(CborEncoder& encoder,
+                                const std::optional<T>& value) {
+    if (!value.has_value()) {
+        return cbor_encode_null(&encoder);
+    }
+
+    if constexpr (std::is_same_v<T, uint32_t> ||
+                  std::is_same_v<T, int32_t> ||
+                  std::is_same_v<T, uint64_t> ||
+                  std::is_same_v<T, int64_t> ||
+                  std::is_same_v<T, bool> ||
+                  std::is_same_v<T, float> ||
+                  std::is_same_v<T, std::string>) {
+        return encodeValue(encoder, value.value());
+    } else {
+        static_assert(always_false_v<T>, "Unsupported encodeOptional<T> type");
+    }
+}
+
+inline CborError encodeOptionalUInt32(CborEncoder& encoder,
+                                      const std::optional<uint32_t>& value) {
+    return encodeOptional(encoder, value);
+}
+
+inline void decodeOptionalUInt32(CborValue& value,
+                                 std::optional<uint32_t>& out) {
+    if (!cbor_value_is_null(&value)) {
+        uint64_t v;
+        cbor_value_get_uint64(&value, &v);
+        out = static_cast<uint32_t>(v);
+    }
+}
+
+inline CborError encodeOptionalInt32(CborEncoder& encoder,
+                                     const std::optional<int32_t>& value) {
+    return encodeOptional(encoder, value);
+}
+
+inline void decodeOptionalInt32(CborValue& value,
+                                std::optional<int32_t>& out) {
+    if (!cbor_value_is_null(&value)) {
+        int64_t v;
+        cbor_value_get_int64(&value, &v);
+        out = static_cast<int32_t>(v);
+    }
+}
+
+inline CborError encodeOptionalUInt64(CborEncoder& encoder,
+                                      const std::optional<uint64_t>& value) {
+    return encodeOptional(encoder, value);
+}
+
+inline void decodeOptionalUInt64(CborValue& value,
+                                 std::optional<uint64_t>& out) {
+    if (!cbor_value_is_null(&value)) {
+        cbor_value_get_uint64(&value, &out.emplace());
+    }
+}
+
+inline CborError encodeOptionalInt64(CborEncoder& encoder,
+                                     const std::optional<int64_t>& value) {
+    return encodeOptional(encoder, value);
+}
+
+inline void decodeOptionalInt64(CborValue& value,
+                                std::optional<int64_t>& out) {
+    if (!cbor_value_is_null(&value)) {
+        cbor_value_get_int64(&value, &out.emplace());
+    }
+}
+
+inline CborError encodeOptionalBool(CborEncoder& encoder,
+                                    const std::optional<bool>& value) {
+    return encodeOptional(encoder, value);
+}
+
+inline void decodeOptionalBool(CborValue& value,
+                               std::optional<bool>& out) {
+    if (!cbor_value_is_null(&value)) {
+        bool v;
+        cbor_value_get_boolean(&value, &v);
+        out = v;
+    }
+}
+
+inline CborError encodeOptionalFloat(CborEncoder& encoder,
+                                     const std::optional<float>& value) {
+    return encodeOptional(encoder, value);
+}
+
+inline void decodeOptionalFloat(CborValue& value,
+                                std::optional<float>& out) {
+    if (!cbor_value_is_null(&value)) {
+        cbor_value_get_float(&value, &out.emplace());
+    }
+}
+
+inline CborError encodeOptionalString(CborEncoder& encoder,
+                                      const std::optional<std::string>& value) {
+    return encodeOptional(encoder, value);
+}
+
+inline void decodeOptionalString(CborValue& value,
+                                 std::optional<std::string>& out) {
+    if (!cbor_value_is_null(&value)) {
+        char* buf = nullptr;
+        size_t len = 0;
+        cbor_value_dup_text_string(&value, &buf, &len, nullptr);
+        out = std::string(buf, len);
+        free(buf);
+    }
+}
+
+} // namespace msgs_detail
 
 
-typedef enum {
-    DEBUG = 1,
-    INFO = 2,
-    WARN = 3,
-    ERROR = 4,
-    FATAL = 5,
-    ALERT = 6,
-} LogLevel;
-
-typedef enum {
-    SYS_CMD = 1,
-    SYS_INFO = 2,
-    WIFI_INFO = 3,
-    MOTOR_INFO = 4,
-    MOTOR_CMD = 5,
-} MessageType;
-
-typedef enum {
-    OFF = 0,
-    ON = 1,
-} Toggle;
-
-typedef enum {
-    VOLTAGE = 1,
-    SPEED = 2,
-    TORQUE = 3,
-} CtrlMod;
-
-typedef enum {
-    COMMUTATION = 0,
-    SINUSOIDAL = 1,
-    FOC = 2,
-} CtrlTyp;
-
-typedef enum {
-    DISABLED = 0,
-    NORMAL_POT = 1,
-    MIDDLE_RESTING_POT = 2,
-    AUTO_DETECT = 3,
-} InTyp;
-
-typedef enum {
-    MANUAL = 0,
-    AUTO = 1,
-    PAUSED = 2,
-    EMERGENCY_STOP = 3,
-} LawnmowerMode;
 
 
 
-class UdpMessage : public Msg{
-    MSG(UdpMessage);
-    public:
 
-    std::optional<uint32_t> dst;
+struct BrokerSubscribeRequest {
     std::optional<uint32_t> src;
-    std::optional<uint32_t> msg_typ;
-    std::optional<uint32_t> req_id;
-    std::optional<Bytes> payload;
-    
+    std::optional<uint32_t> msg_type;
 
-    // Field indexes
-    typedef enum {
-        DST_INDEX = 1,
-        SRC_INDEX = 2,
-        MSG_TYP_INDEX = 3,
-        REQ_ID_INDEX = 4,
-        PAYLOAD_INDEX = 5,
-    } Field;
+    /// Serialize this message into a CBOR map keyed by field id.
+    CborError toCbor(CborEncoder& parentEncoder) const {
+        size_t mapSize = 0;
+        if (src.has_value()) {
+            ++mapSize;
+        }
+        if (msg_type.has_value()) {
+            ++mapSize;
+        }
 
-    Bytes serialize() const;
-    UdpMessage* deserialize(const Bytes& bytes);
-    std::string to_string() const;
+        CborEncoder mapEncoder;
+        CborError err = cbor_encoder_create_map(
+            &parentEncoder, &mapEncoder, mapSize);
+        if (err != CborNoError) return err;
+        if (src.has_value()) {
+            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(0));
+            if (err != CborNoError) return err;
+
+            err = msgs_detail::encodeOptionalUInt32(mapEncoder, src);
+        }
+        if (err != CborNoError) return err;
+        if (msg_type.has_value()) {
+            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(1));
+            if (err != CborNoError) return err;
+
+            err = msgs_detail::encodeOptionalUInt32(mapEncoder, msg_type);
+        }
+        if (err != CborNoError) return err;
+        return cbor_encoder_close_container(&parentEncoder, &mapEncoder);
+    }
+
+    /// Deserialize a BrokerSubscribeRequest from a CBOR map value.
+    static BrokerSubscribeRequest fromCbor(CborValue& it) {
+        BrokerSubscribeRequest msg;
+        CborValue map;
+        if (cbor_value_is_container(&it) &&
+            cbor_value_enter_container(&it, &map) == CborNoError)
+        {
+            while (!cbor_value_at_end(&map)) {
+                uint64_t key = 0;
+                if (cbor_value_is_unsigned_integer(&map)) {
+                    cbor_value_get_uint64(&map, &key);
+                } else if (cbor_value_is_integer(&map)) {
+                    int64_t signedKey = 0;
+                    cbor_value_get_int64(&map, &signedKey);
+                    if (signedKey < 0) {
+                        cbor_value_advance(&map);
+                        if (!cbor_value_at_end(&map)) {
+                            cbor_value_advance(&map);
+                        }
+                        continue;
+                    }
+                    key = static_cast<uint64_t>(signedKey);
+                } else {
+                    cbor_value_advance(&map);
+                    if (!cbor_value_at_end(&map)) {
+                        cbor_value_advance(&map);
+                    }
+                    continue;
+                }
+
+                cbor_value_advance(&map);
+                if (cbor_value_at_end(&map)) {
+                    break;
+                }
+
+                switch (key) {
+                    case 0:
+
+                    msgs_detail::decodeOptionalUInt32(map, msg.src);
+                        break;
+                    case 1:
+
+                    msgs_detail::decodeOptionalUInt32(map, msg.msg_type);
+                        break;
+                    default:
+                        break;
+                }
+
+                if (!cbor_value_at_end(&map)) {
+                    cbor_value_advance(&map);
+                }
+            }
+            cbor_value_leave_container(&it, &map);
+        }
+        return msg;
+    }
 };
 
-class DeviceAliveEvent : public Msg{
-    MSG(DeviceAliveEvent);
-    public:
 
-    std::optional<std::string> device_id;
-    std::vector<std::string> objects;
-    std::vector<std::string> subscribes;
-    std::vector<std::string> publishes;
-    std::vector<std::string> requests;
-    std::vector<std::string> replies;
-    
-
-    // Field indexes
-    typedef enum {
-        DEVICE_ID_INDEX = 1,
-        OBJECTS_INDEX = 2,
-        SUBSCRIBES_INDEX = 3,
-        PUBLISHES_INDEX = 4,
-        REQUESTS_INDEX = 5,
-        REPLIES_INDEX = 6,
-    } Field;
-
-    Bytes serialize() const;
-    DeviceAliveEvent* deserialize(const Bytes& bytes);
-    std::string to_string() const;
-};
-
-class LogEvent : public Msg{
-    MSG(LogEvent);
-    public:
-
-    std::optional<LogLevel> level;
-    std::optional<std::string> message;
-    std::optional<int32_t> error_code;
-    std::optional<std::string> file;
-    std::optional<int32_t> line;
+struct DeviceAliveEvent {
+    std::optional<std::string> device;
+    std::optional<std::string> endpoint;
+    /// Timestamp in milliseconds since epoch
     std::optional<uint64_t> timestamp;
-    
 
-    // Field indexes
-    typedef enum {
-        LEVEL_INDEX = 2,
-        MESSAGE_INDEX = 3,
-        ERROR_CODE_INDEX = 4,
-        FILE_INDEX = 5,
-        LINE_INDEX = 6,
-        TIMESTAMP_INDEX = 7,
-    } Field;
+    /// Serialize this message into a CBOR map keyed by field id.
+    CborError toCbor(CborEncoder& parentEncoder) const {
+        size_t mapSize = 0;
+        if (device.has_value()) {
+            ++mapSize;
+        }
+        if (endpoint.has_value()) {
+            ++mapSize;
+        }
+        if (timestamp.has_value()) {
+            ++mapSize;
+        }
 
-    Bytes serialize() const;
-    LogEvent* deserialize(const Bytes& bytes);
-    std::string to_string() const;
+        CborEncoder mapEncoder;
+        CborError err = cbor_encoder_create_map(
+            &parentEncoder, &mapEncoder, mapSize);
+        if (err != CborNoError) return err;
+        if (device.has_value()) {
+            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(0));
+            if (err != CborNoError) return err;
+
+            err = msgs_detail::encodeOptionalString(mapEncoder, device);
+        }
+        if (err != CborNoError) return err;
+        if (endpoint.has_value()) {
+            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(1));
+            if (err != CborNoError) return err;
+
+            err = msgs_detail::encodeOptionalString(mapEncoder, endpoint);
+        }
+        if (err != CborNoError) return err;
+        if (timestamp.has_value()) {
+            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(2));
+            if (err != CborNoError) return err;
+
+            err = msgs_detail::encodeOptionalUInt64(mapEncoder, timestamp);
+        }
+        if (err != CborNoError) return err;
+        return cbor_encoder_close_container(&parentEncoder, &mapEncoder);
+    }
+
+    /// Deserialize a DeviceAliveEvent from a CBOR map value.
+    static DeviceAliveEvent fromCbor(CborValue& it) {
+        DeviceAliveEvent msg;
+        CborValue map;
+        if (cbor_value_is_container(&it) &&
+            cbor_value_enter_container(&it, &map) == CborNoError)
+        {
+            while (!cbor_value_at_end(&map)) {
+                uint64_t key = 0;
+                if (cbor_value_is_unsigned_integer(&map)) {
+                    cbor_value_get_uint64(&map, &key);
+                } else if (cbor_value_is_integer(&map)) {
+                    int64_t signedKey = 0;
+                    cbor_value_get_int64(&map, &signedKey);
+                    if (signedKey < 0) {
+                        cbor_value_advance(&map);
+                        if (!cbor_value_at_end(&map)) {
+                            cbor_value_advance(&map);
+                        }
+                        continue;
+                    }
+                    key = static_cast<uint64_t>(signedKey);
+                } else {
+                    cbor_value_advance(&map);
+                    if (!cbor_value_at_end(&map)) {
+                        cbor_value_advance(&map);
+                    }
+                    continue;
+                }
+
+                cbor_value_advance(&map);
+                if (cbor_value_at_end(&map)) {
+                    break;
+                }
+
+                switch (key) {
+                    case 0:
+
+                    msgs_detail::decodeOptionalString(map, msg.device);
+                        break;
+                    case 1:
+
+                    msgs_detail::decodeOptionalString(map, msg.endpoint);
+                        break;
+                    case 2:
+
+                    msgs_detail::decodeOptionalUInt64(map, msg.timestamp);
+                        break;
+                    default:
+                        break;
+                }
+
+                if (!cbor_value_at_end(&map)) {
+                    cbor_value_advance(&map);
+                }
+            }
+            cbor_value_leave_container(&it, &map);
+        }
+        return msg;
+    }
 };
 
-class SysRequest : public Msg{
-    MSG(SysRequest);
-    public:
 
-    std::optional<uint32_t> req_id;
-    std::optional<uint64_t> set_time;
-    std::optional<bool> reboot;
-    std::optional<std::string> console;
-    
-
-    // Field indexes
-    typedef enum {
-        REQ_ID_INDEX = 0,
-        SET_TIME_INDEX = 1,
-        REBOOT_INDEX = 2,
-        CONSOLE_INDEX = 3,
-    } Field;
-
-    Bytes serialize() const;
-    SysRequest* deserialize(const Bytes& bytes);
-    std::string to_string() const;
-};
-
-class SysReply : public Msg{
-    MSG(SysReply);
-    public:
-
-    std::optional<uint32_t> req_id;
-    std::optional<int32_t> rc;
-    std::optional<std::string> message;
-    
-
-    // Field indexes
-    typedef enum {
-        REQ_ID_INDEX = 0,
-        RC_INDEX = 1,
-        MESSAGE_INDEX = 2,
-    } Field;
-
-    Bytes serialize() const;
-    SysReply* deserialize(const Bytes& bytes);
-    std::string to_string() const;
-};
-
-class SysEvent : public Msg{
-    MSG(SysEvent);
-    public:
-
-    std::optional<uint64_t> utc;
-    std::optional<uint64_t> uptime;
-    std::optional<uint64_t> free_heap;
-    std::optional<uint64_t> flash;
-    std::optional<std::string> cpu_board;
-    std::optional<std::string> build_date;
-    
-
-    // Field indexes
-    typedef enum {
-        UTC_INDEX = 1,
-        UPTIME_INDEX = 2,
-        FREE_HEAP_INDEX = 3,
-        FLASH_INDEX = 4,
-        CPU_BOARD_INDEX = 5,
-        BUILD_DATE_INDEX = 6,
-    } Field;
-
-    Bytes serialize() const;
-    SysEvent* deserialize(const Bytes& bytes);
-    std::string to_string() const;
-};
-
-class WifiEvent : public Msg{
-    MSG(WifiEvent);
-    public:
-
-    std::optional<std::string> ssid;
-    std::optional<std::string> bssid;
-    std::optional<int32_t> rssi;
-    std::optional<std::string> ip;
-    std::optional<std::string> mac;
-    std::optional<int32_t> channel;
-    std::optional<std::string> gateway;
-    std::optional<std::string> netmask;
-    
-
-    // Field indexes
-    typedef enum {
-        SSID_INDEX = 2,
-        BSSID_INDEX = 3,
-        RSSI_INDEX = 4,
-        IP_INDEX = 5,
-        MAC_INDEX = 6,
-        CHANNEL_INDEX = 7,
-        GATEWAY_INDEX = 8,
-        NETMASK_INDEX = 9,
-    } Field;
-
-    Bytes serialize() const;
-    WifiEvent* deserialize(const Bytes& bytes);
-    std::string to_string() const;
-};
-
-class MulticastEvent : public Msg{
-    MSG(MulticastEvent);
-    public:
-
-    std::optional<std::string> group;
-    std::optional<int32_t> port;
-    std::optional<uint32_t> mtu;
-    
-
-    // Field indexes
-    typedef enum {
-        GROUP_INDEX = 2,
-        PORT_INDEX = 3,
-        MTU_INDEX = 4,
-    } Field;
-
-    Bytes serialize() const;
-    MulticastEvent* deserialize(const Bytes& bytes);
-    std::string to_string() const;
-};
-
-class PingRequest : public Msg{
-    MSG(PingRequest);
-    public:
-
-    std::optional<uint32_t> req_id;
-    std::optional<uint32_t> number;
-    
-
-    // Field indexes
-    typedef enum {
-        REQ_ID_INDEX = 0,
-        NUMBER_INDEX = 1,
-    } Field;
-
-    Bytes serialize() const;
-    PingRequest* deserialize(const Bytes& bytes);
-    std::string to_string() const;
-};
-
-class PingReply : public Msg{
-    MSG(PingReply);
-    public:
-
-    std::optional<uint32_t> req_id;
-    std::optional<uint32_t> number;
-    
-
-    // Field indexes
-    typedef enum {
-        REQ_ID_INDEX = 0,
-        NUMBER_INDEX = 1,
-    } Field;
-
-    Bytes serialize() const;
-    PingReply* deserialize(const Bytes& bytes);
-    std::string to_string() const;
-};
-
-class HoverboardEventRaw : public Msg{
-    MSG(HoverboardEventRaw);
-    public:
-
+struct HoverboardEvent {
+    /// 1:Voltage 2:Speed 3:Torque
     std::optional<int32_t> ctrl_mod;
+    /// 0:Commutation 1:Sinusoidal 2:FOC
     std::optional<int32_t> ctrl_typ;
+    /// Max phase current A
     std::optional<int32_t> cur_mot_max;
+    /// Max motor RPM
     std::optional<int32_t> rpm_mot_max;
+    /// Enable field weak 0:OFF 1:ON
     std::optional<int32_t> fi_weak_ena;
+    /// Field weak high RPM
     std::optional<int32_t> fi_weak_hi;
+    /// Field weak low RPM
     std::optional<int32_t> fi_weak_lo;
+    /// Field weak max current A (FOC only)
     std::optional<int32_t> fi_weak_max;
+    /// Max Phase Adv angle Deg (SIN only)
     std::optional<int32_t> phase_adv_max_deg;
+    /// Input1 raw value
     std::optional<int32_t> input1_raw;
+    /// Input1 type 0:Disabled, 1:Normal Pot, 2:Middle Resting Pot, 3:Auto-detect
     std::optional<int32_t> input1_typ;
+    /// Input1 minimum value
     std::optional<int32_t> input1_min;
+    /// Input1 middle value
     std::optional<int32_t> input1_mid;
+    /// Input1 maximum value
     std::optional<int32_t> input1_max;
+    /// Input1 command value
     std::optional<int32_t> input1_cmd;
+    /// Input2 raw value
     std::optional<int32_t> input2_raw;
+    /// Input2 type 0:Disabled, 1:Normal Pot, 2:Middle Resting Pot, 3:Auto-detect
     std::optional<int32_t> input2_typ;
+    /// Input2 minimum value
     std::optional<int32_t> input2_min;
+    /// Input2 middle value
     std::optional<int32_t> input2_mid;
+    /// Input2 maximum value
     std::optional<int32_t> input2_max;
+    /// Input2 command value
     std::optional<int32_t> input2_cmd;
+    /// Input1 raw value
     std::optional<int32_t> aux_input1_raw;
+    /// Input1 type 0:Disabled, 1:Normal Pot, 2:Middle Resting Pot, 3:Auto-detect
     std::optional<int32_t> aux_input1_typ;
+    /// Input1 minimum value
     std::optional<int32_t> aux_input1_min;
+    /// Input1 middle value
     std::optional<int32_t> aux_input1_mid;
+    /// Input1 maximum value
     std::optional<int32_t> aux_input1_max;
+    /// Input1 command value
     std::optional<int32_t> aux_input1_cmd;
+    /// Input2 raw value
     std::optional<int32_t> aux_input2_raw;
+    /// Input2 type 0:Disabled, 1:Normal Pot, 2:Middle Resting Pot, 3:Auto-detect
     std::optional<int32_t> aux_input2_typ;
+    /// Input2 minimum value
     std::optional<int32_t> aux_input2_min;
+    /// Input2 middle value
     std::optional<int32_t> aux_input2_mid;
+    /// Input2 maximum value
     std::optional<int32_t> aux_input2_max;
+    /// Input2 command value
     std::optional<int32_t> aux_input2_cmd;
-    std::optional<int32_t> dc_curr;
-    std::optional<int32_t> rdc_curr;
-    std::optional<int32_t> ldc_curr;
-    std::optional<int32_t> cmdl;
-    std::optional<int32_t> cmdr;
-    std::optional<int32_t> spd_avg;
-    std::optional<int32_t> spdl;
-    std::optional<int32_t> spdr;
-    std::optional<int32_t> filter_rate;
-    std::optional<int32_t> spd_coef;
-    std::optional<int32_t> str_coef;
-    std::optional<int32_t> batv;
-    std::optional<int32_t> temp;
-    
-
-    // Field indexes
-    typedef enum {
-        CTRL_MOD_INDEX = 0,
-        CTRL_TYP_INDEX = 1,
-        CUR_MOT_MAX_INDEX = 2,
-        RPM_MOT_MAX_INDEX = 3,
-        FI_WEAK_ENA_INDEX = 4,
-        FI_WEAK_HI_INDEX = 5,
-        FI_WEAK_LO_INDEX = 6,
-        FI_WEAK_MAX_INDEX = 7,
-        PHASE_ADV_MAX_DEG_INDEX = 8,
-        INPUT1_RAW_INDEX = 9,
-        INPUT1_TYP_INDEX = 10,
-        INPUT1_MIN_INDEX = 11,
-        INPUT1_MID_INDEX = 12,
-        INPUT1_MAX_INDEX = 13,
-        INPUT1_CMD_INDEX = 14,
-        INPUT2_RAW_INDEX = 15,
-        INPUT2_TYP_INDEX = 16,
-        INPUT2_MIN_INDEX = 17,
-        INPUT2_MID_INDEX = 18,
-        INPUT2_MAX_INDEX = 19,
-        INPUT2_CMD_INDEX = 20,
-        AUX_INPUT1_RAW_INDEX = 21,
-        AUX_INPUT1_TYP_INDEX = 22,
-        AUX_INPUT1_MIN_INDEX = 23,
-        AUX_INPUT1_MID_INDEX = 24,
-        AUX_INPUT1_MAX_INDEX = 25,
-        AUX_INPUT1_CMD_INDEX = 26,
-        AUX_INPUT2_RAW_INDEX = 27,
-        AUX_INPUT2_TYP_INDEX = 28,
-        AUX_INPUT2_MIN_INDEX = 29,
-        AUX_INPUT2_MID_INDEX = 30,
-        AUX_INPUT2_MAX_INDEX = 31,
-        AUX_INPUT2_CMD_INDEX = 32,
-        DC_CURR_INDEX = 33,
-        RDC_CURR_INDEX = 34,
-        LDC_CURR_INDEX = 35,
-        CMDL_INDEX = 36,
-        CMDR_INDEX = 37,
-        SPD_AVG_INDEX = 38,
-        SPDL_INDEX = 39,
-        SPDR_INDEX = 40,
-        FILTER_RATE_INDEX = 41,
-        SPD_COEF_INDEX = 42,
-        STR_COEF_INDEX = 43,
-        BATV_INDEX = 44,
-        TEMP_INDEX = 45,
-    } Field;
-
-    Bytes serialize() const;
-    HoverboardEventRaw* deserialize(const Bytes& bytes);
-    std::string to_string() const;
-};
-
-class HoverboardEvent : public Msg{
-    MSG(HoverboardEvent);
-    public:
-
-    std::optional<int32_t> ctrl_mod;
-    std::optional<int32_t> ctrl_typ;
-    std::optional<int32_t> cur_mot_max;
-    std::optional<int32_t> rpm_mot_max;
-    std::optional<int32_t> fi_weak_ena;
-    std::optional<int32_t> fi_weak_hi;
-    std::optional<int32_t> fi_weak_lo;
-    std::optional<int32_t> fi_weak_max;
-    std::optional<int32_t> phase_adv_max_deg;
-    std::optional<int32_t> input1_raw;
-    std::optional<int32_t> input1_typ;
-    std::optional<int32_t> input1_min;
-    std::optional<int32_t> input1_mid;
-    std::optional<int32_t> input1_max;
-    std::optional<int32_t> input1_cmd;
-    std::optional<int32_t> input2_raw;
-    std::optional<int32_t> input2_typ;
-    std::optional<int32_t> input2_min;
-    std::optional<int32_t> input2_mid;
-    std::optional<int32_t> input2_max;
-    std::optional<int32_t> input2_cmd;
-    std::optional<int32_t> aux_input1_raw;
-    std::optional<int32_t> aux_input1_typ;
-    std::optional<int32_t> aux_input1_min;
-    std::optional<int32_t> aux_input1_mid;
-    std::optional<int32_t> aux_input1_max;
-    std::optional<int32_t> aux_input1_cmd;
-    std::optional<int32_t> aux_input2_raw;
-    std::optional<int32_t> aux_input2_typ;
-    std::optional<int32_t> aux_input2_min;
-    std::optional<int32_t> aux_input2_mid;
-    std::optional<int32_t> aux_input2_max;
-    std::optional<int32_t> aux_input2_cmd;
+    /// Total DC Link current A *100
     std::optional<float> dc_curr;
+    /// Right DC Link current A *100
     std::optional<float> rdc_curr;
+    /// Left DC Link current A *100
     std::optional<float> ldc_curr;
+    /// Left Motor Command RPM
     std::optional<int32_t> cmdl;
+    /// Right Motor Command RPM
     std::optional<int32_t> cmdr;
+    /// Motor Measured Avg RPM
     std::optional<int32_t> spd_avg;
+    /// Left Motor Measured RPM
     std::optional<int32_t> spdl;
+    /// Right Motor Measured RPM
     std::optional<int32_t> spdr;
+    /// Rate *10
     std::optional<int32_t> filter_rate;
+    /// Speed Coefficient *10
     std::optional<int32_t> spd_coef;
+    /// Steer Coefficient *10
     std::optional<int32_t> str_coef;
+    /// Calibrated Battery Voltage *100
     std::optional<float> batv;
+    /// Calibrated Temperature C *10
     std::optional<float> temp;
-    
 
-    // Field indexes
-    typedef enum {
-        CTRL_MOD_INDEX = 1,
-        CTRL_TYP_INDEX = 2,
-        CUR_MOT_MAX_INDEX = 3,
-        RPM_MOT_MAX_INDEX = 4,
-        FI_WEAK_ENA_INDEX = 5,
-        FI_WEAK_HI_INDEX = 6,
-        FI_WEAK_LO_INDEX = 7,
-        FI_WEAK_MAX_INDEX = 8,
-        PHASE_ADV_MAX_DEG_INDEX = 9,
-        INPUT1_RAW_INDEX = 10,
-        INPUT1_TYP_INDEX = 11,
-        INPUT1_MIN_INDEX = 12,
-        INPUT1_MID_INDEX = 13,
-        INPUT1_MAX_INDEX = 14,
-        INPUT1_CMD_INDEX = 15,
-        INPUT2_RAW_INDEX = 16,
-        INPUT2_TYP_INDEX = 17,
-        INPUT2_MIN_INDEX = 18,
-        INPUT2_MID_INDEX = 19,
-        INPUT2_MAX_INDEX = 20,
-        INPUT2_CMD_INDEX = 21,
-        AUX_INPUT1_RAW_INDEX = 22,
-        AUX_INPUT1_TYP_INDEX = 23,
-        AUX_INPUT1_MIN_INDEX = 24,
-        AUX_INPUT1_MID_INDEX = 25,
-        AUX_INPUT1_MAX_INDEX = 26,
-        AUX_INPUT1_CMD_INDEX = 27,
-        AUX_INPUT2_RAW_INDEX = 28,
-        AUX_INPUT2_TYP_INDEX = 29,
-        AUX_INPUT2_MIN_INDEX = 30,
-        AUX_INPUT2_MID_INDEX = 31,
-        AUX_INPUT2_MAX_INDEX = 32,
-        AUX_INPUT2_CMD_INDEX = 33,
-        DC_CURR_INDEX = 34,
-        RDC_CURR_INDEX = 35,
-        LDC_CURR_INDEX = 36,
-        CMDL_INDEX = 37,
-        CMDR_INDEX = 38,
-        SPD_AVG_INDEX = 39,
-        SPDL_INDEX = 40,
-        SPDR_INDEX = 41,
-        FILTER_RATE_INDEX = 42,
-        SPD_COEF_INDEX = 43,
-        STR_COEF_INDEX = 44,
-        BATV_INDEX = 45,
-        TEMP_INDEX = 46,
-    } Field;
+    /// Serialize this message into a CBOR map keyed by field id.
+    CborError toCbor(CborEncoder& parentEncoder) const {
+        size_t mapSize = 0;
+        if (ctrl_mod.has_value()) {
+            ++mapSize;
+        }
+        if (ctrl_typ.has_value()) {
+            ++mapSize;
+        }
+        if (cur_mot_max.has_value()) {
+            ++mapSize;
+        }
+        if (rpm_mot_max.has_value()) {
+            ++mapSize;
+        }
+        if (fi_weak_ena.has_value()) {
+            ++mapSize;
+        }
+        if (fi_weak_hi.has_value()) {
+            ++mapSize;
+        }
+        if (fi_weak_lo.has_value()) {
+            ++mapSize;
+        }
+        if (fi_weak_max.has_value()) {
+            ++mapSize;
+        }
+        if (phase_adv_max_deg.has_value()) {
+            ++mapSize;
+        }
+        if (input1_raw.has_value()) {
+            ++mapSize;
+        }
+        if (input1_typ.has_value()) {
+            ++mapSize;
+        }
+        if (input1_min.has_value()) {
+            ++mapSize;
+        }
+        if (input1_mid.has_value()) {
+            ++mapSize;
+        }
+        if (input1_max.has_value()) {
+            ++mapSize;
+        }
+        if (input1_cmd.has_value()) {
+            ++mapSize;
+        }
+        if (input2_raw.has_value()) {
+            ++mapSize;
+        }
+        if (input2_typ.has_value()) {
+            ++mapSize;
+        }
+        if (input2_min.has_value()) {
+            ++mapSize;
+        }
+        if (input2_mid.has_value()) {
+            ++mapSize;
+        }
+        if (input2_max.has_value()) {
+            ++mapSize;
+        }
+        if (input2_cmd.has_value()) {
+            ++mapSize;
+        }
+        if (aux_input1_raw.has_value()) {
+            ++mapSize;
+        }
+        if (aux_input1_typ.has_value()) {
+            ++mapSize;
+        }
+        if (aux_input1_min.has_value()) {
+            ++mapSize;
+        }
+        if (aux_input1_mid.has_value()) {
+            ++mapSize;
+        }
+        if (aux_input1_max.has_value()) {
+            ++mapSize;
+        }
+        if (aux_input1_cmd.has_value()) {
+            ++mapSize;
+        }
+        if (aux_input2_raw.has_value()) {
+            ++mapSize;
+        }
+        if (aux_input2_typ.has_value()) {
+            ++mapSize;
+        }
+        if (aux_input2_min.has_value()) {
+            ++mapSize;
+        }
+        if (aux_input2_mid.has_value()) {
+            ++mapSize;
+        }
+        if (aux_input2_max.has_value()) {
+            ++mapSize;
+        }
+        if (aux_input2_cmd.has_value()) {
+            ++mapSize;
+        }
+        if (dc_curr.has_value()) {
+            ++mapSize;
+        }
+        if (rdc_curr.has_value()) {
+            ++mapSize;
+        }
+        if (ldc_curr.has_value()) {
+            ++mapSize;
+        }
+        if (cmdl.has_value()) {
+            ++mapSize;
+        }
+        if (cmdr.has_value()) {
+            ++mapSize;
+        }
+        if (spd_avg.has_value()) {
+            ++mapSize;
+        }
+        if (spdl.has_value()) {
+            ++mapSize;
+        }
+        if (spdr.has_value()) {
+            ++mapSize;
+        }
+        if (filter_rate.has_value()) {
+            ++mapSize;
+        }
+        if (spd_coef.has_value()) {
+            ++mapSize;
+        }
+        if (str_coef.has_value()) {
+            ++mapSize;
+        }
+        if (batv.has_value()) {
+            ++mapSize;
+        }
+        if (temp.has_value()) {
+            ++mapSize;
+        }
 
-    Bytes serialize() const;
-    HoverboardEvent* deserialize(const Bytes& bytes);
-    std::string to_string() const;
+        CborEncoder mapEncoder;
+        CborError err = cbor_encoder_create_map(
+            &parentEncoder, &mapEncoder, mapSize);
+        if (err != CborNoError) return err;
+        if (ctrl_mod.has_value()) {
+            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(0));
+            if (err != CborNoError) return err;
+
+            err = msgs_detail::encodeOptionalInt32(mapEncoder, ctrl_mod);
+        }
+        if (err != CborNoError) return err;
+        if (ctrl_typ.has_value()) {
+            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(1));
+            if (err != CborNoError) return err;
+
+            err = msgs_detail::encodeOptionalInt32(mapEncoder, ctrl_typ);
+        }
+        if (err != CborNoError) return err;
+        if (cur_mot_max.has_value()) {
+            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(2));
+            if (err != CborNoError) return err;
+
+            err = msgs_detail::encodeOptionalInt32(mapEncoder, cur_mot_max);
+        }
+        if (err != CborNoError) return err;
+        if (rpm_mot_max.has_value()) {
+            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(3));
+            if (err != CborNoError) return err;
+
+            err = msgs_detail::encodeOptionalInt32(mapEncoder, rpm_mot_max);
+        }
+        if (err != CborNoError) return err;
+        if (fi_weak_ena.has_value()) {
+            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(4));
+            if (err != CborNoError) return err;
+
+            err = msgs_detail::encodeOptionalInt32(mapEncoder, fi_weak_ena);
+        }
+        if (err != CborNoError) return err;
+        if (fi_weak_hi.has_value()) {
+            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(5));
+            if (err != CborNoError) return err;
+
+            err = msgs_detail::encodeOptionalInt32(mapEncoder, fi_weak_hi);
+        }
+        if (err != CborNoError) return err;
+        if (fi_weak_lo.has_value()) {
+            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(6));
+            if (err != CborNoError) return err;
+
+            err = msgs_detail::encodeOptionalInt32(mapEncoder, fi_weak_lo);
+        }
+        if (err != CborNoError) return err;
+        if (fi_weak_max.has_value()) {
+            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(7));
+            if (err != CborNoError) return err;
+
+            err = msgs_detail::encodeOptionalInt32(mapEncoder, fi_weak_max);
+        }
+        if (err != CborNoError) return err;
+        if (phase_adv_max_deg.has_value()) {
+            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(8));
+            if (err != CborNoError) return err;
+
+            err = msgs_detail::encodeOptionalInt32(mapEncoder, phase_adv_max_deg);
+        }
+        if (err != CborNoError) return err;
+        if (input1_raw.has_value()) {
+            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(9));
+            if (err != CborNoError) return err;
+
+            err = msgs_detail::encodeOptionalInt32(mapEncoder, input1_raw);
+        }
+        if (err != CborNoError) return err;
+        if (input1_typ.has_value()) {
+            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(10));
+            if (err != CborNoError) return err;
+
+            err = msgs_detail::encodeOptionalInt32(mapEncoder, input1_typ);
+        }
+        if (err != CborNoError) return err;
+        if (input1_min.has_value()) {
+            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(11));
+            if (err != CborNoError) return err;
+
+            err = msgs_detail::encodeOptionalInt32(mapEncoder, input1_min);
+        }
+        if (err != CborNoError) return err;
+        if (input1_mid.has_value()) {
+            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(12));
+            if (err != CborNoError) return err;
+
+            err = msgs_detail::encodeOptionalInt32(mapEncoder, input1_mid);
+        }
+        if (err != CborNoError) return err;
+        if (input1_max.has_value()) {
+            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(13));
+            if (err != CborNoError) return err;
+
+            err = msgs_detail::encodeOptionalInt32(mapEncoder, input1_max);
+        }
+        if (err != CborNoError) return err;
+        if (input1_cmd.has_value()) {
+            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(14));
+            if (err != CborNoError) return err;
+
+            err = msgs_detail::encodeOptionalInt32(mapEncoder, input1_cmd);
+        }
+        if (err != CborNoError) return err;
+        if (input2_raw.has_value()) {
+            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(15));
+            if (err != CborNoError) return err;
+
+            err = msgs_detail::encodeOptionalInt32(mapEncoder, input2_raw);
+        }
+        if (err != CborNoError) return err;
+        if (input2_typ.has_value()) {
+            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(16));
+            if (err != CborNoError) return err;
+
+            err = msgs_detail::encodeOptionalInt32(mapEncoder, input2_typ);
+        }
+        if (err != CborNoError) return err;
+        if (input2_min.has_value()) {
+            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(17));
+            if (err != CborNoError) return err;
+
+            err = msgs_detail::encodeOptionalInt32(mapEncoder, input2_min);
+        }
+        if (err != CborNoError) return err;
+        if (input2_mid.has_value()) {
+            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(18));
+            if (err != CborNoError) return err;
+
+            err = msgs_detail::encodeOptionalInt32(mapEncoder, input2_mid);
+        }
+        if (err != CborNoError) return err;
+        if (input2_max.has_value()) {
+            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(19));
+            if (err != CborNoError) return err;
+
+            err = msgs_detail::encodeOptionalInt32(mapEncoder, input2_max);
+        }
+        if (err != CborNoError) return err;
+        if (input2_cmd.has_value()) {
+            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(20));
+            if (err != CborNoError) return err;
+
+            err = msgs_detail::encodeOptionalInt32(mapEncoder, input2_cmd);
+        }
+        if (err != CborNoError) return err;
+        if (aux_input1_raw.has_value()) {
+            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(21));
+            if (err != CborNoError) return err;
+
+            err = msgs_detail::encodeOptionalInt32(mapEncoder, aux_input1_raw);
+        }
+        if (err != CborNoError) return err;
+        if (aux_input1_typ.has_value()) {
+            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(22));
+            if (err != CborNoError) return err;
+
+            err = msgs_detail::encodeOptionalInt32(mapEncoder, aux_input1_typ);
+        }
+        if (err != CborNoError) return err;
+        if (aux_input1_min.has_value()) {
+            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(23));
+            if (err != CborNoError) return err;
+
+            err = msgs_detail::encodeOptionalInt32(mapEncoder, aux_input1_min);
+        }
+        if (err != CborNoError) return err;
+        if (aux_input1_mid.has_value()) {
+            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(24));
+            if (err != CborNoError) return err;
+
+            err = msgs_detail::encodeOptionalInt32(mapEncoder, aux_input1_mid);
+        }
+        if (err != CborNoError) return err;
+        if (aux_input1_max.has_value()) {
+            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(25));
+            if (err != CborNoError) return err;
+
+            err = msgs_detail::encodeOptionalInt32(mapEncoder, aux_input1_max);
+        }
+        if (err != CborNoError) return err;
+        if (aux_input1_cmd.has_value()) {
+            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(26));
+            if (err != CborNoError) return err;
+
+            err = msgs_detail::encodeOptionalInt32(mapEncoder, aux_input1_cmd);
+        }
+        if (err != CborNoError) return err;
+        if (aux_input2_raw.has_value()) {
+            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(27));
+            if (err != CborNoError) return err;
+
+            err = msgs_detail::encodeOptionalInt32(mapEncoder, aux_input2_raw);
+        }
+        if (err != CborNoError) return err;
+        if (aux_input2_typ.has_value()) {
+            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(28));
+            if (err != CborNoError) return err;
+
+            err = msgs_detail::encodeOptionalInt32(mapEncoder, aux_input2_typ);
+        }
+        if (err != CborNoError) return err;
+        if (aux_input2_min.has_value()) {
+            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(29));
+            if (err != CborNoError) return err;
+
+            err = msgs_detail::encodeOptionalInt32(mapEncoder, aux_input2_min);
+        }
+        if (err != CborNoError) return err;
+        if (aux_input2_mid.has_value()) {
+            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(30));
+            if (err != CborNoError) return err;
+
+            err = msgs_detail::encodeOptionalInt32(mapEncoder, aux_input2_mid);
+        }
+        if (err != CborNoError) return err;
+        if (aux_input2_max.has_value()) {
+            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(31));
+            if (err != CborNoError) return err;
+
+            err = msgs_detail::encodeOptionalInt32(mapEncoder, aux_input2_max);
+        }
+        if (err != CborNoError) return err;
+        if (aux_input2_cmd.has_value()) {
+            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(32));
+            if (err != CborNoError) return err;
+
+            err = msgs_detail::encodeOptionalInt32(mapEncoder, aux_input2_cmd);
+        }
+        if (err != CborNoError) return err;
+        if (dc_curr.has_value()) {
+            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(33));
+            if (err != CborNoError) return err;
+
+            err = msgs_detail::encodeOptionalFloat(mapEncoder, dc_curr);
+        }
+        if (err != CborNoError) return err;
+        if (rdc_curr.has_value()) {
+            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(34));
+            if (err != CborNoError) return err;
+
+            err = msgs_detail::encodeOptionalFloat(mapEncoder, rdc_curr);
+        }
+        if (err != CborNoError) return err;
+        if (ldc_curr.has_value()) {
+            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(35));
+            if (err != CborNoError) return err;
+
+            err = msgs_detail::encodeOptionalFloat(mapEncoder, ldc_curr);
+        }
+        if (err != CborNoError) return err;
+        if (cmdl.has_value()) {
+            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(36));
+            if (err != CborNoError) return err;
+
+            err = msgs_detail::encodeOptionalInt32(mapEncoder, cmdl);
+        }
+        if (err != CborNoError) return err;
+        if (cmdr.has_value()) {
+            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(37));
+            if (err != CborNoError) return err;
+
+            err = msgs_detail::encodeOptionalInt32(mapEncoder, cmdr);
+        }
+        if (err != CborNoError) return err;
+        if (spd_avg.has_value()) {
+            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(38));
+            if (err != CborNoError) return err;
+
+            err = msgs_detail::encodeOptionalInt32(mapEncoder, spd_avg);
+        }
+        if (err != CborNoError) return err;
+        if (spdl.has_value()) {
+            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(39));
+            if (err != CborNoError) return err;
+
+            err = msgs_detail::encodeOptionalInt32(mapEncoder, spdl);
+        }
+        if (err != CborNoError) return err;
+        if (spdr.has_value()) {
+            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(40));
+            if (err != CborNoError) return err;
+
+            err = msgs_detail::encodeOptionalInt32(mapEncoder, spdr);
+        }
+        if (err != CborNoError) return err;
+        if (filter_rate.has_value()) {
+            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(41));
+            if (err != CborNoError) return err;
+
+            err = msgs_detail::encodeOptionalInt32(mapEncoder, filter_rate);
+        }
+        if (err != CborNoError) return err;
+        if (spd_coef.has_value()) {
+            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(42));
+            if (err != CborNoError) return err;
+
+            err = msgs_detail::encodeOptionalInt32(mapEncoder, spd_coef);
+        }
+        if (err != CborNoError) return err;
+        if (str_coef.has_value()) {
+            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(43));
+            if (err != CborNoError) return err;
+
+            err = msgs_detail::encodeOptionalInt32(mapEncoder, str_coef);
+        }
+        if (err != CborNoError) return err;
+        if (batv.has_value()) {
+            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(44));
+            if (err != CborNoError) return err;
+
+            err = msgs_detail::encodeOptionalFloat(mapEncoder, batv);
+        }
+        if (err != CborNoError) return err;
+        if (temp.has_value()) {
+            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(45));
+            if (err != CborNoError) return err;
+
+            err = msgs_detail::encodeOptionalFloat(mapEncoder, temp);
+        }
+        if (err != CborNoError) return err;
+        return cbor_encoder_close_container(&parentEncoder, &mapEncoder);
+    }
+
+    /// Deserialize a HoverboardEvent from a CBOR map value.
+    static HoverboardEvent fromCbor(CborValue& it) {
+        HoverboardEvent msg;
+        CborValue map;
+        if (cbor_value_is_container(&it) &&
+            cbor_value_enter_container(&it, &map) == CborNoError)
+        {
+            while (!cbor_value_at_end(&map)) {
+                uint64_t key = 0;
+                if (cbor_value_is_unsigned_integer(&map)) {
+                    cbor_value_get_uint64(&map, &key);
+                } else if (cbor_value_is_integer(&map)) {
+                    int64_t signedKey = 0;
+                    cbor_value_get_int64(&map, &signedKey);
+                    if (signedKey < 0) {
+                        cbor_value_advance(&map);
+                        if (!cbor_value_at_end(&map)) {
+                            cbor_value_advance(&map);
+                        }
+                        continue;
+                    }
+                    key = static_cast<uint64_t>(signedKey);
+                } else {
+                    cbor_value_advance(&map);
+                    if (!cbor_value_at_end(&map)) {
+                        cbor_value_advance(&map);
+                    }
+                    continue;
+                }
+
+                cbor_value_advance(&map);
+                if (cbor_value_at_end(&map)) {
+                    break;
+                }
+
+                switch (key) {
+                    case 0:
+
+                    msgs_detail::decodeOptionalInt32(map, msg.ctrl_mod);
+                        break;
+                    case 1:
+
+                    msgs_detail::decodeOptionalInt32(map, msg.ctrl_typ);
+                        break;
+                    case 2:
+
+                    msgs_detail::decodeOptionalInt32(map, msg.cur_mot_max);
+                        break;
+                    case 3:
+
+                    msgs_detail::decodeOptionalInt32(map, msg.rpm_mot_max);
+                        break;
+                    case 4:
+
+                    msgs_detail::decodeOptionalInt32(map, msg.fi_weak_ena);
+                        break;
+                    case 5:
+
+                    msgs_detail::decodeOptionalInt32(map, msg.fi_weak_hi);
+                        break;
+                    case 6:
+
+                    msgs_detail::decodeOptionalInt32(map, msg.fi_weak_lo);
+                        break;
+                    case 7:
+
+                    msgs_detail::decodeOptionalInt32(map, msg.fi_weak_max);
+                        break;
+                    case 8:
+
+                    msgs_detail::decodeOptionalInt32(map, msg.phase_adv_max_deg);
+                        break;
+                    case 9:
+
+                    msgs_detail::decodeOptionalInt32(map, msg.input1_raw);
+                        break;
+                    case 10:
+
+                    msgs_detail::decodeOptionalInt32(map, msg.input1_typ);
+                        break;
+                    case 11:
+
+                    msgs_detail::decodeOptionalInt32(map, msg.input1_min);
+                        break;
+                    case 12:
+
+                    msgs_detail::decodeOptionalInt32(map, msg.input1_mid);
+                        break;
+                    case 13:
+
+                    msgs_detail::decodeOptionalInt32(map, msg.input1_max);
+                        break;
+                    case 14:
+
+                    msgs_detail::decodeOptionalInt32(map, msg.input1_cmd);
+                        break;
+                    case 15:
+
+                    msgs_detail::decodeOptionalInt32(map, msg.input2_raw);
+                        break;
+                    case 16:
+
+                    msgs_detail::decodeOptionalInt32(map, msg.input2_typ);
+                        break;
+                    case 17:
+
+                    msgs_detail::decodeOptionalInt32(map, msg.input2_min);
+                        break;
+                    case 18:
+
+                    msgs_detail::decodeOptionalInt32(map, msg.input2_mid);
+                        break;
+                    case 19:
+
+                    msgs_detail::decodeOptionalInt32(map, msg.input2_max);
+                        break;
+                    case 20:
+
+                    msgs_detail::decodeOptionalInt32(map, msg.input2_cmd);
+                        break;
+                    case 21:
+
+                    msgs_detail::decodeOptionalInt32(map, msg.aux_input1_raw);
+                        break;
+                    case 22:
+
+                    msgs_detail::decodeOptionalInt32(map, msg.aux_input1_typ);
+                        break;
+                    case 23:
+
+                    msgs_detail::decodeOptionalInt32(map, msg.aux_input1_min);
+                        break;
+                    case 24:
+
+                    msgs_detail::decodeOptionalInt32(map, msg.aux_input1_mid);
+                        break;
+                    case 25:
+
+                    msgs_detail::decodeOptionalInt32(map, msg.aux_input1_max);
+                        break;
+                    case 26:
+
+                    msgs_detail::decodeOptionalInt32(map, msg.aux_input1_cmd);
+                        break;
+                    case 27:
+
+                    msgs_detail::decodeOptionalInt32(map, msg.aux_input2_raw);
+                        break;
+                    case 28:
+
+                    msgs_detail::decodeOptionalInt32(map, msg.aux_input2_typ);
+                        break;
+                    case 29:
+
+                    msgs_detail::decodeOptionalInt32(map, msg.aux_input2_min);
+                        break;
+                    case 30:
+
+                    msgs_detail::decodeOptionalInt32(map, msg.aux_input2_mid);
+                        break;
+                    case 31:
+
+                    msgs_detail::decodeOptionalInt32(map, msg.aux_input2_max);
+                        break;
+                    case 32:
+
+                    msgs_detail::decodeOptionalInt32(map, msg.aux_input2_cmd);
+                        break;
+                    case 33:
+
+                    msgs_detail::decodeOptionalFloat(map, msg.dc_curr);
+                        break;
+                    case 34:
+
+                    msgs_detail::decodeOptionalFloat(map, msg.rdc_curr);
+                        break;
+                    case 35:
+
+                    msgs_detail::decodeOptionalFloat(map, msg.ldc_curr);
+                        break;
+                    case 36:
+
+                    msgs_detail::decodeOptionalInt32(map, msg.cmdl);
+                        break;
+                    case 37:
+
+                    msgs_detail::decodeOptionalInt32(map, msg.cmdr);
+                        break;
+                    case 38:
+
+                    msgs_detail::decodeOptionalInt32(map, msg.spd_avg);
+                        break;
+                    case 39:
+
+                    msgs_detail::decodeOptionalInt32(map, msg.spdl);
+                        break;
+                    case 40:
+
+                    msgs_detail::decodeOptionalInt32(map, msg.spdr);
+                        break;
+                    case 41:
+
+                    msgs_detail::decodeOptionalInt32(map, msg.filter_rate);
+                        break;
+                    case 42:
+
+                    msgs_detail::decodeOptionalInt32(map, msg.spd_coef);
+                        break;
+                    case 43:
+
+                    msgs_detail::decodeOptionalInt32(map, msg.str_coef);
+                        break;
+                    case 44:
+
+                    msgs_detail::decodeOptionalFloat(map, msg.batv);
+                        break;
+                    case 45:
+
+                    msgs_detail::decodeOptionalFloat(map, msg.temp);
+                        break;
+                    default:
+                        break;
+                }
+
+                if (!cbor_value_at_end(&map)) {
+                    cbor_value_advance(&map);
+                }
+            }
+            cbor_value_leave_container(&it, &map);
+        }
+        return msg;
+    }
 };
 
-class HoverboardRequest : public Msg{
-    MSG(HoverboardRequest);
-    public:
 
-    std::optional<uint32_t> req_id;
-    std::optional<int32_t> speed;
-    std::optional<int32_t> steer;
-    
-
-    // Field indexes
-    typedef enum {
-        REQ_ID_INDEX = 0,
-        SPEED_INDEX = 1,
-        STEER_INDEX = 2,
-    } Field;
-
-    Bytes serialize() const;
-    HoverboardRequest* deserialize(const Bytes& bytes);
-    std::string to_string() const;
-};
-
-class HoverboardReply : public Msg{
-    MSG(HoverboardReply);
-    public:
-
+struct HoverboardReply {
+    /// For request/reply matching, 0 if not a request/reply
     std::optional<uint32_t> req_id;
     std::optional<int32_t> error_code;
     std::optional<std::string> message;
-    
 
-    // Field indexes
-    typedef enum {
-        REQ_ID_INDEX = 0,
-        ERROR_CODE_INDEX = 1,
-        MESSAGE_INDEX = 2,
-    } Field;
+    /// Serialize this message into a CBOR map keyed by field id.
+    CborError toCbor(CborEncoder& parentEncoder) const {
+        size_t mapSize = 0;
+        if (req_id.has_value()) {
+            ++mapSize;
+        }
+        if (error_code.has_value()) {
+            ++mapSize;
+        }
+        if (message.has_value()) {
+            ++mapSize;
+        }
 
-    Bytes serialize() const;
-    HoverboardReply* deserialize(const Bytes& bytes);
-    std::string to_string() const;
+        CborEncoder mapEncoder;
+        CborError err = cbor_encoder_create_map(
+            &parentEncoder, &mapEncoder, mapSize);
+        if (err != CborNoError) return err;
+        if (req_id.has_value()) {
+            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(0));
+            if (err != CborNoError) return err;
+
+            err = msgs_detail::encodeOptionalUInt32(mapEncoder, req_id);
+        }
+        if (err != CborNoError) return err;
+        if (error_code.has_value()) {
+            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(1));
+            if (err != CborNoError) return err;
+
+            err = msgs_detail::encodeOptionalInt32(mapEncoder, error_code);
+        }
+        if (err != CborNoError) return err;
+        if (message.has_value()) {
+            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(2));
+            if (err != CborNoError) return err;
+
+            err = msgs_detail::encodeOptionalString(mapEncoder, message);
+        }
+        if (err != CborNoError) return err;
+        return cbor_encoder_close_container(&parentEncoder, &mapEncoder);
+    }
+
+    /// Deserialize a HoverboardReply from a CBOR map value.
+    static HoverboardReply fromCbor(CborValue& it) {
+        HoverboardReply msg;
+        CborValue map;
+        if (cbor_value_is_container(&it) &&
+            cbor_value_enter_container(&it, &map) == CborNoError)
+        {
+            while (!cbor_value_at_end(&map)) {
+                uint64_t key = 0;
+                if (cbor_value_is_unsigned_integer(&map)) {
+                    cbor_value_get_uint64(&map, &key);
+                } else if (cbor_value_is_integer(&map)) {
+                    int64_t signedKey = 0;
+                    cbor_value_get_int64(&map, &signedKey);
+                    if (signedKey < 0) {
+                        cbor_value_advance(&map);
+                        if (!cbor_value_at_end(&map)) {
+                            cbor_value_advance(&map);
+                        }
+                        continue;
+                    }
+                    key = static_cast<uint64_t>(signedKey);
+                } else {
+                    cbor_value_advance(&map);
+                    if (!cbor_value_at_end(&map)) {
+                        cbor_value_advance(&map);
+                    }
+                    continue;
+                }
+
+                cbor_value_advance(&map);
+                if (cbor_value_at_end(&map)) {
+                    break;
+                }
+
+                switch (key) {
+                    case 0:
+
+                    msgs_detail::decodeOptionalUInt32(map, msg.req_id);
+                        break;
+                    case 1:
+
+                    msgs_detail::decodeOptionalInt32(map, msg.error_code);
+                        break;
+                    case 2:
+
+                    msgs_detail::decodeOptionalString(map, msg.message);
+                        break;
+                    default:
+                        break;
+                }
+
+                if (!cbor_value_at_end(&map)) {
+                    cbor_value_advance(&map);
+                }
+            }
+            cbor_value_leave_container(&it, &map);
+        }
+        return msg;
+    }
 };
 
-class TouchPoint : public Msg{
-    MSG(TouchPoint);
-    public:
 
-    std::optional<bool> active;
-    std::optional<int32_t> id;
-    std::optional<int32_t> x;
-    std::optional<int32_t> y;
-    
+struct HoverboardRequest {
+    /// For request/reply matching, 0 if not a request/reply
+    std::optional<uint32_t> req_id;
+    /// Speed command for the hoverboard
+    std::optional<int32_t> speed;
+    /// Steering command for the hoverboard
+    std::optional<int32_t> steer;
 
-    // Field indexes
-    typedef enum {
-        ACTIVE_INDEX = 4,
-        ID_INDEX = 1,
-        X_INDEX = 2,
-        Y_INDEX = 3,
-    } Field;
+    /// Serialize this message into a CBOR map keyed by field id.
+    CborError toCbor(CborEncoder& parentEncoder) const {
+        size_t mapSize = 0;
+        if (req_id.has_value()) {
+            ++mapSize;
+        }
+        if (speed.has_value()) {
+            ++mapSize;
+        }
+        if (steer.has_value()) {
+            ++mapSize;
+        }
 
-    Bytes serialize() const;
-    TouchPoint* deserialize(const Bytes& bytes);
-    std::string to_string() const;
+        CborEncoder mapEncoder;
+        CborError err = cbor_encoder_create_map(
+            &parentEncoder, &mapEncoder, mapSize);
+        if (err != CborNoError) return err;
+        if (req_id.has_value()) {
+            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(0));
+            if (err != CborNoError) return err;
+
+            err = msgs_detail::encodeOptionalUInt32(mapEncoder, req_id);
+        }
+        if (err != CborNoError) return err;
+        if (speed.has_value()) {
+            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(1));
+            if (err != CborNoError) return err;
+
+            err = msgs_detail::encodeOptionalInt32(mapEncoder, speed);
+        }
+        if (err != CborNoError) return err;
+        if (steer.has_value()) {
+            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(2));
+            if (err != CborNoError) return err;
+
+            err = msgs_detail::encodeOptionalInt32(mapEncoder, steer);
+        }
+        if (err != CborNoError) return err;
+        return cbor_encoder_close_container(&parentEncoder, &mapEncoder);
+    }
+
+    /// Deserialize a HoverboardRequest from a CBOR map value.
+    static HoverboardRequest fromCbor(CborValue& it) {
+        HoverboardRequest msg;
+        CborValue map;
+        if (cbor_value_is_container(&it) &&
+            cbor_value_enter_container(&it, &map) == CborNoError)
+        {
+            while (!cbor_value_at_end(&map)) {
+                uint64_t key = 0;
+                if (cbor_value_is_unsigned_integer(&map)) {
+                    cbor_value_get_uint64(&map, &key);
+                } else if (cbor_value_is_integer(&map)) {
+                    int64_t signedKey = 0;
+                    cbor_value_get_int64(&map, &signedKey);
+                    if (signedKey < 0) {
+                        cbor_value_advance(&map);
+                        if (!cbor_value_at_end(&map)) {
+                            cbor_value_advance(&map);
+                        }
+                        continue;
+                    }
+                    key = static_cast<uint64_t>(signedKey);
+                } else {
+                    cbor_value_advance(&map);
+                    if (!cbor_value_at_end(&map)) {
+                        cbor_value_advance(&map);
+                    }
+                    continue;
+                }
+
+                cbor_value_advance(&map);
+                if (cbor_value_at_end(&map)) {
+                    break;
+                }
+
+                switch (key) {
+                    case 0:
+
+                    msgs_detail::decodeOptionalUInt32(map, msg.req_id);
+                        break;
+                    case 1:
+
+                    msgs_detail::decodeOptionalInt32(map, msg.speed);
+                        break;
+                    case 2:
+
+                    msgs_detail::decodeOptionalInt32(map, msg.steer);
+                        break;
+                    default:
+                        break;
+                }
+
+                if (!cbor_value_at_end(&map)) {
+                    cbor_value_advance(&map);
+                }
+            }
+            cbor_value_leave_container(&it, &map);
+        }
+        return msg;
+    }
 };
 
-class Ps4Event : public Msg{
-    MSG(Ps4Event);
-    public:
 
+struct PingReply {
+    std::optional<uint32_t> req_id;
+    /// Timestamp in milliseconds since epoch
+    std::optional<uint64_t> timestamp;
+
+    /// Serialize this message into a CBOR map keyed by field id.
+    CborError toCbor(CborEncoder& parentEncoder) const {
+        size_t mapSize = 0;
+        if (req_id.has_value()) {
+            ++mapSize;
+        }
+        if (timestamp.has_value()) {
+            ++mapSize;
+        }
+
+        CborEncoder mapEncoder;
+        CborError err = cbor_encoder_create_map(
+            &parentEncoder, &mapEncoder, mapSize);
+        if (err != CborNoError) return err;
+        if (req_id.has_value()) {
+            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(0));
+            if (err != CborNoError) return err;
+
+            err = msgs_detail::encodeOptionalUInt32(mapEncoder, req_id);
+        }
+        if (err != CborNoError) return err;
+        if (timestamp.has_value()) {
+            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(1));
+            if (err != CborNoError) return err;
+
+            err = msgs_detail::encodeOptionalUInt64(mapEncoder, timestamp);
+        }
+        if (err != CborNoError) return err;
+        return cbor_encoder_close_container(&parentEncoder, &mapEncoder);
+    }
+
+    /// Deserialize a PingReply from a CBOR map value.
+    static PingReply fromCbor(CborValue& it) {
+        PingReply msg;
+        CborValue map;
+        if (cbor_value_is_container(&it) &&
+            cbor_value_enter_container(&it, &map) == CborNoError)
+        {
+            while (!cbor_value_at_end(&map)) {
+                uint64_t key = 0;
+                if (cbor_value_is_unsigned_integer(&map)) {
+                    cbor_value_get_uint64(&map, &key);
+                } else if (cbor_value_is_integer(&map)) {
+                    int64_t signedKey = 0;
+                    cbor_value_get_int64(&map, &signedKey);
+                    if (signedKey < 0) {
+                        cbor_value_advance(&map);
+                        if (!cbor_value_at_end(&map)) {
+                            cbor_value_advance(&map);
+                        }
+                        continue;
+                    }
+                    key = static_cast<uint64_t>(signedKey);
+                } else {
+                    cbor_value_advance(&map);
+                    if (!cbor_value_at_end(&map)) {
+                        cbor_value_advance(&map);
+                    }
+                    continue;
+                }
+
+                cbor_value_advance(&map);
+                if (cbor_value_at_end(&map)) {
+                    break;
+                }
+
+                switch (key) {
+                    case 0:
+
+                    msgs_detail::decodeOptionalUInt32(map, msg.req_id);
+                        break;
+                    case 1:
+
+                    msgs_detail::decodeOptionalUInt64(map, msg.timestamp);
+                        break;
+                    default:
+                        break;
+                }
+
+                if (!cbor_value_at_end(&map)) {
+                    cbor_value_advance(&map);
+                }
+            }
+            cbor_value_leave_container(&it, &map);
+        }
+        return msg;
+    }
+};
+
+
+struct PingRequest {
+    std::optional<uint32_t> req_id;
+    /// Timestamp in milliseconds since epoch
+    std::optional<uint64_t> timestamp;
+
+    /// Serialize this message into a CBOR map keyed by field id.
+    CborError toCbor(CborEncoder& parentEncoder) const {
+        size_t mapSize = 0;
+        if (req_id.has_value()) {
+            ++mapSize;
+        }
+        if (timestamp.has_value()) {
+            ++mapSize;
+        }
+
+        CborEncoder mapEncoder;
+        CborError err = cbor_encoder_create_map(
+            &parentEncoder, &mapEncoder, mapSize);
+        if (err != CborNoError) return err;
+        if (req_id.has_value()) {
+            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(0));
+            if (err != CborNoError) return err;
+
+            err = msgs_detail::encodeOptionalUInt32(mapEncoder, req_id);
+        }
+        if (err != CborNoError) return err;
+        if (timestamp.has_value()) {
+            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(1));
+            if (err != CborNoError) return err;
+
+            err = msgs_detail::encodeOptionalUInt64(mapEncoder, timestamp);
+        }
+        if (err != CborNoError) return err;
+        return cbor_encoder_close_container(&parentEncoder, &mapEncoder);
+    }
+
+    /// Deserialize a PingRequest from a CBOR map value.
+    static PingRequest fromCbor(CborValue& it) {
+        PingRequest msg;
+        CborValue map;
+        if (cbor_value_is_container(&it) &&
+            cbor_value_enter_container(&it, &map) == CborNoError)
+        {
+            while (!cbor_value_at_end(&map)) {
+                uint64_t key = 0;
+                if (cbor_value_is_unsigned_integer(&map)) {
+                    cbor_value_get_uint64(&map, &key);
+                } else if (cbor_value_is_integer(&map)) {
+                    int64_t signedKey = 0;
+                    cbor_value_get_int64(&map, &signedKey);
+                    if (signedKey < 0) {
+                        cbor_value_advance(&map);
+                        if (!cbor_value_at_end(&map)) {
+                            cbor_value_advance(&map);
+                        }
+                        continue;
+                    }
+                    key = static_cast<uint64_t>(signedKey);
+                } else {
+                    cbor_value_advance(&map);
+                    if (!cbor_value_at_end(&map)) {
+                        cbor_value_advance(&map);
+                    }
+                    continue;
+                }
+
+                cbor_value_advance(&map);
+                if (cbor_value_at_end(&map)) {
+                    break;
+                }
+
+                switch (key) {
+                    case 0:
+
+                    msgs_detail::decodeOptionalUInt32(map, msg.req_id);
+                        break;
+                    case 1:
+
+                    msgs_detail::decodeOptionalUInt64(map, msg.timestamp);
+                        break;
+                    default:
+                        break;
+                }
+
+                if (!cbor_value_at_end(&map)) {
+                    cbor_value_advance(&map);
+                }
+            }
+            cbor_value_leave_container(&it, &map);
+        }
+        return msg;
+    }
+};
+
+
+struct Ps4Event {
     std::optional<bool> button_left;
     std::optional<bool> button_right;
     std::optional<bool> button_up;
@@ -617,54 +1614,533 @@ class Ps4Event : public Msg{
     std::optional<bool> bluetooth;
     std::optional<std::string> debug;
     std::optional<int32_t> temp;
-    
 
-    // Field indexes
-    typedef enum {
-        BUTTON_LEFT_INDEX = 1,
-        BUTTON_RIGHT_INDEX = 2,
-        BUTTON_UP_INDEX = 3,
-        BUTTON_DOWN_INDEX = 4,
-        BUTTON_SQUARE_INDEX = 5,
-        BUTTON_CROSS_INDEX = 6,
-        BUTTON_CIRCLE_INDEX = 7,
-        BUTTON_TRIANGLE_INDEX = 8,
-        BUTTON_LEFT_SHOULDER_INDEX = 9,
-        BUTTON_RIGHT_SHOULDER_INDEX = 10,
-        BUTTON_LEFT_TRIGGER_INDEX = 11,
-        BUTTON_RIGHT_TRIGGER_INDEX = 12,
-        BUTTON_LEFT_JOYSTICK_INDEX = 13,
-        BUTTON_RIGHT_JOYSTICK_INDEX = 14,
-        BUTTON_SHARE_INDEX = 15,
-        BUTTON_OPTIONS_INDEX = 16,
-        BUTTON_TOUCHPAD_INDEX = 33,
-        BUTTON_PS_INDEX = 34,
-        AXIS_LX_INDEX = 17,
-        AXIS_LY_INDEX = 18,
-        AXIS_RX_INDEX = 19,
-        AXIS_RY_INDEX = 20,
-        GYRO_X_INDEX = 21,
-        GYRO_Y_INDEX = 22,
-        GYRO_Z_INDEX = 23,
-        ACCEL_X_INDEX = 24,
-        ACCEL_Y_INDEX = 25,
-        ACCEL_Z_INDEX = 26,
-        CONNECTED_INDEX = 27,
-        BATTERY_LEVEL_INDEX = 28,
-        BLUETOOTH_INDEX = 30,
-        DEBUG_INDEX = 31,
-        TEMP_INDEX = 32,
-    } Field;
+    /// Serialize this message into a CBOR map keyed by field id.
+    CborError toCbor(CborEncoder& parentEncoder) const {
+        size_t mapSize = 0;
+        if (button_left.has_value()) {
+            ++mapSize;
+        }
+        if (button_right.has_value()) {
+            ++mapSize;
+        }
+        if (button_up.has_value()) {
+            ++mapSize;
+        }
+        if (button_down.has_value()) {
+            ++mapSize;
+        }
+        if (button_square.has_value()) {
+            ++mapSize;
+        }
+        if (button_cross.has_value()) {
+            ++mapSize;
+        }
+        if (button_circle.has_value()) {
+            ++mapSize;
+        }
+        if (button_triangle.has_value()) {
+            ++mapSize;
+        }
+        if (button_left_shoulder.has_value()) {
+            ++mapSize;
+        }
+        if (button_right_shoulder.has_value()) {
+            ++mapSize;
+        }
+        if (button_left_trigger.has_value()) {
+            ++mapSize;
+        }
+        if (button_right_trigger.has_value()) {
+            ++mapSize;
+        }
+        if (button_left_joystick.has_value()) {
+            ++mapSize;
+        }
+        if (button_right_joystick.has_value()) {
+            ++mapSize;
+        }
+        if (button_share.has_value()) {
+            ++mapSize;
+        }
+        if (button_options.has_value()) {
+            ++mapSize;
+        }
+        if (button_touchpad.has_value()) {
+            ++mapSize;
+        }
+        if (button_ps.has_value()) {
+            ++mapSize;
+        }
+        if (axis_lx.has_value()) {
+            ++mapSize;
+        }
+        if (axis_ly.has_value()) {
+            ++mapSize;
+        }
+        if (axis_rx.has_value()) {
+            ++mapSize;
+        }
+        if (axis_ry.has_value()) {
+            ++mapSize;
+        }
+        if (gyro_x.has_value()) {
+            ++mapSize;
+        }
+        if (gyro_y.has_value()) {
+            ++mapSize;
+        }
+        if (gyro_z.has_value()) {
+            ++mapSize;
+        }
+        if (accel_x.has_value()) {
+            ++mapSize;
+        }
+        if (accel_y.has_value()) {
+            ++mapSize;
+        }
+        if (accel_z.has_value()) {
+            ++mapSize;
+        }
+        if (connected.has_value()) {
+            ++mapSize;
+        }
+        if (battery_level.has_value()) {
+            ++mapSize;
+        }
+        if (bluetooth.has_value()) {
+            ++mapSize;
+        }
+        if (debug.has_value()) {
+            ++mapSize;
+        }
+        if (temp.has_value()) {
+            ++mapSize;
+        }
 
-    Bytes serialize() const;
-    Ps4Event* deserialize(const Bytes& bytes);
-    std::string to_string() const;
+        CborEncoder mapEncoder;
+        CborError err = cbor_encoder_create_map(
+            &parentEncoder, &mapEncoder, mapSize);
+        if (err != CborNoError) return err;
+        if (button_left.has_value()) {
+            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(0));
+            if (err != CborNoError) return err;
+
+            err = msgs_detail::encodeOptionalBool(mapEncoder, button_left);
+        }
+        if (err != CborNoError) return err;
+        if (button_right.has_value()) {
+            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(1));
+            if (err != CborNoError) return err;
+
+            err = msgs_detail::encodeOptionalBool(mapEncoder, button_right);
+        }
+        if (err != CborNoError) return err;
+        if (button_up.has_value()) {
+            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(2));
+            if (err != CborNoError) return err;
+
+            err = msgs_detail::encodeOptionalBool(mapEncoder, button_up);
+        }
+        if (err != CborNoError) return err;
+        if (button_down.has_value()) {
+            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(3));
+            if (err != CborNoError) return err;
+
+            err = msgs_detail::encodeOptionalBool(mapEncoder, button_down);
+        }
+        if (err != CborNoError) return err;
+        if (button_square.has_value()) {
+            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(4));
+            if (err != CborNoError) return err;
+
+            err = msgs_detail::encodeOptionalBool(mapEncoder, button_square);
+        }
+        if (err != CborNoError) return err;
+        if (button_cross.has_value()) {
+            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(5));
+            if (err != CborNoError) return err;
+
+            err = msgs_detail::encodeOptionalBool(mapEncoder, button_cross);
+        }
+        if (err != CborNoError) return err;
+        if (button_circle.has_value()) {
+            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(6));
+            if (err != CborNoError) return err;
+
+            err = msgs_detail::encodeOptionalBool(mapEncoder, button_circle);
+        }
+        if (err != CborNoError) return err;
+        if (button_triangle.has_value()) {
+            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(7));
+            if (err != CborNoError) return err;
+
+            err = msgs_detail::encodeOptionalBool(mapEncoder, button_triangle);
+        }
+        if (err != CborNoError) return err;
+        if (button_left_shoulder.has_value()) {
+            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(8));
+            if (err != CborNoError) return err;
+
+            err = msgs_detail::encodeOptionalBool(mapEncoder, button_left_shoulder);
+        }
+        if (err != CborNoError) return err;
+        if (button_right_shoulder.has_value()) {
+            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(9));
+            if (err != CborNoError) return err;
+
+            err = msgs_detail::encodeOptionalBool(mapEncoder, button_right_shoulder);
+        }
+        if (err != CborNoError) return err;
+        if (button_left_trigger.has_value()) {
+            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(10));
+            if (err != CborNoError) return err;
+
+            err = msgs_detail::encodeOptionalBool(mapEncoder, button_left_trigger);
+        }
+        if (err != CborNoError) return err;
+        if (button_right_trigger.has_value()) {
+            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(11));
+            if (err != CborNoError) return err;
+
+            err = msgs_detail::encodeOptionalBool(mapEncoder, button_right_trigger);
+        }
+        if (err != CborNoError) return err;
+        if (button_left_joystick.has_value()) {
+            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(12));
+            if (err != CborNoError) return err;
+
+            err = msgs_detail::encodeOptionalBool(mapEncoder, button_left_joystick);
+        }
+        if (err != CborNoError) return err;
+        if (button_right_joystick.has_value()) {
+            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(13));
+            if (err != CborNoError) return err;
+
+            err = msgs_detail::encodeOptionalBool(mapEncoder, button_right_joystick);
+        }
+        if (err != CborNoError) return err;
+        if (button_share.has_value()) {
+            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(14));
+            if (err != CborNoError) return err;
+
+            err = msgs_detail::encodeOptionalBool(mapEncoder, button_share);
+        }
+        if (err != CborNoError) return err;
+        if (button_options.has_value()) {
+            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(15));
+            if (err != CborNoError) return err;
+
+            err = msgs_detail::encodeOptionalBool(mapEncoder, button_options);
+        }
+        if (err != CborNoError) return err;
+        if (button_touchpad.has_value()) {
+            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(16));
+            if (err != CborNoError) return err;
+
+            err = msgs_detail::encodeOptionalBool(mapEncoder, button_touchpad);
+        }
+        if (err != CborNoError) return err;
+        if (button_ps.has_value()) {
+            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(17));
+            if (err != CborNoError) return err;
+
+            err = msgs_detail::encodeOptionalBool(mapEncoder, button_ps);
+        }
+        if (err != CborNoError) return err;
+        if (axis_lx.has_value()) {
+            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(18));
+            if (err != CborNoError) return err;
+
+            err = msgs_detail::encodeOptionalInt32(mapEncoder, axis_lx);
+        }
+        if (err != CborNoError) return err;
+        if (axis_ly.has_value()) {
+            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(19));
+            if (err != CborNoError) return err;
+
+            err = msgs_detail::encodeOptionalInt32(mapEncoder, axis_ly);
+        }
+        if (err != CborNoError) return err;
+        if (axis_rx.has_value()) {
+            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(20));
+            if (err != CborNoError) return err;
+
+            err = msgs_detail::encodeOptionalInt32(mapEncoder, axis_rx);
+        }
+        if (err != CborNoError) return err;
+        if (axis_ry.has_value()) {
+            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(21));
+            if (err != CborNoError) return err;
+
+            err = msgs_detail::encodeOptionalInt32(mapEncoder, axis_ry);
+        }
+        if (err != CborNoError) return err;
+        if (gyro_x.has_value()) {
+            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(22));
+            if (err != CborNoError) return err;
+
+            err = msgs_detail::encodeOptionalInt32(mapEncoder, gyro_x);
+        }
+        if (err != CborNoError) return err;
+        if (gyro_y.has_value()) {
+            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(23));
+            if (err != CborNoError) return err;
+
+            err = msgs_detail::encodeOptionalInt32(mapEncoder, gyro_y);
+        }
+        if (err != CborNoError) return err;
+        if (gyro_z.has_value()) {
+            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(24));
+            if (err != CborNoError) return err;
+
+            err = msgs_detail::encodeOptionalInt32(mapEncoder, gyro_z);
+        }
+        if (err != CborNoError) return err;
+        if (accel_x.has_value()) {
+            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(25));
+            if (err != CborNoError) return err;
+
+            err = msgs_detail::encodeOptionalInt32(mapEncoder, accel_x);
+        }
+        if (err != CborNoError) return err;
+        if (accel_y.has_value()) {
+            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(26));
+            if (err != CborNoError) return err;
+
+            err = msgs_detail::encodeOptionalInt32(mapEncoder, accel_y);
+        }
+        if (err != CborNoError) return err;
+        if (accel_z.has_value()) {
+            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(27));
+            if (err != CborNoError) return err;
+
+            err = msgs_detail::encodeOptionalInt32(mapEncoder, accel_z);
+        }
+        if (err != CborNoError) return err;
+        if (connected.has_value()) {
+            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(28));
+            if (err != CborNoError) return err;
+
+            err = msgs_detail::encodeOptionalBool(mapEncoder, connected);
+        }
+        if (err != CborNoError) return err;
+        if (battery_level.has_value()) {
+            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(29));
+            if (err != CborNoError) return err;
+
+            err = msgs_detail::encodeOptionalInt32(mapEncoder, battery_level);
+        }
+        if (err != CborNoError) return err;
+        if (bluetooth.has_value()) {
+            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(30));
+            if (err != CborNoError) return err;
+
+            err = msgs_detail::encodeOptionalBool(mapEncoder, bluetooth);
+        }
+        if (err != CborNoError) return err;
+        if (debug.has_value()) {
+            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(31));
+            if (err != CborNoError) return err;
+
+            err = msgs_detail::encodeOptionalString(mapEncoder, debug);
+        }
+        if (err != CborNoError) return err;
+        if (temp.has_value()) {
+            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(32));
+            if (err != CborNoError) return err;
+
+            err = msgs_detail::encodeOptionalInt32(mapEncoder, temp);
+        }
+        if (err != CborNoError) return err;
+        return cbor_encoder_close_container(&parentEncoder, &mapEncoder);
+    }
+
+    /// Deserialize a Ps4Event from a CBOR map value.
+    static Ps4Event fromCbor(CborValue& it) {
+        Ps4Event msg;
+        CborValue map;
+        if (cbor_value_is_container(&it) &&
+            cbor_value_enter_container(&it, &map) == CborNoError)
+        {
+            while (!cbor_value_at_end(&map)) {
+                uint64_t key = 0;
+                if (cbor_value_is_unsigned_integer(&map)) {
+                    cbor_value_get_uint64(&map, &key);
+                } else if (cbor_value_is_integer(&map)) {
+                    int64_t signedKey = 0;
+                    cbor_value_get_int64(&map, &signedKey);
+                    if (signedKey < 0) {
+                        cbor_value_advance(&map);
+                        if (!cbor_value_at_end(&map)) {
+                            cbor_value_advance(&map);
+                        }
+                        continue;
+                    }
+                    key = static_cast<uint64_t>(signedKey);
+                } else {
+                    cbor_value_advance(&map);
+                    if (!cbor_value_at_end(&map)) {
+                        cbor_value_advance(&map);
+                    }
+                    continue;
+                }
+
+                cbor_value_advance(&map);
+                if (cbor_value_at_end(&map)) {
+                    break;
+                }
+
+                switch (key) {
+                    case 0:
+
+                    msgs_detail::decodeOptionalBool(map, msg.button_left);
+                        break;
+                    case 1:
+
+                    msgs_detail::decodeOptionalBool(map, msg.button_right);
+                        break;
+                    case 2:
+
+                    msgs_detail::decodeOptionalBool(map, msg.button_up);
+                        break;
+                    case 3:
+
+                    msgs_detail::decodeOptionalBool(map, msg.button_down);
+                        break;
+                    case 4:
+
+                    msgs_detail::decodeOptionalBool(map, msg.button_square);
+                        break;
+                    case 5:
+
+                    msgs_detail::decodeOptionalBool(map, msg.button_cross);
+                        break;
+                    case 6:
+
+                    msgs_detail::decodeOptionalBool(map, msg.button_circle);
+                        break;
+                    case 7:
+
+                    msgs_detail::decodeOptionalBool(map, msg.button_triangle);
+                        break;
+                    case 8:
+
+                    msgs_detail::decodeOptionalBool(map, msg.button_left_shoulder);
+                        break;
+                    case 9:
+
+                    msgs_detail::decodeOptionalBool(map, msg.button_right_shoulder);
+                        break;
+                    case 10:
+
+                    msgs_detail::decodeOptionalBool(map, msg.button_left_trigger);
+                        break;
+                    case 11:
+
+                    msgs_detail::decodeOptionalBool(map, msg.button_right_trigger);
+                        break;
+                    case 12:
+
+                    msgs_detail::decodeOptionalBool(map, msg.button_left_joystick);
+                        break;
+                    case 13:
+
+                    msgs_detail::decodeOptionalBool(map, msg.button_right_joystick);
+                        break;
+                    case 14:
+
+                    msgs_detail::decodeOptionalBool(map, msg.button_share);
+                        break;
+                    case 15:
+
+                    msgs_detail::decodeOptionalBool(map, msg.button_options);
+                        break;
+                    case 16:
+
+                    msgs_detail::decodeOptionalBool(map, msg.button_touchpad);
+                        break;
+                    case 17:
+
+                    msgs_detail::decodeOptionalBool(map, msg.button_ps);
+                        break;
+                    case 18:
+
+                    msgs_detail::decodeOptionalInt32(map, msg.axis_lx);
+                        break;
+                    case 19:
+
+                    msgs_detail::decodeOptionalInt32(map, msg.axis_ly);
+                        break;
+                    case 20:
+
+                    msgs_detail::decodeOptionalInt32(map, msg.axis_rx);
+                        break;
+                    case 21:
+
+                    msgs_detail::decodeOptionalInt32(map, msg.axis_ry);
+                        break;
+                    case 22:
+
+                    msgs_detail::decodeOptionalInt32(map, msg.gyro_x);
+                        break;
+                    case 23:
+
+                    msgs_detail::decodeOptionalInt32(map, msg.gyro_y);
+                        break;
+                    case 24:
+
+                    msgs_detail::decodeOptionalInt32(map, msg.gyro_z);
+                        break;
+                    case 25:
+
+                    msgs_detail::decodeOptionalInt32(map, msg.accel_x);
+                        break;
+                    case 26:
+
+                    msgs_detail::decodeOptionalInt32(map, msg.accel_y);
+                        break;
+                    case 27:
+
+                    msgs_detail::decodeOptionalInt32(map, msg.accel_z);
+                        break;
+                    case 28:
+
+                    msgs_detail::decodeOptionalBool(map, msg.connected);
+                        break;
+                    case 29:
+
+                    msgs_detail::decodeOptionalInt32(map, msg.battery_level);
+                        break;
+                    case 30:
+
+                    msgs_detail::decodeOptionalBool(map, msg.bluetooth);
+                        break;
+                    case 31:
+
+                    msgs_detail::decodeOptionalString(map, msg.debug);
+                        break;
+                    case 32:
+
+                    msgs_detail::decodeOptionalInt32(map, msg.temp);
+                        break;
+                    default:
+                        break;
+                }
+
+                if (!cbor_value_at_end(&map)) {
+                    cbor_value_advance(&map);
+                }
+            }
+            cbor_value_leave_container(&it, &map);
+        }
+        return msg;
+    }
 };
 
-class Ps4Request : public Msg{
-    MSG(Ps4Request);
-    public:
 
+struct Ps4Request {
+    /// For request/reply matching, 0 if not a request/reply
     std::optional<uint32_t> req_id;
     std::optional<int32_t> rumble_small;
     std::optional<int32_t> rumble_large;
@@ -673,362 +2149,751 @@ class Ps4Request : public Msg{
     std::optional<int32_t> led_blue;
     std::optional<int32_t> led_flash_on;
     std::optional<int32_t> led_flash_off;
-    
 
-    // Field indexes
-    typedef enum {
-        REQ_ID_INDEX = 0,
-        RUMBLE_SMALL_INDEX = 1,
-        RUMBLE_LARGE_INDEX = 2,
-        LED_RED_INDEX = 3,
-        LED_GREEN_INDEX = 4,
-        LED_BLUE_INDEX = 5,
-        LED_FLASH_ON_INDEX = 6,
-        LED_FLASH_OFF_INDEX = 7,
-    } Field;
+    /// Serialize this message into a CBOR map keyed by field id.
+    CborError toCbor(CborEncoder& parentEncoder) const {
+        size_t mapSize = 0;
+        if (req_id.has_value()) {
+            ++mapSize;
+        }
+        if (rumble_small.has_value()) {
+            ++mapSize;
+        }
+        if (rumble_large.has_value()) {
+            ++mapSize;
+        }
+        if (led_red.has_value()) {
+            ++mapSize;
+        }
+        if (led_green.has_value()) {
+            ++mapSize;
+        }
+        if (led_blue.has_value()) {
+            ++mapSize;
+        }
+        if (led_flash_on.has_value()) {
+            ++mapSize;
+        }
+        if (led_flash_off.has_value()) {
+            ++mapSize;
+        }
 
-    Bytes serialize() const;
-    Ps4Request* deserialize(const Bytes& bytes);
-    std::string to_string() const;
+        CborEncoder mapEncoder;
+        CborError err = cbor_encoder_create_map(
+            &parentEncoder, &mapEncoder, mapSize);
+        if (err != CborNoError) return err;
+        if (req_id.has_value()) {
+            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(0));
+            if (err != CborNoError) return err;
+
+            err = msgs_detail::encodeOptionalUInt32(mapEncoder, req_id);
+        }
+        if (err != CborNoError) return err;
+        if (rumble_small.has_value()) {
+            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(1));
+            if (err != CborNoError) return err;
+
+            err = msgs_detail::encodeOptionalInt32(mapEncoder, rumble_small);
+        }
+        if (err != CborNoError) return err;
+        if (rumble_large.has_value()) {
+            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(2));
+            if (err != CborNoError) return err;
+
+            err = msgs_detail::encodeOptionalInt32(mapEncoder, rumble_large);
+        }
+        if (err != CborNoError) return err;
+        if (led_red.has_value()) {
+            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(3));
+            if (err != CborNoError) return err;
+
+            err = msgs_detail::encodeOptionalInt32(mapEncoder, led_red);
+        }
+        if (err != CborNoError) return err;
+        if (led_green.has_value()) {
+            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(4));
+            if (err != CborNoError) return err;
+
+            err = msgs_detail::encodeOptionalInt32(mapEncoder, led_green);
+        }
+        if (err != CborNoError) return err;
+        if (led_blue.has_value()) {
+            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(5));
+            if (err != CborNoError) return err;
+
+            err = msgs_detail::encodeOptionalInt32(mapEncoder, led_blue);
+        }
+        if (err != CborNoError) return err;
+        if (led_flash_on.has_value()) {
+            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(6));
+            if (err != CborNoError) return err;
+
+            err = msgs_detail::encodeOptionalInt32(mapEncoder, led_flash_on);
+        }
+        if (err != CborNoError) return err;
+        if (led_flash_off.has_value()) {
+            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(7));
+            if (err != CborNoError) return err;
+
+            err = msgs_detail::encodeOptionalInt32(mapEncoder, led_flash_off);
+        }
+        if (err != CborNoError) return err;
+        return cbor_encoder_close_container(&parentEncoder, &mapEncoder);
+    }
+
+    /// Deserialize a Ps4Request from a CBOR map value.
+    static Ps4Request fromCbor(CborValue& it) {
+        Ps4Request msg;
+        CborValue map;
+        if (cbor_value_is_container(&it) &&
+            cbor_value_enter_container(&it, &map) == CborNoError)
+        {
+            while (!cbor_value_at_end(&map)) {
+                uint64_t key = 0;
+                if (cbor_value_is_unsigned_integer(&map)) {
+                    cbor_value_get_uint64(&map, &key);
+                } else if (cbor_value_is_integer(&map)) {
+                    int64_t signedKey = 0;
+                    cbor_value_get_int64(&map, &signedKey);
+                    if (signedKey < 0) {
+                        cbor_value_advance(&map);
+                        if (!cbor_value_at_end(&map)) {
+                            cbor_value_advance(&map);
+                        }
+                        continue;
+                    }
+                    key = static_cast<uint64_t>(signedKey);
+                } else {
+                    cbor_value_advance(&map);
+                    if (!cbor_value_at_end(&map)) {
+                        cbor_value_advance(&map);
+                    }
+                    continue;
+                }
+
+                cbor_value_advance(&map);
+                if (cbor_value_at_end(&map)) {
+                    break;
+                }
+
+                switch (key) {
+                    case 0:
+
+                    msgs_detail::decodeOptionalUInt32(map, msg.req_id);
+                        break;
+                    case 1:
+
+                    msgs_detail::decodeOptionalInt32(map, msg.rumble_small);
+                        break;
+                    case 2:
+
+                    msgs_detail::decodeOptionalInt32(map, msg.rumble_large);
+                        break;
+                    case 3:
+
+                    msgs_detail::decodeOptionalInt32(map, msg.led_red);
+                        break;
+                    case 4:
+
+                    msgs_detail::decodeOptionalInt32(map, msg.led_green);
+                        break;
+                    case 5:
+
+                    msgs_detail::decodeOptionalInt32(map, msg.led_blue);
+                        break;
+                    case 6:
+
+                    msgs_detail::decodeOptionalInt32(map, msg.led_flash_on);
+                        break;
+                    case 7:
+
+                    msgs_detail::decodeOptionalInt32(map, msg.led_flash_off);
+                        break;
+                    default:
+                        break;
+                }
+
+                if (!cbor_value_at_end(&map)) {
+                    cbor_value_advance(&map);
+                }
+            }
+            cbor_value_leave_container(&it, &map);
+        }
+        return msg;
+    }
 };
 
-class CameraEvent : public Msg{
-    MSG(CameraEvent);
-    public:
 
-    std::optional<int32_t> width;
-    std::optional<int32_t> height;
-    std::optional<std::string> format;
-    std::optional<Bytes> data;
-    std::optional<bool> led;
-    std::optional<int32_t> quality;
-    
+struct SysEvent {
+    std::optional<uint64_t> utc;
+    std::optional<uint64_t> uptime;
+    std::optional<uint64_t> free_heap;
+    std::optional<uint64_t> flash;
+    std::optional<std::string> cpu_board;
+    std::optional<std::string> build_date;
 
-    // Field indexes
-    typedef enum {
-        WIDTH_INDEX = 1,
-        HEIGHT_INDEX = 2,
-        FORMAT_INDEX = 3,
-        DATA_INDEX = 4,
-        LED_INDEX = 5,
-        QUALITY_INDEX = 6,
-    } Field;
+    /// Serialize this message into a CBOR map keyed by field id.
+    CborError toCbor(CborEncoder& parentEncoder) const {
+        size_t mapSize = 0;
+        if (utc.has_value()) {
+            ++mapSize;
+        }
+        if (uptime.has_value()) {
+            ++mapSize;
+        }
+        if (free_heap.has_value()) {
+            ++mapSize;
+        }
+        if (flash.has_value()) {
+            ++mapSize;
+        }
+        if (cpu_board.has_value()) {
+            ++mapSize;
+        }
+        if (build_date.has_value()) {
+            ++mapSize;
+        }
 
-    Bytes serialize() const;
-    CameraEvent* deserialize(const Bytes& bytes);
-    std::string to_string() const;
+        CborEncoder mapEncoder;
+        CborError err = cbor_encoder_create_map(
+            &parentEncoder, &mapEncoder, mapSize);
+        if (err != CborNoError) return err;
+        if (utc.has_value()) {
+            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(0));
+            if (err != CborNoError) return err;
+
+            err = msgs_detail::encodeOptionalUInt64(mapEncoder, utc);
+        }
+        if (err != CborNoError) return err;
+        if (uptime.has_value()) {
+            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(1));
+            if (err != CborNoError) return err;
+
+            err = msgs_detail::encodeOptionalUInt64(mapEncoder, uptime);
+        }
+        if (err != CborNoError) return err;
+        if (free_heap.has_value()) {
+            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(2));
+            if (err != CborNoError) return err;
+
+            err = msgs_detail::encodeOptionalUInt64(mapEncoder, free_heap);
+        }
+        if (err != CborNoError) return err;
+        if (flash.has_value()) {
+            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(3));
+            if (err != CborNoError) return err;
+
+            err = msgs_detail::encodeOptionalUInt64(mapEncoder, flash);
+        }
+        if (err != CborNoError) return err;
+        if (cpu_board.has_value()) {
+            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(4));
+            if (err != CborNoError) return err;
+
+            err = msgs_detail::encodeOptionalString(mapEncoder, cpu_board);
+        }
+        if (err != CborNoError) return err;
+        if (build_date.has_value()) {
+            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(5));
+            if (err != CborNoError) return err;
+
+            err = msgs_detail::encodeOptionalString(mapEncoder, build_date);
+        }
+        if (err != CborNoError) return err;
+        return cbor_encoder_close_container(&parentEncoder, &mapEncoder);
+    }
+
+    /// Deserialize a SysEvent from a CBOR map value.
+    static SysEvent fromCbor(CborValue& it) {
+        SysEvent msg;
+        CborValue map;
+        if (cbor_value_is_container(&it) &&
+            cbor_value_enter_container(&it, &map) == CborNoError)
+        {
+            while (!cbor_value_at_end(&map)) {
+                uint64_t key = 0;
+                if (cbor_value_is_unsigned_integer(&map)) {
+                    cbor_value_get_uint64(&map, &key);
+                } else if (cbor_value_is_integer(&map)) {
+                    int64_t signedKey = 0;
+                    cbor_value_get_int64(&map, &signedKey);
+                    if (signedKey < 0) {
+                        cbor_value_advance(&map);
+                        if (!cbor_value_at_end(&map)) {
+                            cbor_value_advance(&map);
+                        }
+                        continue;
+                    }
+                    key = static_cast<uint64_t>(signedKey);
+                } else {
+                    cbor_value_advance(&map);
+                    if (!cbor_value_at_end(&map)) {
+                        cbor_value_advance(&map);
+                    }
+                    continue;
+                }
+
+                cbor_value_advance(&map);
+                if (cbor_value_at_end(&map)) {
+                    break;
+                }
+
+                switch (key) {
+                    case 0:
+
+                    msgs_detail::decodeOptionalUInt64(map, msg.utc);
+                        break;
+                    case 1:
+
+                    msgs_detail::decodeOptionalUInt64(map, msg.uptime);
+                        break;
+                    case 2:
+
+                    msgs_detail::decodeOptionalUInt64(map, msg.free_heap);
+                        break;
+                    case 3:
+
+                    msgs_detail::decodeOptionalUInt64(map, msg.flash);
+                        break;
+                    case 4:
+
+                    msgs_detail::decodeOptionalString(map, msg.cpu_board);
+                        break;
+                    case 5:
+
+                    msgs_detail::decodeOptionalString(map, msg.build_date);
+                        break;
+                    default:
+                        break;
+                }
+
+                if (!cbor_value_at_end(&map)) {
+                    cbor_value_advance(&map);
+                }
+            }
+            cbor_value_leave_container(&it, &map);
+        }
+        return msg;
+    }
 };
 
-class CameraRequest : public Msg{
-    MSG(CameraRequest);
-    public:
 
+struct SysReply {
+    /// For request/reply matching, 0 if not a request/reply
     std::optional<uint32_t> req_id;
-    std::optional<bool> led;
-    std::optional<std::string> capture_tcp_destination;
-    std::optional<int32_t> quality;
-    
-
-    // Field indexes
-    typedef enum {
-        REQ_ID_INDEX = 0,
-        LED_INDEX = 1,
-        CAPTURE_TCP_DESTINATION_INDEX = 2,
-        QUALITY_INDEX = 4,
-    } Field;
-
-    Bytes serialize() const;
-    CameraRequest* deserialize(const Bytes& bytes);
-    std::string to_string() const;
-};
-
-class CameraReply : public Msg{
-    MSG(CameraReply);
-    public:
-
-    std::optional<uint32_t> req_id;
-    std::optional<int32_t> error_code;
+    std::optional<int32_t> rc;
     std::optional<std::string> message;
-    std::optional<Bytes> data;
-    
 
-    // Field indexes
-    typedef enum {
-        REQ_ID_INDEX = 0,
-        ERROR_CODE_INDEX = 1,
-        MESSAGE_INDEX = 2,
-        DATA_INDEX = 3,
-    } Field;
+    /// Serialize this message into a CBOR map keyed by field id.
+    CborError toCbor(CborEncoder& parentEncoder) const {
+        size_t mapSize = 0;
+        if (req_id.has_value()) {
+            ++mapSize;
+        }
+        if (rc.has_value()) {
+            ++mapSize;
+        }
+        if (message.has_value()) {
+            ++mapSize;
+        }
 
-    Bytes serialize() const;
-    CameraReply* deserialize(const Bytes& bytes);
-    std::string to_string() const;
+        CborEncoder mapEncoder;
+        CborError err = cbor_encoder_create_map(
+            &parentEncoder, &mapEncoder, mapSize);
+        if (err != CborNoError) return err;
+        if (req_id.has_value()) {
+            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(0));
+            if (err != CborNoError) return err;
+
+            err = msgs_detail::encodeOptionalUInt32(mapEncoder, req_id);
+        }
+        if (err != CborNoError) return err;
+        if (rc.has_value()) {
+            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(1));
+            if (err != CborNoError) return err;
+
+            err = msgs_detail::encodeOptionalInt32(mapEncoder, rc);
+        }
+        if (err != CborNoError) return err;
+        if (message.has_value()) {
+            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(2));
+            if (err != CborNoError) return err;
+
+            err = msgs_detail::encodeOptionalString(mapEncoder, message);
+        }
+        if (err != CborNoError) return err;
+        return cbor_encoder_close_container(&parentEncoder, &mapEncoder);
+    }
+
+    /// Deserialize a SysReply from a CBOR map value.
+    static SysReply fromCbor(CborValue& it) {
+        SysReply msg;
+        CborValue map;
+        if (cbor_value_is_container(&it) &&
+            cbor_value_enter_container(&it, &map) == CborNoError)
+        {
+            while (!cbor_value_at_end(&map)) {
+                uint64_t key = 0;
+                if (cbor_value_is_unsigned_integer(&map)) {
+                    cbor_value_get_uint64(&map, &key);
+                } else if (cbor_value_is_integer(&map)) {
+                    int64_t signedKey = 0;
+                    cbor_value_get_int64(&map, &signedKey);
+                    if (signedKey < 0) {
+                        cbor_value_advance(&map);
+                        if (!cbor_value_at_end(&map)) {
+                            cbor_value_advance(&map);
+                        }
+                        continue;
+                    }
+                    key = static_cast<uint64_t>(signedKey);
+                } else {
+                    cbor_value_advance(&map);
+                    if (!cbor_value_at_end(&map)) {
+                        cbor_value_advance(&map);
+                    }
+                    continue;
+                }
+
+                cbor_value_advance(&map);
+                if (cbor_value_at_end(&map)) {
+                    break;
+                }
+
+                switch (key) {
+                    case 0:
+
+                    msgs_detail::decodeOptionalUInt32(map, msg.req_id);
+                        break;
+                    case 1:
+
+                    msgs_detail::decodeOptionalInt32(map, msg.rc);
+                        break;
+                    case 2:
+
+                    msgs_detail::decodeOptionalString(map, msg.message);
+                        break;
+                    default:
+                        break;
+                }
+
+                if (!cbor_value_at_end(&map)) {
+                    cbor_value_advance(&map);
+                }
+            }
+            cbor_value_leave_container(&it, &map);
+        }
+        return msg;
+    }
 };
 
-class LawnmowerManualEvent : public Msg{
-    MSG(LawnmowerManualEvent);
-    public:
 
-    std::optional<int32_t> speed;
-    std::optional<int32_t> steering;
-    std::optional<bool> blade;
-    
-
-    // Field indexes
-    typedef enum {
-        SPEED_INDEX = 1,
-        STEERING_INDEX = 2,
-        BLADE_INDEX = 3,
-    } Field;
-
-    Bytes serialize() const;
-    LawnmowerManualEvent* deserialize(const Bytes& bytes);
-    std::string to_string() const;
-};
-
-class LawnmowerManualRequest : public Msg{
-    MSG(LawnmowerManualRequest);
-    public:
-
+struct SysRequest {
+    /// For request/reply matching, 0 if not a request/reply
     std::optional<uint32_t> req_id;
-    std::optional<float> speed;
-    std::optional<float> steer;
-    std::optional<bool> blade;
-    std::optional<bool> start_manual_control;
-    std::optional<bool> stop_manual_control;
-    std::optional<bool> emergency_stop;
-    std::optional<bool> start_auto_mode;
-    std::optional<bool> stop_auto_mode;
-    
+    std::optional<uint64_t> set_time;
+    std::optional<bool> reboot;
+    std::optional<std::string> console;
 
-    // Field indexes
-    typedef enum {
-        REQ_ID_INDEX = 0,
-        SPEED_INDEX = 1,
-        STEER_INDEX = 2,
-        BLADE_INDEX = 3,
-        START_MANUAL_CONTROL_INDEX = 4,
-        STOP_MANUAL_CONTROL_INDEX = 5,
-        EMERGENCY_STOP_INDEX = 6,
-        START_AUTO_MODE_INDEX = 7,
-        STOP_AUTO_MODE_INDEX = 8,
-    } Field;
+    /// Serialize this message into a CBOR map keyed by field id.
+    CborError toCbor(CborEncoder& parentEncoder) const {
+        size_t mapSize = 0;
+        if (req_id.has_value()) {
+            ++mapSize;
+        }
+        if (set_time.has_value()) {
+            ++mapSize;
+        }
+        if (reboot.has_value()) {
+            ++mapSize;
+        }
+        if (console.has_value()) {
+            ++mapSize;
+        }
 
-    Bytes serialize() const;
-    LawnmowerManualRequest* deserialize(const Bytes& bytes);
-    std::string to_string() const;
+        CborEncoder mapEncoder;
+        CborError err = cbor_encoder_create_map(
+            &parentEncoder, &mapEncoder, mapSize);
+        if (err != CborNoError) return err;
+        if (req_id.has_value()) {
+            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(0));
+            if (err != CborNoError) return err;
+
+            err = msgs_detail::encodeOptionalUInt32(mapEncoder, req_id);
+        }
+        if (err != CborNoError) return err;
+        if (set_time.has_value()) {
+            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(1));
+            if (err != CborNoError) return err;
+
+            err = msgs_detail::encodeOptionalUInt64(mapEncoder, set_time);
+        }
+        if (err != CborNoError) return err;
+        if (reboot.has_value()) {
+            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(2));
+            if (err != CborNoError) return err;
+
+            err = msgs_detail::encodeOptionalBool(mapEncoder, reboot);
+        }
+        if (err != CborNoError) return err;
+        if (console.has_value()) {
+            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(3));
+            if (err != CborNoError) return err;
+
+            err = msgs_detail::encodeOptionalString(mapEncoder, console);
+        }
+        if (err != CborNoError) return err;
+        return cbor_encoder_close_container(&parentEncoder, &mapEncoder);
+    }
+
+    /// Deserialize a SysRequest from a CBOR map value.
+    static SysRequest fromCbor(CborValue& it) {
+        SysRequest msg;
+        CborValue map;
+        if (cbor_value_is_container(&it) &&
+            cbor_value_enter_container(&it, &map) == CborNoError)
+        {
+            while (!cbor_value_at_end(&map)) {
+                uint64_t key = 0;
+                if (cbor_value_is_unsigned_integer(&map)) {
+                    cbor_value_get_uint64(&map, &key);
+                } else if (cbor_value_is_integer(&map)) {
+                    int64_t signedKey = 0;
+                    cbor_value_get_int64(&map, &signedKey);
+                    if (signedKey < 0) {
+                        cbor_value_advance(&map);
+                        if (!cbor_value_at_end(&map)) {
+                            cbor_value_advance(&map);
+                        }
+                        continue;
+                    }
+                    key = static_cast<uint64_t>(signedKey);
+                } else {
+                    cbor_value_advance(&map);
+                    if (!cbor_value_at_end(&map)) {
+                        cbor_value_advance(&map);
+                    }
+                    continue;
+                }
+
+                cbor_value_advance(&map);
+                if (cbor_value_at_end(&map)) {
+                    break;
+                }
+
+                switch (key) {
+                    case 0:
+
+                    msgs_detail::decodeOptionalUInt32(map, msg.req_id);
+                        break;
+                    case 1:
+
+                    msgs_detail::decodeOptionalUInt64(map, msg.set_time);
+                        break;
+                    case 2:
+
+                    msgs_detail::decodeOptionalBool(map, msg.reboot);
+                        break;
+                    case 3:
+
+                    msgs_detail::decodeOptionalString(map, msg.console);
+                        break;
+                    default:
+                        break;
+                }
+
+                if (!cbor_value_at_end(&map)) {
+                    cbor_value_advance(&map);
+                }
+            }
+            cbor_value_leave_container(&it, &map);
+        }
+        return msg;
+    }
 };
 
-class LawnmowerManualReply : public Msg{
-    MSG(LawnmowerManualReply);
-    public:
 
-    std::optional<uint32_t> req_id;
-    std::optional<int32_t> error_code;
-    std::optional<std::string> message;
-    
+struct WifiEvent {
+    std::optional<std::string> ip;
+    std::optional<std::string> gateway;
+    std::optional<std::string> netmask;
+    std::optional<std::string> ssid;
+    std::optional<std::string> bssid;
+    std::optional<int32_t> channel;
+    std::optional<int32_t> rssi;
+    std::optional<std::string> mac;
 
-    // Field indexes
-    typedef enum {
-        REQ_ID_INDEX = 0,
-        ERROR_CODE_INDEX = 1,
-        MESSAGE_INDEX = 2,
-    } Field;
+    /// Serialize this message into a CBOR map keyed by field id.
+    CborError toCbor(CborEncoder& parentEncoder) const {
+        size_t mapSize = 0;
+        if (ip.has_value()) {
+            ++mapSize;
+        }
+        if (gateway.has_value()) {
+            ++mapSize;
+        }
+        if (netmask.has_value()) {
+            ++mapSize;
+        }
+        if (ssid.has_value()) {
+            ++mapSize;
+        }
+        if (bssid.has_value()) {
+            ++mapSize;
+        }
+        if (channel.has_value()) {
+            ++mapSize;
+        }
+        if (rssi.has_value()) {
+            ++mapSize;
+        }
+        if (mac.has_value()) {
+            ++mapSize;
+        }
 
-    Bytes serialize() const;
-    LawnmowerManualReply* deserialize(const Bytes& bytes);
-    std::string to_string() const;
+        CborEncoder mapEncoder;
+        CborError err = cbor_encoder_create_map(
+            &parentEncoder, &mapEncoder, mapSize);
+        if (err != CborNoError) return err;
+        if (ip.has_value()) {
+            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(0));
+            if (err != CborNoError) return err;
+
+            err = msgs_detail::encodeOptionalString(mapEncoder, ip);
+        }
+        if (err != CborNoError) return err;
+        if (gateway.has_value()) {
+            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(1));
+            if (err != CborNoError) return err;
+
+            err = msgs_detail::encodeOptionalString(mapEncoder, gateway);
+        }
+        if (err != CborNoError) return err;
+        if (netmask.has_value()) {
+            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(2));
+            if (err != CborNoError) return err;
+
+            err = msgs_detail::encodeOptionalString(mapEncoder, netmask);
+        }
+        if (err != CborNoError) return err;
+        if (ssid.has_value()) {
+            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(3));
+            if (err != CborNoError) return err;
+
+            err = msgs_detail::encodeOptionalString(mapEncoder, ssid);
+        }
+        if (err != CborNoError) return err;
+        if (bssid.has_value()) {
+            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(4));
+            if (err != CborNoError) return err;
+
+            err = msgs_detail::encodeOptionalString(mapEncoder, bssid);
+        }
+        if (err != CborNoError) return err;
+        if (channel.has_value()) {
+            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(5));
+            if (err != CborNoError) return err;
+
+            err = msgs_detail::encodeOptionalInt32(mapEncoder, channel);
+        }
+        if (err != CborNoError) return err;
+        if (rssi.has_value()) {
+            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(6));
+            if (err != CborNoError) return err;
+
+            err = msgs_detail::encodeOptionalInt32(mapEncoder, rssi);
+        }
+        if (err != CborNoError) return err;
+        if (mac.has_value()) {
+            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(7));
+            if (err != CborNoError) return err;
+
+            err = msgs_detail::encodeOptionalString(mapEncoder, mac);
+        }
+        if (err != CborNoError) return err;
+        return cbor_encoder_close_container(&parentEncoder, &mapEncoder);
+    }
+
+    /// Deserialize a WifiEvent from a CBOR map value.
+    static WifiEvent fromCbor(CborValue& it) {
+        WifiEvent msg;
+        CborValue map;
+        if (cbor_value_is_container(&it) &&
+            cbor_value_enter_container(&it, &map) == CborNoError)
+        {
+            while (!cbor_value_at_end(&map)) {
+                uint64_t key = 0;
+                if (cbor_value_is_unsigned_integer(&map)) {
+                    cbor_value_get_uint64(&map, &key);
+                } else if (cbor_value_is_integer(&map)) {
+                    int64_t signedKey = 0;
+                    cbor_value_get_int64(&map, &signedKey);
+                    if (signedKey < 0) {
+                        cbor_value_advance(&map);
+                        if (!cbor_value_at_end(&map)) {
+                            cbor_value_advance(&map);
+                        }
+                        continue;
+                    }
+                    key = static_cast<uint64_t>(signedKey);
+                } else {
+                    cbor_value_advance(&map);
+                    if (!cbor_value_at_end(&map)) {
+                        cbor_value_advance(&map);
+                    }
+                    continue;
+                }
+
+                cbor_value_advance(&map);
+                if (cbor_value_at_end(&map)) {
+                    break;
+                }
+
+                switch (key) {
+                    case 0:
+
+                    msgs_detail::decodeOptionalString(map, msg.ip);
+                        break;
+                    case 1:
+
+                    msgs_detail::decodeOptionalString(map, msg.gateway);
+                        break;
+                    case 2:
+
+                    msgs_detail::decodeOptionalString(map, msg.netmask);
+                        break;
+                    case 3:
+
+                    msgs_detail::decodeOptionalString(map, msg.ssid);
+                        break;
+                    case 4:
+
+                    msgs_detail::decodeOptionalString(map, msg.bssid);
+                        break;
+                    case 5:
+
+                    msgs_detail::decodeOptionalInt32(map, msg.channel);
+                        break;
+                    case 6:
+
+                    msgs_detail::decodeOptionalInt32(map, msg.rssi);
+                        break;
+                    case 7:
+
+                    msgs_detail::decodeOptionalString(map, msg.mac);
+                        break;
+                    default:
+                        break;
+                }
+
+                if (!cbor_value_at_end(&map)) {
+                    cbor_value_advance(&map);
+                }
+            }
+            cbor_value_leave_container(&it, &map);
+        }
+        return msg;
+    }
 };
 
-class LawnmowerAutoEvent : public Msg{
-    MSG(LawnmowerAutoEvent);
-    public:
 
-    std::optional<bool> started;
-    std::optional<bool> stopped;
-    std::optional<bool> paused;
-    std::optional<bool> resumed;
-    std::optional<std::string> mode;
-    std::optional<std::string> path;
-    
-
-    // Field indexes
-    typedef enum {
-        STARTED_INDEX = 1,
-        STOPPED_INDEX = 2,
-        PAUSED_INDEX = 3,
-        RESUMED_INDEX = 4,
-        MODE_INDEX = 5,
-        PATH_INDEX = 6,
-    } Field;
-
-    Bytes serialize() const;
-    LawnmowerAutoEvent* deserialize(const Bytes& bytes);
-    std::string to_string() const;
-};
-
-class LawnmowerAutoRequest : public Msg{
-    MSG(LawnmowerAutoRequest);
-    public:
-
-    std::optional<uint32_t> req_id;
-    std::optional<bool> start;
-    std::optional<bool> stop;
-    std::optional<bool> pause;
-    std::optional<bool> resume;
-    std::optional<std::string> mode;
-    std::optional<std::string> path;
-    
-
-    // Field indexes
-    typedef enum {
-        REQ_ID_INDEX = 0,
-        START_INDEX = 1,
-        STOP_INDEX = 2,
-        PAUSE_INDEX = 3,
-        RESUME_INDEX = 4,
-        MODE_INDEX = 5,
-        PATH_INDEX = 6,
-    } Field;
-
-    Bytes serialize() const;
-    LawnmowerAutoRequest* deserialize(const Bytes& bytes);
-    std::string to_string() const;
-};
-
-class LawnmowerStatus : public Msg{
-    MSG(LawnmowerStatus);
-    public:
-
-    std::optional<int32_t> battery_level;
-    std::optional<bool> blade_status;
-    std::optional<std::string> current_mode;
-    std::optional<std::string> error_message;
-    
-
-    // Field indexes
-    typedef enum {
-        BATTERY_LEVEL_INDEX = 1,
-        BLADE_STATUS_INDEX = 2,
-        CURRENT_MODE_INDEX = 3,
-        ERROR_MESSAGE_INDEX = 4,
-    } Field;
-
-    Bytes serialize() const;
-    LawnmowerStatus* deserialize(const Bytes& bytes);
-    std::string to_string() const;
-};
-
-class MotorEvent : public Msg{
-    MSG(MotorEvent);
-    public:
-
-    std::optional<int32_t> motor_id;
-    std::optional<float> temperature;
-    std::optional<float> voltage;
-    std::optional<float> current;
-    std::optional<float> speed;
-    std::optional<float> position;
-    
-
-    // Field indexes
-    typedef enum {
-        MOTOR_ID_INDEX = 1,
-        TEMPERATURE_INDEX = 2,
-        VOLTAGE_INDEX = 3,
-        CURRENT_INDEX = 4,
-        SPEED_INDEX = 5,
-        POSITION_INDEX = 6,
-    } Field;
-
-    Bytes serialize() const;
-    MotorEvent* deserialize(const Bytes& bytes);
-    std::string to_string() const;
-};
-
-class Max31855Event : public Msg{
-    MSG(Max31855Event);
-    public:
-
-    std::optional<float> thermocouple_c;
-    std::optional<float> internal_c;
-    std::optional<bool> fault;
-    std::optional<bool> open_circuit;
-    std::optional<bool> short_to_gnd;
-    std::optional<bool> short_to_vcc;
-    std::optional<uint64_t> timestamp_ms;
-    
-
-    // Field indexes
-    typedef enum {
-        THERMOCOUPLE_C_INDEX = 1,
-        INTERNAL_C_INDEX = 2,
-        FAULT_INDEX = 3,
-        OPEN_CIRCUIT_INDEX = 4,
-        SHORT_TO_GND_INDEX = 5,
-        SHORT_TO_VCC_INDEX = 6,
-        TIMESTAMP_MS_INDEX = 7,
-    } Field;
-
-    Bytes serialize() const;
-    Max31855Event* deserialize(const Bytes& bytes);
-    std::string to_string() const;
-};
-
-class HeatingRequest : public Msg{
-    MSG(HeatingRequest);
-    public:
-
-    std::optional<uint32_t> req_id;
-    std::optional<float> setpoint_c;
-    std::optional<bool> enabled;
-    std::optional<float> kp;
-    std::optional<float> ki;
-    std::optional<float> kd;
-    std::optional<bool> reset_integral;
-    
-
-    // Field indexes
-    typedef enum {
-        REQ_ID_INDEX = 0,
-        SETPOINT_C_INDEX = 1,
-        ENABLED_INDEX = 2,
-        KP_INDEX = 3,
-        KI_INDEX = 4,
-        KD_INDEX = 5,
-        RESET_INTEGRAL_INDEX = 6,
-    } Field;
-
-    Bytes serialize() const;
-    HeatingRequest* deserialize(const Bytes& bytes);
-    std::string to_string() const;
-};
-
-class HeatingEvent : public Msg{
-    MSG(HeatingEvent);
-    public:
-
-    std::optional<float> temperature_c;
-    std::optional<float> setpoint_c;
-    std::optional<float> output_pct;
-    std::optional<bool> enabled;
-    std::optional<bool> heater_on;
-    std::optional<bool> fault;
-    std::optional<uint64_t> timestamp_ms;
-    
-
-    // Field indexes
-    typedef enum {
-        TEMPERATURE_C_INDEX = 1,
-        SETPOINT_C_INDEX = 2,
-        OUTPUT_PCT_INDEX = 3,
-        ENABLED_INDEX = 4,
-        HEATER_ON_INDEX = 5,
-        FAULT_INDEX = 6,
-        TIMESTAMP_MS_INDEX = 7,
-    } Field;
-
-    Bytes serialize() const;
-    HeatingEvent* deserialize(const Bytes& bytes);
-    std::string to_string() const;
-};
