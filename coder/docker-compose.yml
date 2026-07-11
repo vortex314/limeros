@@ -1,0 +1,42 @@
+version: '3.8'
+
+services:
+  openobserve:
+    image: public.ecr.aws/zinclabs/openobserve:latest
+    container_name: openobserve
+    restart: unless-stopped
+    environment:
+      - ZO_ROOT_USER_EMAIL=admin@example.com
+      - ZO_ROOT_USER_PASSWORD=ChangeThisSecurePassword123!
+    ports:
+      - "5080:5080"
+    volumes:
+      - o2_data:/data
+
+  fluent-bit:
+    image: cr.fluentbit.io/fluent/fluent-bit:latest
+    container_name: fluent-bit
+    restart: unless-stopped
+    depends_on:
+      - openobserve
+    volumes:
+      - ./fluent-bit.conf:/fluent-bit/etc/fluent-bit.conf:ro
+      - ./parsers.conf:/fluent-bit/etc/parsers.conf:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /var/log:/var/log:ro
+    user: "0:0" 
+
+  portainer:
+    image: portainer/portainer-ce:latest
+    container_name: portainer
+    restart: unless-stopped
+    ports:
+      - "9443:9443"
+      - "9000:9000" # Optional: HTTP port if you don't want to use local SSL (9443)
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro  # Allows Portainer to manage the local Docker host
+      - portainer_data:/data
+
+volumes:
+  o2_data:
+  portainer_data:
