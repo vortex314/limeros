@@ -280,13 +280,13 @@ void Max31855Actor::control()
 
     auto event = new Max31855Event();
 
-    event->thermocouple_c = thermocouple_c;
-    event->internal_c = internal_c;
+    event->thermocouple_temp = thermocouple_c;
+    event->internal_temp     = internal_c;
     event->fault = fault;
-    event->open_circuit = open_circuit;
-    event->short_to_gnd = short_to_gnd;
-    event->short_to_vcc = short_to_vcc;
-    event->timestamp_ms = esp_timer_get_time() / 1000;
+    event->fault_open_tc = open_circuit;
+    event->fault_short_gnd = short_to_gnd;
+    event->fault_short_vcc = short_to_vcc;
+ //   event->timestamp_ms = esp_timer_get_time() / 1000;
 
     DEBUG("MAX31855 tc=%.2fC cj=%.2fC fault=%d oc=%d scg=%d scv=%d",
          thermocouple_c,

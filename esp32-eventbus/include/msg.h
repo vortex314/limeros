@@ -4,6 +4,7 @@
 #include <vector>
 #include <functional>
 #include <type_traits>
+#include <optional>
 #include <result.h>
 #include <stdint.h>
 #include <util.h>
@@ -47,6 +48,72 @@ struct Name : public Msg { \
     __VA_ARGS__; \
     Name() = default; \
 };
+/*
+#[derive(Debug, Clone, PartialEq, cbor2::Cbor)]
+pub struct UdpMessage {
+    #[cbor(key = 0)]
+    pub src: Option<u32>,
+    #[cbor(key = 1)]
+    pub dst: Option<u32>,
+    #[cbor(key = 2)]
+    pub msg_type: Option<u32>,
+    #[cbor(key = 3)]
+    pub req_id: Option<u32>,
+    #[cbor(key = 4)]
+    pub payload: Option<Vec<u8>>,
+}
 
 
+impl Msg<EndpointAnnounce> for EndpointAnnounce {
+    fn id() -> u32 {
+        2371693343
+    }
+    fn name() -> &'static str {
+        "EndpointAnnounce"
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, cbor2::Cbor)]
+pub struct EndpointAnnounce {
+    #[cbor(key = 0)]
+    pub endpoint_id: Option<u32>,
+    #[cbor(key = 1)]
+    pub endpoint_name: Option<String>,
+}
+
+
+impl Msg<EndpointAnnounceReply> for EndpointAnnounceReply {
+    fn id() -> u32 {
+        3238220441
+    }
+    fn name() -> &'static str {
+        "EndpointAnnounceReply"
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, cbor2::Cbor)]
+pub struct EndpointAnnounceReply {
+    #[cbor(key = 0)]
+    pub broker_id: Option<u32>,
+}*/
+
+struct UdpMessage : public Msg {
+    MSG(UdpMessage)
+    std::optional<uint32_t> src;
+    std::optional<uint32_t> dst;
+    std::optional<uint32_t> msg_type;
+    std::optional<uint32_t> req_id;
+    std::optional<Bytes> payload;
+};
+
+struct EndpointAnnounce : public Msg {
+    MSG(EndpointAnnounce)
+    std::optional<uint32_t> endpoint_id;
+    std::optional<std::string> endpoint_name;
+};
+
+struct EndpointAnnounceReply : public Msg {
+    MSG(EndpointAnnounceReply)
+    std::optional<uint32_t> broker_id;
+};
 

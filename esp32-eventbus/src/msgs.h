@@ -368,6 +368,118 @@ struct DeviceAliveEvent {
 };
 
 
+struct HeatingEvent {
+    /// Current temperature in Celsius
+    std::optional<float> temperature;
+    /// Setpoint temperature in Celsius
+    std::optional<float> setpoint;
+    /// Heating status
+    std::optional<bool> heating;
+
+    /// Serialize this message into a CBOR map keyed by field id.
+    CborError toCbor(CborEncoder& parentEncoder) const {
+        size_t mapSize = 0;
+        if (temperature.has_value()) {
+            ++mapSize;
+        }
+        if (setpoint.has_value()) {
+            ++mapSize;
+        }
+        if (heating.has_value()) {
+            ++mapSize;
+        }
+
+        CborEncoder mapEncoder;
+        CborError err = cbor_encoder_create_map(
+            &parentEncoder, &mapEncoder, mapSize);
+        if (err != CborNoError) return err;
+        if (temperature.has_value()) {
+            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(0));
+            if (err != CborNoError) return err;
+
+            err = msgs_detail::encodeOptionalFloat(mapEncoder, temperature);
+        }
+        if (err != CborNoError) return err;
+        if (setpoint.has_value()) {
+            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(1));
+            if (err != CborNoError) return err;
+
+            err = msgs_detail::encodeOptionalFloat(mapEncoder, setpoint);
+        }
+        if (err != CborNoError) return err;
+        if (heating.has_value()) {
+            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(2));
+            if (err != CborNoError) return err;
+
+            err = msgs_detail::encodeOptionalBool(mapEncoder, heating);
+        }
+        if (err != CborNoError) return err;
+        return cbor_encoder_close_container(&parentEncoder, &mapEncoder);
+    }
+
+    /// Deserialize a HeatingEvent from a CBOR map value.
+    static HeatingEvent fromCbor(CborValue& it) {
+        HeatingEvent msg;
+        CborValue map;
+        if (cbor_value_is_container(&it) &&
+            cbor_value_enter_container(&it, &map) == CborNoError)
+        {
+            while (!cbor_value_at_end(&map)) {
+                uint64_t key = 0;
+                if (cbor_value_is_unsigned_integer(&map)) {
+                    cbor_value_get_uint64(&map, &key);
+                } else if (cbor_value_is_integer(&map)) {
+                    int64_t signedKey = 0;
+                    cbor_value_get_int64(&map, &signedKey);
+                    if (signedKey < 0) {
+                        cbor_value_advance(&map);
+                        if (!cbor_value_at_end(&map)) {
+                            cbor_value_advance(&map);
+                        }
+                        continue;
+                    }
+                    key = static_cast<uint64_t>(signedKey);
+                } else {
+                    cbor_value_advance(&map);
+                    if (!cbor_value_at_end(&map)) {
+                        cbor_value_advance(&map);
+                    }
+                    continue;
+                }
+
+                cbor_value_advance(&map);
+                if (cbor_value_at_end(&map)) {
+                    break;
+                }
+
+                switch (key) {
+                    case 0:
+
+                    msgs_detail::decodeOptionalFloat(map, msg.temperature);
+                        break;
+                    case 1:
+
+                    msgs_detail::decodeOptionalFloat(map, msg.setpoint);
+                        break;
+                    case 2:
+
+                    msgs_detail::decodeOptionalBool(map, msg.heating);
+                        break;
+                    default:
+                        break;
+                }
+
+                if (!cbor_value_at_end(&map)) {
+                    cbor_value_advance(&map);
+                }
+            }
+            cbor_value_leave_container(&it, &map);
+        }
+        return msg;
+    }
+};
+
+
 struct HoverboardEvent {
     /// 1:Voltage 2:Speed 3:Torque
     std::optional<int32_t> ctrl_mod;
@@ -1374,6 +1486,166 @@ struct HoverboardRequest {
                     case 2:
 
                     msgs_detail::decodeOptionalInt32(map, msg.steer);
+                        break;
+                    default:
+                        break;
+                }
+
+                if (!cbor_value_at_end(&map)) {
+                    cbor_value_advance(&map);
+                }
+            }
+            cbor_value_leave_container(&it, &map);
+        }
+        return msg;
+    }
+};
+
+
+struct Max31855Event {
+    /// Thermocouple temperature in Celsius
+    std::optional<float> thermocouple_temp;
+    /// Internal temperature in Celsius
+    std::optional<float> internal_temp;
+    /// Fault detected
+    std::optional<bool> fault;
+    /// Short to VCC detected
+    std::optional<bool> fault_short_vcc;
+    /// Short to GND detected
+    std::optional<bool> fault_short_gnd;
+    /// Open thermocouple detected
+    std::optional<bool> fault_open_tc;
+
+    /// Serialize this message into a CBOR map keyed by field id.
+    CborError toCbor(CborEncoder& parentEncoder) const {
+        size_t mapSize = 0;
+        if (thermocouple_temp.has_value()) {
+            ++mapSize;
+        }
+        if (internal_temp.has_value()) {
+            ++mapSize;
+        }
+        if (fault.has_value()) {
+            ++mapSize;
+        }
+        if (fault_short_vcc.has_value()) {
+            ++mapSize;
+        }
+        if (fault_short_gnd.has_value()) {
+            ++mapSize;
+        }
+        if (fault_open_tc.has_value()) {
+            ++mapSize;
+        }
+
+        CborEncoder mapEncoder;
+        CborError err = cbor_encoder_create_map(
+            &parentEncoder, &mapEncoder, mapSize);
+        if (err != CborNoError) return err;
+        if (thermocouple_temp.has_value()) {
+            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(0));
+            if (err != CborNoError) return err;
+
+            err = msgs_detail::encodeOptionalFloat(mapEncoder, thermocouple_temp);
+        }
+        if (err != CborNoError) return err;
+        if (internal_temp.has_value()) {
+            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(1));
+            if (err != CborNoError) return err;
+
+            err = msgs_detail::encodeOptionalFloat(mapEncoder, internal_temp);
+        }
+        if (err != CborNoError) return err;
+        if (fault.has_value()) {
+            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(2));
+            if (err != CborNoError) return err;
+
+            err = msgs_detail::encodeOptionalBool(mapEncoder, fault);
+        }
+        if (err != CborNoError) return err;
+        if (fault_short_vcc.has_value()) {
+            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(3));
+            if (err != CborNoError) return err;
+
+            err = msgs_detail::encodeOptionalBool(mapEncoder, fault_short_vcc);
+        }
+        if (err != CborNoError) return err;
+        if (fault_short_gnd.has_value()) {
+            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(4));
+            if (err != CborNoError) return err;
+
+            err = msgs_detail::encodeOptionalBool(mapEncoder, fault_short_gnd);
+        }
+        if (err != CborNoError) return err;
+        if (fault_open_tc.has_value()) {
+            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(5));
+            if (err != CborNoError) return err;
+
+            err = msgs_detail::encodeOptionalBool(mapEncoder, fault_open_tc);
+        }
+        if (err != CborNoError) return err;
+        return cbor_encoder_close_container(&parentEncoder, &mapEncoder);
+    }
+
+    /// Deserialize a Max31855Event from a CBOR map value.
+    static Max31855Event fromCbor(CborValue& it) {
+        Max31855Event msg;
+        CborValue map;
+        if (cbor_value_is_container(&it) &&
+            cbor_value_enter_container(&it, &map) == CborNoError)
+        {
+            while (!cbor_value_at_end(&map)) {
+                uint64_t key = 0;
+                if (cbor_value_is_unsigned_integer(&map)) {
+                    cbor_value_get_uint64(&map, &key);
+                } else if (cbor_value_is_integer(&map)) {
+                    int64_t signedKey = 0;
+                    cbor_value_get_int64(&map, &signedKey);
+                    if (signedKey < 0) {
+                        cbor_value_advance(&map);
+                        if (!cbor_value_at_end(&map)) {
+                            cbor_value_advance(&map);
+                        }
+                        continue;
+                    }
+                    key = static_cast<uint64_t>(signedKey);
+                } else {
+                    cbor_value_advance(&map);
+                    if (!cbor_value_at_end(&map)) {
+                        cbor_value_advance(&map);
+                    }
+                    continue;
+                }
+
+                cbor_value_advance(&map);
+                if (cbor_value_at_end(&map)) {
+                    break;
+                }
+
+                switch (key) {
+                    case 0:
+
+                    msgs_detail::decodeOptionalFloat(map, msg.thermocouple_temp);
+                        break;
+                    case 1:
+
+                    msgs_detail::decodeOptionalFloat(map, msg.internal_temp);
+                        break;
+                    case 2:
+
+                    msgs_detail::decodeOptionalBool(map, msg.fault);
+                        break;
+                    case 3:
+
+                    msgs_detail::decodeOptionalBool(map, msg.fault_short_vcc);
+                        break;
+                    case 4:
+
+                    msgs_detail::decodeOptionalBool(map, msg.fault_short_gnd);
+                        break;
+                    case 5:
+
+                    msgs_detail::decodeOptionalBool(map, msg.fault_open_tc);
                         break;
                     default:
                         break;

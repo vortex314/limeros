@@ -9,6 +9,7 @@
 #include <ArduinoJson.h>
 #include <msg.h>
 #include <zenoh_actor.h>
+#include <hoverboard_event_raw.h>
 
 DEFINE_MSG(UartRxd,
     Bytes payload;

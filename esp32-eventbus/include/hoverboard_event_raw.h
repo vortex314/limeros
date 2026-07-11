@@ -1,6 +1,11 @@
 #include <msgs.h>
+#include <vector>
+#include <optional>
+#include <string>
+#include <result.h>
+#include <msg.h>
 
-
+typedef std::vector<uint8_t> Bytes;
 
 typedef enum HbVar {
     CTRL_MOD = 0,

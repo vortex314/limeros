@@ -286,4 +286,23 @@ robot "ronald" {
     field "timestamp" { id = 2 type = "uint64"  description = "Timestamp in milliseconds since epoch"}
   }
 
+  message Max31855Event {
+    description = "Max31855 event message"
+    field "thermocouple_temp" { id = 0 type = "float"  description = "Thermocouple temperature in Celsius"}
+    field "internal_temp" { id = 1 type = "float"  description = "Internal temperature in Celsius"}
+    field "fault" { id = 2 type = "bool"  description = "Fault detected"}
+    field "fault_short_vcc" { id = 3 type = "bool"  description = "Short to VCC detected"}
+    field "fault_short_gnd" { id = 4 type = "bool"  description = "Short to GND detected"}
+    field "fault_open_tc" { id = 5 type = "bool"  description = "Open thermocouple detected"}
+  }
+
+  message HeatingEvent {
+    description = "Heating event message"
+    field "temperature" { id = 0 type = "float"  description = "Current temperature in Celsius"}
+    field "setpoint" { id = 1 type = "float"  description = "Setpoint temperature in Celsius"}
+    field "heating" { id = 2 type = "bool"  description = "Heating status"}
+  }
+
+
+
 }
