@@ -7,11 +7,11 @@ use std::collections::HashSet;
 use std::hash::{Hash, Hasher};
 use std::net::{Ipv4Addr, SocketAddr};
 use std::sync::Arc;
-use tokio::sync::Mutex;
 use tokio::sync::mpsc::{Receiver, Sender};
+use tokio::sync::Mutex;
 
 use common::node::UdpNode;
-use common::{RobotConfig, load_robot_config, logger};
+use common::{RobotConfig, fnv1a_32, load_robot_config, logger};
 use generated::generated as msgs;
 use msgs::{BrokerSubscribeRequest, EndpointAnnounce, EndpointAnnounceReply, Envelope};
 
@@ -48,12 +48,6 @@ struct KnownEndpoint {
     addr: SocketAddr,
 }
 
-fn fnv1a_32(s: &str) -> u32 {
-    let mut hasher = FnvHasher::default();
-    s.hash(&mut hasher);
-    hasher.finish() as u32
-}
-
 fn normalize_symbol(value: &str) -> String {
     value
         .split('.')
@@ -65,26 +59,24 @@ fn normalize_symbol(value: &str) -> String {
 
 fn parse_subscriptions(cfg: &RobotConfig) -> Vec<Subscription> {
     let mut subs = Vec::new();
-    for endpoint_map in cfg.devices.values().map(|d| &d.endpoints) {
-        for ep in endpoint_map.values() {
-            for sub in &ep.subscribes {
-                let src = sub
-                    .src
-                    .as_deref()
-                    .map(normalize_symbol)
-                    .map(|v| fnv1a_32(&v));
-                let msg_type = sub
-                    .msg_type
-                    .as_deref()
-                    .map(normalize_symbol)
-                    .map(|v| fnv1a_32(&v));
-                let dst = sub
-                    .dst
-                    .as_deref()
-                    .map(normalize_symbol)
-                    .map(|v| fnv1a_32(&v));
-                subs.push(Subscription { src, msg_type, dst });
-            }
+    for ep in cfg.endpoints.values() {
+        for sub in &ep.subscribes {
+            let src = sub
+                .src
+                .as_deref()
+                .map(normalize_symbol)
+                .map(|v| fnv1a_32(&v));
+            let msg_type = sub
+                .msg_type
+                .as_deref()
+                .map(normalize_symbol)
+                .map(|v| fnv1a_32(&v));
+            let dst = sub
+                .dst
+                .as_deref()
+                .map(normalize_symbol)
+                .map(|v| fnv1a_32(&v));
+            subs.push(Subscription { src, msg_type, dst });
         }
     }
     subs
@@ -97,18 +89,15 @@ fn matches_subscription(msg: &Envelope, sub: &Subscription) -> bool {
     src_ok && typ_ok && dst_ok
 }
 
-
-
 fn target_ids(msg: &Envelope, subscriptions: &[Subscription]) -> HashSet<u32> {
-
-    let mut hash_set:   HashSet<u32> = subscriptions
+    let mut hash_set: HashSet<u32> = subscriptions
         .iter()
         .filter(|s| matches_subscription(msg, s))
         .filter_map(|s| s.dst)
         .collect();
     if let Some(dst) = msg.dst {
         hash_set.insert(dst);
-    } ;
+    };
     hash_set
 }
 
@@ -123,14 +112,7 @@ struct Broker {
 
 struct MetaMessage {
     msg: Envelope,
-    src_addr: SocketAddr,
     raw: Vec<u8>,
-}
-
-fn show_cbor_bytes(bytes: &[u8]) -> String {
-    cbor2::from_slice::<cbor2::Value>(bytes)
-        .map(|v| format!("{:?}", v))
-        .unwrap_or_else(|_| format!("Invalid CBOR: {:?}", bytes))
 }
 
 impl Broker {
@@ -152,22 +134,40 @@ impl Broker {
         let udp_message = Envelope::from_bytes(packet)?;
         let udp_message_clone = udp_message.clone();
         if udp_message.msg_type == Some(EndpointAnnounce::id()) {
-            let payload = udp_message.payload.ok_or_else(|| anyhow::anyhow!("Missing payload"))?;
+            let payload = udp_message
+                .payload
+                .ok_or_else(|| anyhow::anyhow!("Missing payload"))?;
             let announce = EndpointAnnounce::from_bytes(&payload)?;
             if let Some(endpoint_id) = announce.id {
-                info!(
-                    "Received EndpointAnnounce from endpoint {} at {}: {:?}",
-                    endpoint_id, addr, announce
-                );
-                self.known_endpoints.insert(
-                    endpoint_id,
-                    KnownEndpoint {
-                        announce: announce.clone(),
-                        addr,
-                    },
-                );
+                if self.known_endpoints.contains_key(&endpoint_id) {
+                    if self.known_endpoints.get(&endpoint_id).unwrap().addr != addr {
+                        info!(
+                            "Endpoint {} ( {} ) already known, updating address to {}",announce.name.clone().unwrap_or_default(),
+                            endpoint_id, addr
+                        );
+                        self.known_endpoints.insert(
+                            endpoint_id,
+                            KnownEndpoint {
+                                announce: announce.clone(),
+                                addr,
+                            },
+                        );
+                    }
+                } else {
+                    info!("New endpoint {} ( {} ) discovered at {}", announce.name.clone().unwrap_or_default(), endpoint_id, addr);
+                    self.known_endpoints.insert(
+                        endpoint_id,
+                        KnownEndpoint {
+                            announce: announce.clone(),
+                            addr,
+                        },
+                    );
+                }
             }
-            let reply_payload = EndpointAnnounceReply {}.to_bytes()?;
+            let reply_payload = EndpointAnnounceReply {
+                utc: Some(chrono::Utc::now().timestamp_millis() as u64),
+            }
+            .to_bytes()?;
             let reply_message = Envelope {
                 src: Some(fnv1a_32("broker")),
                 dst: udp_message.src,
@@ -176,13 +176,14 @@ impl Broker {
                 instance_id: udp_message.instance_id,
                 payload: Some(reply_payload),
             };
-            self.node.send_unicast(&reply_message.to_bytes()?, addr).await?;
+            self.node
+                .send_unicast(&reply_message.to_bytes()?, addr)
+                .await?;
 
             // Also forward the announce to subscribers via the publisher channel
             self.tx_message
                 .send(MetaMessage {
                     msg: udp_message_clone,
-                    src_addr: addr,
                     raw: packet.to_vec(),
                 })
                 .await
@@ -198,9 +199,7 @@ impl Broker {
         if udp_message.msg_type == Some(BrokerSubscribeRequest::id()) {
             if let Some(payload) = &udp_message.payload {
                 if let Ok(sub_req) = BrokerSubscribeRequest::from_bytes(payload) {
-                    let endpoint_id = udp_message
-                        .src
-                        .unwrap_or(0);
+                    let endpoint_id = udp_message.src.unwrap_or(0);
                     let sub = Subscription {
                         src: sub_req.src,
                         msg_type: sub_req.msg_type,
@@ -242,7 +241,6 @@ impl Broker {
         self.tx_message
             .send(MetaMessage {
                 msg: udp_message,
-                src_addr: addr,
                 raw: packet.to_vec(),
             })
             .await
@@ -303,10 +301,8 @@ impl Broker {
                 // and sub.dst is not a message filter for dynamic subs.
                 for dyn_subs in self_pub.dynamic_subscriptions.iter() {
                     if dyn_subs.value().iter().any(|s| {
-                        let src_ok = s.src.is_none()
-                            || s.src == meta.msg.src;
-                        let typ_ok = s.msg_type.is_none()
-                            || s.msg_type == meta.msg.msg_type;
+                        let src_ok = s.src.is_none() || s.src == meta.msg.src;
+                        let typ_ok = s.msg_type.is_none() || s.msg_type == meta.msg.msg_type;
                         src_ok && typ_ok
                     }) {
                         target_ids.insert(*dyn_subs.key());
@@ -314,11 +310,7 @@ impl Broker {
                 }
                 for endpoint_id in target_ids {
                     if let Some(target) = self_pub.known_endpoints.get(&endpoint_id) {
-                        if let Err(e) = self
-                            .node
-                            .send_unicast(&meta.raw, target.addr)
-                            .await
-                        {
+                        if let Err(e) = self.node.send_unicast(&meta.raw, target.addr).await {
                             warn!(
                                 "forward to endpoint {} at ({:?}) failed: {}",
                                 endpoint_id, target.addr, e

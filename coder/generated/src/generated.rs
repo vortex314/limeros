@@ -236,6 +236,9 @@ impl Msg for EndpointAnnounce {
 
 #[derive(Debug, Clone, PartialEq, cbor2::Cbor)]
 pub struct EndpointAnnounceReply {
+    /// Timestamp in milliseconds since epoch
+    #[cbor(key = 0)]
+    pub utc: Option<u64>,
 }
 
 impl EndpointAnnounceReply {

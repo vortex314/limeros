@@ -101,11 +101,9 @@ fn build_name_map_from_config(config_path: &str) -> HashMap<u32, String> {
     let mut map = HashMap::new();
     match load_robot_config(config_path) {
         Ok(cfg) => {
-            for (dev_name, dev) in &cfg.devices {
-                for ep_name in dev.endpoints.keys() {
-                    // Map both the qualified codegen ID and bare name ID.
-                    map.insert(fnv1a_32(&ep_name), ep_name.clone());
-                }
+            for ep_name in cfg.endpoints.keys() {
+                // Map both the qualified codegen ID and bare name ID.
+                map.insert(fnv1a_32(&ep_name), ep_name.clone());
             }
             info!("Loaded {} endpoint names from config", map.len());
         }

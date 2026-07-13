@@ -146,11 +146,9 @@ fn fmt_endpoint(name_map: &HashMap<u32, String>, id: Option<u32>) -> String {
 fn build_name_map(config_path: &str) -> HashMap<u32, String> {
     let mut map = HashMap::new();
     if let Ok(cfg) = load_robot_config(config_path) {
-        for (dev_name, dev) in &cfg.devices {
-            for ep_name in dev.endpoints.keys() {
-                // and the bare name ID ("endpoint") used by apps like pinger.
-                map.insert(fnv1a_32(&ep_name), ep_name.clone());
-            }
+        for ep_name in cfg.endpoints.keys() {
+            // and the bare name ID ("endpoint") used by apps like pinger.
+            map.insert(fnv1a_32(&ep_name), ep_name.clone());
         }
     }
     map

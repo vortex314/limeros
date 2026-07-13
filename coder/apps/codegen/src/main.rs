@@ -6,7 +6,7 @@
 
 use anyhow::Context;
 use clap::Parser;
-use common::{load_robot_config, DeviceConfig, MessageConfig, RobotConfig, SubscribeConfig,fnv1a_32};
+use common::{load_robot_config, MessageConfig, RobotConfig, SubscribeConfig, fnv1a_32};
 use serde::Serialize;
 use tera::{Context as TeraContext, Tera};
 
@@ -44,10 +44,10 @@ fn main() -> anyhow::Result<()> {
         .with_context(|| format!("failed to write {}", args.output))?;
 
     let msg_count = tera_context.get("messages").and_then(|v| v.as_array()).map(|a| a.len()).unwrap_or(0);
-    let dev_count = tera_context.get("devices").and_then(|v| v.as_array()).map(|a| a.len()).unwrap_or(0);
+    let ep_count = tera_context.get("endpoints").and_then(|v| v.as_array()).map(|a| a.len()).unwrap_or(0);
     eprintln!(
-        "Wrote {} messages, {} devices to {}",
-        msg_count, dev_count, args.output
+        "Wrote {} messages, {} endpoints to {}",
+        msg_count, ep_count, args.output
     );
     Ok(())
 }
@@ -60,7 +60,6 @@ fn main() -> anyhow::Result<()> {
 struct TemplateCtx {
     robot: RobotCtx,
     messages: Vec<MessageCtx>,
-    devices: Vec<DeviceCtx>,
     endpoints: Vec<EndpointCtx>,
 }
 
@@ -74,21 +73,10 @@ struct RobotCtx {
     multicast_addr: String,
 }
 
-#[derive(Serialize)]
-struct DeviceCtx {
-    name: String,
-    id: u32,
-    description: String,
-    mac: String,
-    mdns: String,
-    endpoints: Vec<EndpointCtx>,
-}
-
 #[derive(Serialize, Clone)]
 struct EndpointCtx {
     name: String,
     id: u32,
-    device_name: String,
     const_name: String,
     interfaces: Vec<String>,
     subscribes: Vec<SubscribeCtx>,
@@ -122,26 +110,26 @@ struct FieldCtx {
 
 fn build_template_context(cfg: &RobotConfig) -> anyhow::Result<TeraContext> {
     let mut messages: Vec<MessageCtx> = Vec::new();
-    let mut devices: Vec<DeviceCtx> = Vec::new();
     let mut endpoints: Vec<EndpointCtx> = Vec::new();
 
-    let mut iface_names: Vec<&String> = cfg.interfaces.keys().collect();
-    iface_names.sort();
-    for iface_name in iface_names {
-        let iface = &cfg.interfaces[iface_name];
-        let mut msg_names: Vec<&String> = iface.messages.keys().collect();
-        msg_names.sort();
-        for msg_name in msg_names {
-            messages.push(message_to_ctx(msg_name, &iface.messages[msg_name])?);
-        }
+    let mut msg_names: Vec<&String> = cfg.messages.keys().collect();
+    msg_names.sort();
+    for msg_name in msg_names {
+        messages.push(message_to_ctx(msg_name, &cfg.messages[msg_name])?);
     }
 
-    let mut dev_names: Vec<&String> = cfg.devices.keys().collect();
-    dev_names.sort();
-    for dev_name in dev_names {
-        let dev_ctx = device_to_ctx(dev_name, &cfg.devices[dev_name]);
-        endpoints.extend(dev_ctx.endpoints.iter().cloned());
-        devices.push(dev_ctx);
+    let mut ep_names: Vec<&String> = cfg.endpoints.keys().collect();
+    ep_names.sort();
+    for ep_name in ep_names {
+        let ep = &cfg.endpoints[ep_name];
+        endpoints.push(EndpointCtx {
+            name: ep_name.clone(),
+            id: fnv1a_32(&ep_name),
+            const_name: to_const_ident(ep_name),
+            interfaces: ep.interfaces.clone(),
+            subscribes: ep.subscribes.iter().map(subscribe_to_ctx).collect(),
+            description: ep.description.clone().unwrap_or_default(),
+        });
     }
     endpoints.sort_by(|a, b| a.const_name.cmp(&b.const_name));
 
@@ -155,40 +143,10 @@ fn build_template_context(cfg: &RobotConfig) -> anyhow::Result<TeraContext> {
             multicast_addr: cfg.multicast_addr.clone().unwrap_or("224.0.0.1".to_string()),
         },
         messages,
-        devices,
         endpoints,
     };
     let ctx = TeraContext::from_serialize(&template_ctx)?;
     Ok(ctx)
-}
-
-fn device_to_ctx(name: &str, dev: &DeviceConfig) -> DeviceCtx {
-    let mut ep_names: Vec<&String> = dev.endpoints.keys().collect();
-    ep_names.sort();
-    let endpoints: Vec<EndpointCtx> = ep_names
-        .into_iter()
-        .map(|ep_name| {
-            let ep = &dev.endpoints[ep_name];
-            EndpointCtx {
-                name: ep_name.clone(),
-                id: fnv1a_32(&ep_name),
-                device_name: name.to_string(),
-                const_name: format!("{}_{}", to_const_ident(name), to_const_ident(ep_name)),
-                interfaces: ep.interfaces.clone(),
-                subscribes: ep.subscribes.iter().map(subscribe_to_ctx).collect(),
-                description: ep.description.clone().unwrap_or_default(),
-            }
-        })
-        .collect();
-
-    DeviceCtx {
-        name: name.to_string(),
-        id: fnv1a_32(name),
-        description: dev.description.clone().unwrap_or_default(),
-        mac: dev.mac.clone().unwrap_or_default(),
-        mdns: dev.mdns.clone().unwrap_or_default(),
-        endpoints,
-    }
 }
 
 fn subscribe_to_ctx(sub: &SubscribeConfig) -> SubscribeCtx {

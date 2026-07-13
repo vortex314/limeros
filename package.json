@@ -1,0 +1,5 @@
+{
+  "dependencies": {
+    "deepseek-tui": "^0.8.47"
+  }
+}

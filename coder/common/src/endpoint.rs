@@ -34,7 +34,7 @@ impl Endpoint {
         self.node.bind_unicast().await
     }
 
-    pub async fn broker_handshake(&mut self) -> Result<()> {
+    pub async fn broker_handshake(&self) -> Result<()> {
         loop {
             let announce_payload = EndpointAnnounce {
                 id: Some(self.id),
@@ -105,8 +105,16 @@ impl Endpoint {
                 if let Ok(reply) =
                     EndpointAnnounceReply::from_bytes(message.payload.as_deref().unwrap_or(&[]))
                 {
-                    info!("Received EndpointAnnounceReply from {}: {:?}", addr, reply);
-                    self.broker_addr.lock().await.replace(addr);
+                    if self.broker_addr.lock().await.is_none() {
+                        info!("Setting broker address to {}", addr);
+                        self.broker_addr.lock().await.replace(addr);
+                    } else if (*self.broker_addr.lock().await != Some(addr)) {
+                        warn!(
+                            "Received EndpointAnnounceReply from unexpected broker address {} (expected {})",
+                            addr,
+                            self.broker_addr.lock().await.unwrap()
+                        );
+                    }
                 } else {
                     warn!("Failed to decode EndpointAnnounceReply from {}", addr);
                 }

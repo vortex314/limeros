@@ -5,106 +5,55 @@ robot "ronald" {
   broker_port   = 50001
   multicast_addr = "224.0.0.1"
 
-  device "broker" {
-    description = "Message broker for the hoverboard"
-    mac         = "00:1A:7D:DA:71:12"
-    mdns        = "broker"
 
-    endpoint "broker" {
+  endpoint "broker" {
       services    = [$ { message.EndpointAnnounce }, $ { message.EndpointAnnounceReply }, $ { message.PingRequest }, $ { message.PingReply }]
       description = "Message broker for the hoverboard"
     }
-  }
-
-  device "pinger" {
-    description = "Pinger device for testing"
-    mac         = "00:1A:7D:DA:71:18"
-    mdns        = "pinger"
-
-    endpoint "pinger" {
+ 
+  endpoint "pinger" {
       services    = [$ { message.PingRequest }, $ { message.PingReply }]
       description = "Pinger device for testing"
     }
-  }
-
-  device "sniffer" {
-    description = "Sniffer device for all messages"
-    mac         = "00:1A:7D:DA:71:17"
-    mdns        = "sniffer"
-
-    endpoint "sniffer" {
+ 
+  endpoint "sniffer" {
       subscribes  = [{ src = null msg_type = null dst = null }]
     }
 
-    endpoint "tui_sniffer" {
+  endpoint "tui_sniffer" {
       description = "Sniffer device for all messages"
       subscribes  = [{ src = null msg_type = null dst = null }]
     }
 
-  }
-
-  device compass {
-    description = "Compass device"
-    mac         = "00:1A:7D:DA:71:19"
-    mdns        = "compass"
-
-    endpoint "compass" {
+  endpoint "compass" {
       services    = [$ { message.SysRequest }]
       events      = [$ { message.SysEvent } , ${ message.CompassEvent}]
       description = "Compass device for the hoverboard"
     }
-  }
 
-  device "hoverboard" {
-    description = "Motor controller for hoverboard"
-    mac         = "00:1A:7D:DA:71:13"
-    mdns        = "hoverboard"
-
-    endpoint "hoverboard" {
+  endpoint "hoverboard" {
       services    = [$ { message.HoverboardRequest }, $ { message.SysRequest }]
       events      = [$ { message.HoverboardEvent }, $ { message.SysEvent }]
       replies     = [$ { message.GenericReply }, $ { message.SysReply }]
       description = "Hoverboard to drive the mower"
     }
-  }
-
-  device "logger" {
-    description = "Logger device"
-    mac         = "00:1A:7D:DA:71:16"
-    mdns        = "logger"
-
-    endpoint "logger" {
+  
+  endpoint "logger" {
       description = "Logger interface for the hoverboard"
       subscribes  = [{ src = "hoverboard" msg_type = "HoverboardEvent" dst = null }]
     }
 
-  }
-
-  device "ps4" {
-    description = "PS4 controller for hoverboard"
-    mac         = "00:1A:7D:DA:71:14"
-    mdns        = "ps4"
-
-    endpoint "ps4" {
+  endpoint "ps4" {
       description = "PS4 controller for the hoverboard"
       services    = [$ { message.Ps4Request }, $ { message.SysRequest }]
       events      = [$ { message.Ps4Event }, $ { message.SysEvent }]
       replies    = [$ { message.GenericReply }, $ { message.SysReply }]
     }
 
-  }
-
-  device "mower" {
-    description = "Mower device"
-    mac         = "00:1A:7D:DA:71:15"
-    mdns        = "mower"
-
-    endpoint "mower" {
+  endpoint "mower" {
       services    = [$ { message.SystemRequest }]
       description = "System interface for the mower"
     }
-
-  }
 
   message "HoverboardRequest" {
     description = "Request command for hoverboard drive"
@@ -351,6 +300,8 @@ robot "ronald" {
   }
 
   message EndpointAnnounceReply {
+    field "utc" { id = 0 type = "uint64"  description = "Timestamp in milliseconds since epoch"}
+    description = "Endpoint announce reply message for service discovery"
   }
 
 

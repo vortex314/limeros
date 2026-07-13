@@ -6,7 +6,7 @@ pub mod node;
 pub mod endpoint;
 pub mod base_message;
 
-pub use config::{DeviceConfig, EndpointConfig, InterfaceConfig, MessageConfig, RobotConfig, SubscribeConfig};
+pub use config::{EndpointConfig, MessageConfig, RobotConfig, SubscribeConfig};
 pub use logger::init;
 pub use config::load_robot_config;
 pub use fnv::fnv1a_32;

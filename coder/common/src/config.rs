@@ -10,18 +10,21 @@
 //!
 //! let cfg = load_robot_config("hcl/robot.hcl").unwrap();
 //! println!("Robot: {} (model {})", cfg.name, cfg.model);
-//! for (name, dev) in &cfg.devices {
-//!     println!("  device {name}: mac={}", dev.mac.as_deref().unwrap_or("?"));
+//! for (name, ep) in &cfg.endpoints {
+//!     println!("  endpoint {name}: {:?}", ep.services);
 //! }
 //! ```
 
 use hcl::template::{Element, Template};
 use hcl::{Block, Body, Expression, TemplateExpr, TraversalOperator};
+use log::info;
 use regex::Regex;
 use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
 use std::str::FromStr;
+
+use crate::fnv1a_32;
 
 // ── Public types ──────────────────────────────────────────────────────────
 
@@ -34,53 +37,32 @@ pub struct RobotConfig {
     pub model: String,
     /// Multicast port for the robot.
     pub multicast_port: u16,
+    /// Broker port for the robot.
+    pub broker_port: u16,
     /// Multicast address for the robot.
     pub multicast_addr: Option<String>,
     /// Optional human-readable description.
     pub description: Option<String>,
-    /// Named devices, keyed by label.
-    pub devices: HashMap<String, DeviceConfig>,
-    /// Named interfaces, keyed by label.
-    pub interfaces: HashMap<String, InterfaceConfig>,
+    /// Named endpoints, keyed by label.
+    pub endpoints: HashMap<String, EndpointConfig>,
+    /// Named messages, keyed by label.
+    pub messages: HashMap<String, MessageConfig>,
+    pub id_map: HashMap<u32, String>,
 }
 
 impl RobotConfig {
-    /// Resolve an interface reference string (e.g. `"interface.HoverboardDrive"`
-    /// or just `"HoverboardDrive"`) to the corresponding [`InterfaceConfig`].
-    ///
-    /// Returns `None` if the referenced interface is not defined.
-    pub fn resolve_interface(&self, interface_ref: &str) -> Option<&InterfaceConfig> {
-        let key = interface_ref.strip_prefix("interface.").unwrap_or(interface_ref);
-        self.interfaces.get(key)
-    }
-
-    /// Resolve the interface for a given endpoint on a device.
-    ///
-    /// Returns `None` if the device, endpoint, or referenced interface is not found.
-    pub fn resolve_endpoint_interface(
-        &self,
-        device_name: &str,
-        endpoint_name: &str,
-    ) -> Option<&InterfaceConfig> {
-        let device = self.devices.get(device_name)?;
-        let endpoint = device.endpoints.get(endpoint_name)?;
-        let interface_ref = endpoint.interfaces.first()?;
-        self.resolve_interface(interface_ref)
-    }
-
     pub fn load_from_file(path: impl AsRef<Path>) -> anyhow::Result<Self> {
         load_robot_config(path)
     }
-}
 
-/// A hardware device with network identity and endpoints.
-#[derive(Debug, Clone)]
-pub struct DeviceConfig {
-    pub description: Option<String>,
-    pub mac: Option<String>,
-    pub mdns: Option<String>,
-    /// Endpoints exposed by this device, keyed by label.
-    pub endpoints: HashMap<String, EndpointConfig>,
+
+
+    pub fn id_to_name(&self, id: Option<u32>) -> String {
+        match id {
+            Some(id) => self.id_map.get(&id).cloned().unwrap_or_else(|| id.to_string()),
+            None => "None".to_string(),
+        }
+    }
 }
 
 /// An endpoint on a device, referencing an interface.
@@ -100,14 +82,6 @@ pub struct SubscribeConfig {
     pub src: Option<String>,
     pub msg_type: Option<String>,
     pub dst: Option<String>,
-}
-
-/// A message-based interface definition.
-#[derive(Debug, Clone)]
-pub struct InterfaceConfig {
-    pub description: Option<String>,
-    /// Messages defined in this interface, keyed by label.
-    pub messages: HashMap<String, MessageConfig>,
 }
 
 /// A message type with named fields, kept in declaration order.
@@ -223,46 +197,44 @@ pub fn parse_robot_body(body: &Body) -> anyhow::Result<RobotConfig> {
 
     let inner = robot_block.body();
 
-    let mut interfaces = parse_labeled_blocks(inner, "interface", parse_interface)?;
-    let root_messages = parse_labeled_blocks(inner, "message", parse_message)?;
-    if !root_messages.is_empty() {
-        interfaces.insert(
-            "_root".to_string(),
-            InterfaceConfig {
-                description: Some("Synthetic interface for top-level robot messages".to_string()),
-                messages: root_messages,
-            },
-        );
+    let messages = parse_labeled_blocks(inner, "message", parse_message)?;
+    let endpoints = parse_labeled_blocks(inner, "endpoint", parse_endpoint)?;
+
+    let mut id_map: HashMap<u32, String> = messages
+        .keys()
+        .map(|msg_name| {
+            let id = fnv1a_32(msg_name);
+            (id, msg_name.clone())
+        })
+        .collect();
+    for (ep_name, _) in &endpoints {
+        let id = fnv1a_32(ep_name);
+        id_map.insert(id, ep_name.clone());
     }
+
+    // list all known names
+    id_map.iter().for_each(|(id, name)| {
+        info!("Known endpoint: {} -> {}", id, name);
+    });
 
     Ok(RobotConfig {
         model: get_attr_string(inner, "model")?,
         description: get_attr_optional(inner, "description"),
-        devices: parse_labeled_blocks(inner, "device", parse_device)?,
-        interfaces,
+        endpoints,
+        messages,
         name,
         multicast_port: get_attr_optional(inner, "multicast_port")
             .and_then(|s| s.parse::<u16>().ok())
             .unwrap_or(0),
+        broker_port: get_attr_optional(inner, "broker_port")
+            .and_then(|s| s.parse::<u16>().ok())
+            .unwrap_or(0),
         multicast_addr: get_attr_optional(inner, "multicast_addr"),
+        id_map,
     })
 }
 
 // ── Block parsers ─────────────────────────────────────────────────────────
-
-fn parse_device(block: &Block) -> anyhow::Result<(String, DeviceConfig)> {
-    let name = label(block);
-    let body = block.body();
-    Ok((
-        name,
-        DeviceConfig {
-            description: get_attr_optional(body, "description"),
-            mac: get_attr_optional(body, "mac"),
-            mdns: get_attr_optional(body, "mdns"),
-            endpoints: parse_labeled_blocks(body, "endpoint", parse_endpoint)?,
-        },
-    ))
-}
 
 fn parse_endpoint(block: &Block) -> anyhow::Result<(String, EndpointConfig)> {
     let name = label(block);
@@ -279,19 +251,6 @@ fn parse_endpoint(block: &Block) -> anyhow::Result<(String, EndpointConfig)> {
         },
     ))
 }
-
-fn parse_interface(block: &Block) -> anyhow::Result<(String, InterfaceConfig)> {
-    let name = label(block);
-    let body = block.body();
-    Ok((
-        name,
-        InterfaceConfig {
-            description: get_attr_optional(body, "description"),
-            messages: parse_labeled_blocks(body, "message", parse_message)?,
-        },
-    ))
-}
-
 
 fn parse_message(block: &Block) -> anyhow::Result<(String, MessageConfig)> {
     let name = label(block);
