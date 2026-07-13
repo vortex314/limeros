@@ -1,7 +1,20 @@
 // Auto-generated from robot.hcl — do not edit by hand.
 // Every field is `Option<T>`.
 // Messages are encoded as CBOR maps keyed by field id.
-use common::base_message::Msg;
+use anyhow::Context;
+
+pub trait Msg: Sized + serde::Serialize + serde::de::DeserializeOwned {
+    fn id() -> u32;
+    fn name() -> &'static str;
+
+    fn from_bytes(data: &[u8]) -> anyhow::Result<Self> {
+        cbor2::from_reader(data).context("Failed to deserialize from CBOR")
+    }
+
+    fn to_bytes(&self) -> anyhow::Result<Vec<u8>> {
+        cbor2::to_vec(self).context("Failed to serialize to CBOR")
+    }
+}
 
 pub const MULTICAST_PORT : u16 = {{ robot.multicast_port }};
 pub const MULTICAST_ADDR : &str = "{{ robot.multicast_addr }}";
@@ -24,12 +37,31 @@ pub struct {{ msg.name }} {
 {%- endfor %}
 }
 
-impl Msg<{{ msg.name }}> for {{ msg.name }} {
-    fn id() -> u32 {
+impl {{ msg.name }} {
+    pub fn id() -> u32 {
         {{ msg.id }}
     }
-    fn name() -> &'static str {
+
+    pub fn name() -> &'static str {
         "{{ msg.name }}"
+    }
+
+    pub fn from_bytes(data: &[u8]) -> anyhow::Result<Self> {
+        cbor2::from_reader(data).context("Failed to deserialize from CBOR")
+    }
+
+    pub fn to_bytes(&self) -> anyhow::Result<Vec<u8>> {
+        cbor2::to_vec(self).context("Failed to serialize to CBOR")
+    }
+}
+
+impl Msg for {{ msg.name }} {
+    fn id() -> u32 {
+        Self::id()
+    }
+
+    fn name() -> &'static str {
+        Self::name()
     }
 }
 

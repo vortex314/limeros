@@ -233,6 +233,10 @@ fn message_to_ctx(name: &str, msg: &MessageConfig) -> anyhow::Result<MessageCtx>
 // ── Type mapping ─────────────────────────────────────────────────────────
 
 fn hcl_type_to_rust(hcl: &str) -> anyhow::Result<String> {
+    if let Some(inner) = hcl.strip_suffix("[]") {
+        return Ok(format!("Vec<{}>", hcl_type_to_rust(inner)?));
+    }
+
     let rust = match hcl {
         "uint32" => "u32",
         "uint64" => "u64",
@@ -249,6 +253,10 @@ fn hcl_type_to_rust(hcl: &str) -> anyhow::Result<String> {
 }
 
 fn hcl_type_to_cpp(hcl: &str) -> anyhow::Result<String> {
+    if let Some(inner) = hcl.strip_suffix("[]") {
+        return Ok(format!("std::vector<{}>", hcl_type_to_cpp(inner)?));
+    }
+
     let cpp = match hcl {
         "uint32" => "uint32_t",
         "uint64" => "uint64_t",

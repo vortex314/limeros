@@ -229,7 +229,7 @@ void HoverboardActor::handle_uart_bytes(const Bytes &data)
             DEBUG("COBS frame received (%d bytes)", uart_read_buffer.size());
             (void)cobs_decode(uart_read_buffer)
                 .and_then(check_crc)
-                .and_then(HoverboardEventRaw::fromCbor)
+                .and_then(HoverboardEventRaw::deserialize)
                 .and_then([&](HoverboardEventRaw *info)
                           {
                             HoverboardEvent* event = new HoverboardEvent();

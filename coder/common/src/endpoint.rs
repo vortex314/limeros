@@ -3,10 +3,10 @@ use tokio::sync::Mutex;
 use tokio::time::sleep;
 use std::time::Duration;
 
-use crate::base_message::{Msg, EndpointAnnounce, EndpointAnnounceReply, UdpMessage};
 use crate::node::UdpNode;
 use crate::fnv::fnv1a_32;
 use anyhow::Result;
+use generated::generated::{EndpointAnnounce, EndpointAnnounceReply, Envelope};
 use log::{info, warn};
 
 pub struct Endpoint {
@@ -37,15 +37,20 @@ impl Endpoint {
     pub async fn broker_handshake(&mut self) -> Result<()> {
         loop {
             let announce_payload = EndpointAnnounce {
-                endpoint_id: Some(self.id),
-                endpoint_name: Some(self.name.clone()),
+                id: Some(self.id),
+                name: Some(self.name.clone()),
+                services: None,
+                events: None,
+                replies: None,
+                subscribes: None,
             }
             .to_bytes()?;
-            let udp_message = UdpMessage {
+            let udp_message = Envelope {
                 src: Some(self.id),
                 dst: None,
                 msg_type: Some(EndpointAnnounce::id()),
-                req_id: None,
+                request_id: None,
+                instance_id: None,
                 payload: Some(announce_payload),
             };
             self.node.send_multicast(&udp_message.to_bytes()?).await?;
@@ -79,22 +84,23 @@ impl Endpoint {
 
     pub async fn announce(&self, announce: EndpointAnnounce) -> Result<()> {
         let payload = announce.to_bytes()?;
-        let envelope = UdpMessage {
+        let envelope = Envelope {
             src: Some(self.id),
             dst: None,
             msg_type: Some(EndpointAnnounce::id()),
-            req_id: None,
+            request_id: None,
+            instance_id: None,
             payload: Some(payload),
         };
         let packet = envelope.to_bytes()?;
         self.node.send_multicast(&packet).await
     }
 
-    pub async fn receive(&self) -> Result<(UdpMessage, std::net::SocketAddr)> {
+    pub async fn receive(&self) -> Result<(Envelope, std::net::SocketAddr)> {
         let mut buf = [0u8; 1500];
         let (len, addr) = self.node.receive_unicast(&mut buf).await?;
         let packet = &buf[..len];
-        if let Ok(message) = UdpMessage::from_bytes(packet) {
+        if let Ok(message) = Envelope::from_bytes(packet) {
             if message.msg_type == Some(EndpointAnnounceReply::id()) {
                 if let Ok(reply) =
                     EndpointAnnounceReply::from_bytes(message.payload.as_deref().unwrap_or(&[]))
@@ -117,7 +123,7 @@ impl Endpoint {
         }
     }
 
-    pub async fn send(&self, message: UdpMessage) -> Result<()> {
+    pub async fn send(&self, message: Envelope) -> Result<()> {
         if let Some(broker_addr) = *self.broker_addr.lock().await {
             let packet = message.to_bytes()?;
             self.node.send_unicast(&packet, broker_addr).await

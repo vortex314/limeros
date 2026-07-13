@@ -24,7 +24,7 @@ pub fn show_cbor_bytes(bytes: &[u8]) -> String {
         .map(|v| format!("{:?}", v))
         .unwrap_or_else(|_| format!("Invalid CBOR: {:?}", bytes))
 }
-
+/* 
 impl Msg<UdpMessage> for UdpMessage {
     fn id() -> u32 {
         1293877827
@@ -82,3 +82,4 @@ pub struct EndpointAnnounceReply {
     pub broker_id: Option<u32>,
 }
 
+*/

@@ -1,12 +1,12 @@
 use anyhow::{Context, Result};
 use clap::Parser;
-use common::base_message::{EndpointAnnounce, Msg, UdpMessage};
 use common::endpoint::Endpoint;
 use common::fnv::fnv1a_32;
 use common::load_robot_config;
 use common::logger;
 use common::node::UdpNode;
-use generated::generated;
+use generated::generated as msgs;
+use msgs::{EndpointAnnounce, EndpointAnnounceReply, Envelope};
 use log::info;
 use std::collections::HashMap;
 use std::io;
@@ -36,7 +36,7 @@ struct Args {
     #[arg(long, default_value = "tui_sniffer")]
     endpoint: String,
 
-    #[arg(long, default_value = generated::MULTICAST_ADDR)]
+    #[arg(long, default_value = msgs::MULTICAST_ADDR)]
     group: String,
 
     #[arg(long)]
@@ -94,9 +94,7 @@ impl AppState {
 /// Deserialize a payload into a known message struct (Debug display),
 /// falling back to CBOR diagnostic notation if the type is unknown or
 /// deserialization fails.
-fn format_payload_typed(msg_type_id: u32, payload: Option<&[u8]>) -> String {
-    use common::base_message::{EndpointAnnounce, EndpointAnnounceReply, UdpMessage};
-
+fn format_payload_typed(msg_type: Option<u32>, payload: Option<&[u8]>) -> String {
     let bytes = match payload {
         Some(b) => b,
         None => return "-".into(),
@@ -106,7 +104,7 @@ fn format_payload_typed(msg_type_id: u32, payload: Option<&[u8]>) -> String {
     // We match on the numeric ID so only one deserialization is attempted.
     macro_rules! try_deser {
         ($ty:ty) => {{
-            if msg_type_id == <$ty>::id() {
+            if msg_type == Some(<$ty>::id()) {
                 if let Ok(m) = <$ty>::from_bytes(bytes) {
                     return format!("{:?}", m);
                 }
@@ -116,18 +114,18 @@ fn format_payload_typed(msg_type_id: u32, payload: Option<&[u8]>) -> String {
 
     try_deser!(EndpointAnnounce);
     try_deser!(EndpointAnnounceReply);
-    try_deser!(UdpMessage);
-    try_deser!(generated::BrokerSubscribeRequest);
-    try_deser!(generated::HoverboardEvent);
-    try_deser!(generated::HoverboardReply);
-    try_deser!(generated::HoverboardRequest);
-    try_deser!(generated::PingReply);
-    try_deser!(generated::PingRequest);
-    try_deser!(generated::Ps4Event);
-    try_deser!(generated::Ps4Request);
-    try_deser!(generated::SysEvent);
-    try_deser!(generated::SysReply);
-    try_deser!(generated::SysRequest);
+    try_deser!(Envelope);
+    try_deser!(msgs::BrokerSubscribeRequest);
+    try_deser!(msgs::HoverboardEvent);
+    try_deser!(msgs::GenericReply);
+    try_deser!(msgs::HoverboardRequest);
+    try_deser!(msgs::PingReply);
+    try_deser!(msgs::PingRequest);
+    try_deser!(msgs::Ps4Event);
+    try_deser!(msgs::Ps4Request);
+    try_deser!(msgs::SysEvent);
+    try_deser!(msgs::SysReply);
+    try_deser!(msgs::SysRequest);
 
     // Fallback: generic CBOR diagnostic
     cbor2::from_slice::<cbor2::Value>(bytes)
@@ -135,29 +133,12 @@ fn format_payload_typed(msg_type_id: u32, payload: Option<&[u8]>) -> String {
         .unwrap_or_else(|_| format!("<{}b>", bytes.len()))
 }
 
-fn msg_type_name(id: u32) -> &'static str {
-    match id {
-        3190208493 => "BrokerSubscribeReq",
-        2371693343 => "EndpointAnnounce",
-        3238220441 => "EndpointAnnReply",
-        1293877827 => "UdpMessage",
-        104988481 => "HoverboardEvent",
-        2095960949 => "HoverboardReply",
-        2735870956 => "HoverboardRequest",
-        1594103907 => "PingReply",
-        31253678 => "PingRequest",
-        4282593576 => "Ps4Event",
-        1992038561 => "Ps4Request",
-        924742914 => "SysEvent",
-        2952492394 => "SysReply",
-        2966412411 => "SysRequest",
-        _ => "?",
-    }
-}
-
 fn fmt_endpoint(name_map: &HashMap<u32, String>, id: Option<u32>) -> String {
     match id {
-        Some(v) => name_map.get(&v).cloned().unwrap_or_else(|| v.to_string()),
+        Some(v) => {
+            let id_hash = fnv1a_32(&v.to_string());
+            name_map.get(&id_hash).cloned().unwrap_or_else(|| v.to_string())
+        }
         None => "-".into(),
     }
 }
@@ -176,7 +157,7 @@ fn build_name_map(config_path: &str) -> HashMap<u32, String> {
 }
 
 fn process_message(
-    msg: &UdpMessage,
+    msg: &Envelope,
     name_map: &mut HashMap<u32, String>,
     count: &mut u64,
 ) -> LogEntry {
@@ -184,7 +165,7 @@ fn process_message(
     if msg.msg_type == Some(EndpointAnnounce::id()) {
         if let Some(payload) = &msg.payload {
             if let Ok(announce) = EndpointAnnounce::from_bytes(payload) {
-                if let (Some(ep_id), Some(ep_name)) = (announce.endpoint_id, announce.endpoint_name)
+                if let (Some(ep_id), Some(ep_name)) = (announce.id, announce.name)
                 {
                     name_map.entry(ep_id).or_insert_with(|| {
                         info!("Discovered endpoint: {} (id={})", ep_name, ep_id);
@@ -201,9 +182,9 @@ fn process_message(
         timestamp: chrono::Local::now().format("%H:%M:%S%.3f").to_string(),
         src: fmt_endpoint(name_map, msg.src),
         dst: fmt_endpoint(name_map, msg.dst),
-        msg_type: msg_type_name(msg.msg_type.unwrap_or(0)).to_string(),
-        req_id: msg.req_id.map(|v| v.to_string()).unwrap_or_default(),
-        payload: format_payload_typed(msg.msg_type.unwrap_or(0), msg.payload.as_deref()),
+        msg_type: msg.msg_type.map(|v| v.to_string()).unwrap_or_else(|| "-".to_string()),
+        req_id: msg.request_id.map(|v| v.to_string()).unwrap_or_default(),
+        payload: format_payload_typed(msg.msg_type, msg.payload.as_deref()),
     }
 }
 
@@ -226,16 +207,17 @@ async fn run_network(
     endpoint.broker_handshake().await?;
     info!("Broker found, subscribing to all messages");
 
-    let sub_req = generated::BrokerSubscribeRequest {
+    let sub_req = msgs::BrokerSubscribeRequest {
         src: None,
         msg_type: None,
     };
     endpoint
-        .send(UdpMessage {
+        .send(Envelope {
             src: Some(endpoint_id),
             dst: None,
-            msg_type: Some(generated::BrokerSubscribeRequest::id()),
-            req_id: None,
+            msg_type: Some(msgs::BrokerSubscribeRequest::id()),
+            request_id: None,
+            instance_id: None,
             payload: Some(sub_req.to_bytes()?),
         })
         .await?;
@@ -441,7 +423,7 @@ fn main() -> Result<()> {
     logger::init();
     let args = Args::parse();
 
-    let port = args.port.unwrap_or(generated::MULTICAST_PORT as u16);
+    let port = args.port.unwrap_or(msgs::MULTICAST_PORT as u16);
     let group: Ipv4Addr = args
         .group
         .parse()

@@ -43,6 +43,18 @@ robot "ronald" {
 
   }
 
+  device compass {
+    description = "Compass device"
+    mac         = "00:1A:7D:DA:71:19"
+    mdns        = "compass"
+
+    endpoint "compass" {
+      services    = [$ { message.SysRequest }]
+      events      = [$ { message.SysEvent } , ${ message.CompassEvent}]
+      description = "Compass device for the hoverboard"
+    }
+  }
+
   device "hoverboard" {
     description = "Motor controller for hoverboard"
     mac         = "00:1A:7D:DA:71:13"
@@ -51,7 +63,7 @@ robot "ronald" {
     endpoint "hoverboard" {
       services    = [$ { message.HoverboardRequest }, $ { message.SysRequest }]
       events      = [$ { message.HoverboardEvent }, $ { message.SysEvent }]
-      replies     = [$ { message.HoverboardReply }, $ { message.SysReply }]
+      replies     = [$ { message.GenericReply }, $ { message.SysReply }]
       description = "Hoverboard to drive the mower"
     }
   }
@@ -77,6 +89,7 @@ robot "ronald" {
       description = "PS4 controller for the hoverboard"
       services    = [$ { message.Ps4Request }, $ { message.SysRequest }]
       events      = [$ { message.Ps4Event }, $ { message.SysEvent }]
+      replies    = [$ { message.GenericReply }, $ { message.SysReply }]
     }
 
   }
@@ -100,11 +113,12 @@ robot "ronald" {
     field "steer" { id = 2 type = "int32" unit = "deg" description = "Steering command for the hoverboard" }
   }
 
-  message "HoverboardReply" {
+  message "GenericReply" {
     description = "Reply for hoverboard request"
     field "req_id" { id = 0 type = "uint32" description = "For request/reply matching, 0 if not a request/reply" }
-    field "error_code" { id = 1 type = "int32" }
-    field "message" { id = 2 type = "string" }
+    field "error_code" { id = 1 type = "uint32" description = "Error code, 0 if no error" }
+    field "message" { id = 2 type = "string" description = "Error message or additional information" }
+    field "msg_type" { id = 3 type = "uint32" description = "Message type identifier , the original request" }
   }
 
   message "HoverboardEvent" {
@@ -165,6 +179,19 @@ robot "ronald" {
     field "str_coef" { id = 43 type = "int32" description = "Steer Coefficient *10" }
     field "batv" { id = 44 type = "float" description = "Calibrated Battery Voltage *100" }
     field "temp" { id = 45 type = "float" description = "Calibrated Temperature C *10" }
+  }
+
+  message CompassEvent {
+    description = "Compass event message"
+    field "heading" { id = 0 type = "float" description = "Heading in degrees" }
+    field "pitch" { id = 1 type = "float" description = "Pitch in degrees" }
+    field "roll" { id = 2 type = "float" description = "Roll in degrees" }
+    field "mag_x" { id = 3 type = "float" description = "Magnetometer X axis in uT" }
+    field "mag_y" { id = 4 type = "float" description = "Magnetometer Y axis in uT" }
+    field "mag_z" { id = 5 type = "float" description = "Magnetometer Z axis in uT" }
+    field "accel_x" { id = 6 type = "float" description = "Accelerometer X axis in m/s^2" }
+    field "accel_y" { id = 7 type = "float" description = "Accelerometer Y axis in m/s^2" }
+    field "accel_z" { id = 8 type = "float" description = "Accelerometer Z axis in m/s^2" }
   }
 
   message "Ps4Event" {
@@ -301,6 +328,29 @@ robot "ronald" {
     field "temperature" { id = 0 type = "float"  description = "Current temperature in Celsius"}
     field "setpoint" { id = 1 type = "float"  description = "Setpoint temperature in Celsius"}
     field "heating" { id = 2 type = "bool"  description = "Heating status"}
+  }
+
+  message Envelope {
+    description = "Envelope message for encapsulating other messages"
+    field "src" { id = 0 type = "uint32"  description = "Source endpoint name"}
+    field "dst" { id = 1 type = "uint32"  description = "Destination endpoint name"}
+    field "msg_type" { id = 2 type = "uint32"  description = "Message type name"}
+    field "request_id" { id = 3 type = "uint32"  description = "Request ID for matching request/reply"}
+    field "instance_id" { id = 4 type = "uint32"  description = "Instance ID for matching request/reply"}
+    field "payload" { id = 5 type = "bytes"  description = "Serialized payload of the message"}
+  }
+
+  message EndpointAnnounce {
+    field "id" { id = 0 type = "uint32"  description = "Unique identifier for the announcing endpoint"}
+    description = "Endpoint announce message for service discovery"
+    field "name" { id = 1 type = "string"  description = "Name of the announcing endpoint"}
+    field "services" { id = 2 type = "uint32[]"  description = "List of services provided by the endpoint"}
+    field "events" { id = 3 type = "uint32[]"  description = "List of events emitted by the endpoint"}
+    field "replies" { id = 4 type = "uint32[]"  description = "List of replies supported by the endpoint"}
+    field "subscribes" { id = 5 type = "uint32[]"  description = "List of subscriptions for the endpoint"}
+  }
+
+  message EndpointAnnounceReply {
   }
 
 

@@ -1,8 +1,8 @@
 use anyhow::{Context, Result};
 use clap::Parser;
-use common::base_message::{Msg, UdpMessage};
 use common::{endpoint, fnv::fnv1a_32, logger, node::UdpNode};
-use generated::generated;
+use generated::generated as msgs;
+use msgs::{Envelope, PingReply, PingRequest};
 use log::{debug, info, warn};
 use tokio::join;
 use std::{
@@ -14,7 +14,7 @@ use std::{
 #[command(about = "Pinger endpoint announce client")]
 struct Args {
     /// Multicast group address.
-    #[arg(long, default_value = generated::MULTICAST_ADDR)]
+    #[arg(long, default_value = msgs::MULTICAST_ADDR)]
     group: String,
 
     /// UDP port (defaults to generated MULTICAST_PORT when omitted).
@@ -49,7 +49,7 @@ async fn main() -> Result<()> {
 
     let endpoint_id = fnv1a_32(&args.endpoint);
 
-    let port = args.port.unwrap_or(generated::MULTICAST_PORT as u16);
+    let port = args.port.unwrap_or(msgs::MULTICAST_PORT as u16);
     let mc_addr_str = &args.group;
     let group: Ipv4Addr = mc_addr_str
         .parse()
@@ -61,18 +61,22 @@ async fn main() -> Result<()> {
     pinger.broker_handshake().await?;
     let pinger = Arc::new(pinger);
     let pinger1 = pinger.clone();
+    let endpoint_name = args.endpoint.clone();
+    let endpoint_name_1 = endpoint_name.clone();
+    let endpoint_name_2 = endpoint_name.clone();
 
         let t1 = tokio::spawn(async move {
             loop {
-            let ping_request = generated::PingRequest {
+            let ping_request = PingRequest {
                 req_id: Some(1),
                 timestamp: Some(chrono::Utc::now().timestamp_millis() as u64),
             };
-            let udp_message = UdpMessage {
+            let udp_message = Envelope {
                 src: Some(endpoint_id),
-                dst: Some(endpoint_id),
-                msg_type: Some(generated::PingRequest::id()),
-                req_id: ping_request.req_id,
+                dst: Some(endpoint_id  ),
+                msg_type: Some(PingRequest::id()),
+                request_id: ping_request.req_id,
+                instance_id: None,
                 payload: Some(ping_request.to_bytes().unwrap()),
             };
             pinger1.send(udp_message).await.unwrap();
@@ -85,22 +89,23 @@ async fn main() -> Result<()> {
         let t2 = tokio::spawn(async move {
             loop {
                 let (reply, addr) = pinger.receive().await.unwrap();
-                if reply.msg_type == Some(generated::PingRequest::id()) {
-                    let ping_request = generated::PingRequest::from_bytes(&reply.payload.unwrap()).unwrap();
-                    debug!("Received PingRequest from broker at {}: {:?}", addr, ping_request);let ping_reply = generated::PingReply {
+                if reply.msg_type == Some(PingRequest::id()) {
+                    let ping_request = PingRequest::from_bytes(&reply.payload.unwrap()).unwrap();
+                    debug!("Received PingRequest from broker at {}: {:?}", addr, ping_request);let ping_reply = PingReply {
                         req_id: ping_request.req_id,
                         timestamp: Some(chrono::Utc::now().timestamp_micros() as u64),
                     };
-                    let reply_message = UdpMessage {
-                        src: Some(endpoint_id),
-                        dst: Some(reply.src.unwrap_or(0)),
-                        msg_type: Some(generated::PingReply::id()),
-                        req_id: ping_reply.req_id,
+                    let reply_message = Envelope {
+                        src: Some(fnv1a_32(&endpoint_name_2)),
+                        dst: reply.src.clone(),
+                        msg_type: Some(PingReply::id()),
+                        request_id: ping_reply.req_id,
+                        instance_id: None,
                         payload: Some(ping_reply.to_bytes().unwrap()),
                     };
                     let _ = pinger.send(reply_message).await;
-                } else if reply.msg_type == Some(generated::PingReply::id()) {
-                    let ping_reply = generated::PingReply::from_bytes(&reply.payload.unwrap()).unwrap();
+                } else if reply.msg_type == Some(PingReply::id()) {
+                    let ping_reply = PingReply::from_bytes(&reply.payload.unwrap()).unwrap();
                     debug!("Received PingReply from broker at {}: {:?}", addr, ping_reply);
                     let delta_ts = chrono::Utc::now().timestamp_micros() as u64 - ping_reply.timestamp.unwrap_or(0);
                     info!("Ping round-trip time: {} µs", delta_ts);

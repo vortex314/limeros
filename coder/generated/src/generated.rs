@@ -1,13 +1,28 @@
 // Auto-generated from robot.hcl — do not edit by hand.
 // Every field is `Option<T>`.
 // Messages are encoded as CBOR maps keyed by field id.
-use common::base_message::Msg;
+use anyhow::Context;
+
+pub trait Msg: Sized + serde::Serialize + serde::de::DeserializeOwned {
+    fn id() -> u32;
+    fn name() -> &'static str;
+
+    fn from_bytes(data: &[u8]) -> anyhow::Result<Self> {
+        cbor2::from_reader(data).context("Failed to deserialize from CBOR")
+    }
+
+    fn to_bytes(&self) -> anyhow::Result<Vec<u8>> {
+        cbor2::to_vec(self).context("Failed to serialize to CBOR")
+    }
+}
 
 pub const MULTICAST_PORT : u16 = 50000;
 pub const MULTICAST_ADDR : &str = "224.0.0.1";
 
 
 pub const BROKER_ID: u32 = 2490238132;
+
+pub const COMPASS_ID: u32 = 2753264687;
 
 pub const HOVERBOARD_ID: u32 = 1152836275;
 
@@ -35,12 +50,360 @@ pub struct BrokerSubscribeRequest {
     pub msg_type: Option<u32>,
 }
 
-impl Msg<BrokerSubscribeRequest> for BrokerSubscribeRequest {
-    fn id() -> u32 {
+impl BrokerSubscribeRequest {
+    pub fn id() -> u32 {
         3190208493
     }
-    fn name() -> &'static str {
+
+    pub fn name() -> &'static str {
         "BrokerSubscribeRequest"
+    }
+
+    pub fn from_bytes(data: &[u8]) -> anyhow::Result<Self> {
+        cbor2::from_reader(data).context("Failed to deserialize from CBOR")
+    }
+
+    pub fn to_bytes(&self) -> anyhow::Result<Vec<u8>> {
+        cbor2::to_vec(self).context("Failed to serialize to CBOR")
+    }
+}
+
+impl Msg for BrokerSubscribeRequest {
+    fn id() -> u32 {
+        Self::id()
+    }
+
+    fn name() -> &'static str {
+        Self::name()
+    }
+}
+
+
+
+#[derive(Debug, Clone, PartialEq, cbor2::Cbor)]
+pub struct CompassEvent {
+    /// Heading in degrees
+    #[cbor(key = 0)]
+    pub heading: Option<f32>,
+    /// Pitch in degrees
+    #[cbor(key = 1)]
+    pub pitch: Option<f32>,
+    /// Roll in degrees
+    #[cbor(key = 2)]
+    pub roll: Option<f32>,
+    /// Magnetometer X axis in uT
+    #[cbor(key = 3)]
+    pub mag_x: Option<f32>,
+    /// Magnetometer Y axis in uT
+    #[cbor(key = 4)]
+    pub mag_y: Option<f32>,
+    /// Magnetometer Z axis in uT
+    #[cbor(key = 5)]
+    pub mag_z: Option<f32>,
+    /// Accelerometer X axis in m/s^2
+    #[cbor(key = 6)]
+    pub accel_x: Option<f32>,
+    /// Accelerometer Y axis in m/s^2
+    #[cbor(key = 7)]
+    pub accel_y: Option<f32>,
+    /// Accelerometer Z axis in m/s^2
+    #[cbor(key = 8)]
+    pub accel_z: Option<f32>,
+}
+
+impl CompassEvent {
+    pub fn id() -> u32 {
+        3197332525
+    }
+
+    pub fn name() -> &'static str {
+        "CompassEvent"
+    }
+
+    pub fn from_bytes(data: &[u8]) -> anyhow::Result<Self> {
+        cbor2::from_reader(data).context("Failed to deserialize from CBOR")
+    }
+
+    pub fn to_bytes(&self) -> anyhow::Result<Vec<u8>> {
+        cbor2::to_vec(self).context("Failed to serialize to CBOR")
+    }
+}
+
+impl Msg for CompassEvent {
+    fn id() -> u32 {
+        Self::id()
+    }
+
+    fn name() -> &'static str {
+        Self::name()
+    }
+}
+
+
+
+#[derive(Debug, Clone, PartialEq, cbor2::Cbor)]
+pub struct DeviceAliveEvent {
+    #[cbor(key = 0)]
+    pub device: Option<String>,
+    #[cbor(key = 1)]
+    pub endpoint: Option<String>,
+    /// Timestamp in milliseconds since epoch
+    #[cbor(key = 2)]
+    pub timestamp: Option<u64>,
+}
+
+impl DeviceAliveEvent {
+    pub fn id() -> u32 {
+        2637772092
+    }
+
+    pub fn name() -> &'static str {
+        "DeviceAliveEvent"
+    }
+
+    pub fn from_bytes(data: &[u8]) -> anyhow::Result<Self> {
+        cbor2::from_reader(data).context("Failed to deserialize from CBOR")
+    }
+
+    pub fn to_bytes(&self) -> anyhow::Result<Vec<u8>> {
+        cbor2::to_vec(self).context("Failed to serialize to CBOR")
+    }
+}
+
+impl Msg for DeviceAliveEvent {
+    fn id() -> u32 {
+        Self::id()
+    }
+
+    fn name() -> &'static str {
+        Self::name()
+    }
+}
+
+
+
+#[derive(Debug, Clone, PartialEq, cbor2::Cbor)]
+pub struct EndpointAnnounce {
+    /// Unique identifier for the announcing endpoint
+    #[cbor(key = 0)]
+    pub id: Option<u32>,
+    /// Name of the announcing endpoint
+    #[cbor(key = 1)]
+    pub name: Option<String>,
+    /// List of services provided by the endpoint
+    #[cbor(key = 2)]
+    pub services: Option<Vec<u32>>,
+    /// List of events emitted by the endpoint
+    #[cbor(key = 3)]
+    pub events: Option<Vec<u32>>,
+    /// List of replies supported by the endpoint
+    #[cbor(key = 4)]
+    pub replies: Option<Vec<u32>>,
+    /// List of subscriptions for the endpoint
+    #[cbor(key = 5)]
+    pub subscribes: Option<Vec<u32>>,
+}
+
+impl EndpointAnnounce {
+    pub fn id() -> u32 {
+        2371693343
+    }
+
+    pub fn name() -> &'static str {
+        "EndpointAnnounce"
+    }
+
+    pub fn from_bytes(data: &[u8]) -> anyhow::Result<Self> {
+        cbor2::from_reader(data).context("Failed to deserialize from CBOR")
+    }
+
+    pub fn to_bytes(&self) -> anyhow::Result<Vec<u8>> {
+        cbor2::to_vec(self).context("Failed to serialize to CBOR")
+    }
+}
+
+impl Msg for EndpointAnnounce {
+    fn id() -> u32 {
+        Self::id()
+    }
+
+    fn name() -> &'static str {
+        Self::name()
+    }
+}
+
+
+
+#[derive(Debug, Clone, PartialEq, cbor2::Cbor)]
+pub struct EndpointAnnounceReply {
+}
+
+impl EndpointAnnounceReply {
+    pub fn id() -> u32 {
+        3238220441
+    }
+
+    pub fn name() -> &'static str {
+        "EndpointAnnounceReply"
+    }
+
+    pub fn from_bytes(data: &[u8]) -> anyhow::Result<Self> {
+        cbor2::from_reader(data).context("Failed to deserialize from CBOR")
+    }
+
+    pub fn to_bytes(&self) -> anyhow::Result<Vec<u8>> {
+        cbor2::to_vec(self).context("Failed to serialize to CBOR")
+    }
+}
+
+impl Msg for EndpointAnnounceReply {
+    fn id() -> u32 {
+        Self::id()
+    }
+
+    fn name() -> &'static str {
+        Self::name()
+    }
+}
+
+
+
+#[derive(Debug, Clone, PartialEq, cbor2::Cbor)]
+pub struct Envelope {
+    /// Source endpoint name
+    #[cbor(key = 0)]
+    pub src: Option<u32>,
+    /// Destination endpoint name
+    #[cbor(key = 1)]
+    pub dst: Option<u32>,
+    /// Message type name
+    #[cbor(key = 2)]
+    pub msg_type: Option<u32>,
+    /// Request ID for matching request/reply
+    #[cbor(key = 3)]
+    pub request_id: Option<u32>,
+    /// Instance ID for matching request/reply
+    #[cbor(key = 4)]
+    pub instance_id: Option<u32>,
+    /// Serialized payload of the message
+    #[cbor(key = 5)]
+    pub payload: Option<Vec<u8>>,
+}
+
+impl Envelope {
+    pub fn id() -> u32 {
+        1228864117
+    }
+
+    pub fn name() -> &'static str {
+        "Envelope"
+    }
+
+    pub fn from_bytes(data: &[u8]) -> anyhow::Result<Self> {
+        cbor2::from_reader(data).context("Failed to deserialize from CBOR")
+    }
+
+    pub fn to_bytes(&self) -> anyhow::Result<Vec<u8>> {
+        cbor2::to_vec(self).context("Failed to serialize to CBOR")
+    }
+}
+
+impl Msg for Envelope {
+    fn id() -> u32 {
+        Self::id()
+    }
+
+    fn name() -> &'static str {
+        Self::name()
+    }
+}
+
+
+
+#[derive(Debug, Clone, PartialEq, cbor2::Cbor)]
+pub struct GenericReply {
+    /// For request/reply matching, 0 if not a request/reply
+    #[cbor(key = 0)]
+    pub req_id: Option<u32>,
+    /// Error code, 0 if no error
+    #[cbor(key = 1)]
+    pub error_code: Option<u32>,
+    /// Error message or additional information
+    #[cbor(key = 2)]
+    pub message: Option<String>,
+    /// Message type identifier , the original request
+    #[cbor(key = 3)]
+    pub msg_type: Option<u32>,
+}
+
+impl GenericReply {
+    pub fn id() -> u32 {
+        2578784998
+    }
+
+    pub fn name() -> &'static str {
+        "GenericReply"
+    }
+
+    pub fn from_bytes(data: &[u8]) -> anyhow::Result<Self> {
+        cbor2::from_reader(data).context("Failed to deserialize from CBOR")
+    }
+
+    pub fn to_bytes(&self) -> anyhow::Result<Vec<u8>> {
+        cbor2::to_vec(self).context("Failed to serialize to CBOR")
+    }
+}
+
+impl Msg for GenericReply {
+    fn id() -> u32 {
+        Self::id()
+    }
+
+    fn name() -> &'static str {
+        Self::name()
+    }
+}
+
+
+
+#[derive(Debug, Clone, PartialEq, cbor2::Cbor)]
+pub struct HeatingEvent {
+    /// Current temperature in Celsius
+    #[cbor(key = 0)]
+    pub temperature: Option<f32>,
+    /// Setpoint temperature in Celsius
+    #[cbor(key = 1)]
+    pub setpoint: Option<f32>,
+    /// Heating status
+    #[cbor(key = 2)]
+    pub heating: Option<bool>,
+}
+
+impl HeatingEvent {
+    pub fn id() -> u32 {
+        461737375
+    }
+
+    pub fn name() -> &'static str {
+        "HeatingEvent"
+    }
+
+    pub fn from_bytes(data: &[u8]) -> anyhow::Result<Self> {
+        cbor2::from_reader(data).context("Failed to deserialize from CBOR")
+    }
+
+    pub fn to_bytes(&self) -> anyhow::Result<Vec<u8>> {
+        cbor2::to_vec(self).context("Failed to serialize to CBOR")
+    }
+}
+
+impl Msg for HeatingEvent {
+    fn id() -> u32 {
+        Self::id()
+    }
+
+    fn name() -> &'static str {
+        Self::name()
     }
 }
 
@@ -188,34 +551,31 @@ pub struct HoverboardEvent {
     pub temp: Option<f32>,
 }
 
-impl Msg<HoverboardEvent> for HoverboardEvent {
-    fn id() -> u32 {
+impl HoverboardEvent {
+    pub fn id() -> u32 {
         104988481
     }
-    fn name() -> &'static str {
+
+    pub fn name() -> &'static str {
         "HoverboardEvent"
     }
-}
 
-
-
-#[derive(Debug, Clone, PartialEq, cbor2::Cbor)]
-pub struct HoverboardReply {
-    /// For request/reply matching, 0 if not a request/reply
-    #[cbor(key = 0)]
-    pub req_id: Option<u32>,
-    #[cbor(key = 1)]
-    pub error_code: Option<i32>,
-    #[cbor(key = 2)]
-    pub message: Option<String>,
-}
-
-impl Msg<HoverboardReply> for HoverboardReply {
-    fn id() -> u32 {
-        2095960949
+    pub fn from_bytes(data: &[u8]) -> anyhow::Result<Self> {
+        cbor2::from_reader(data).context("Failed to deserialize from CBOR")
     }
+
+    pub fn to_bytes(&self) -> anyhow::Result<Vec<u8>> {
+        cbor2::to_vec(self).context("Failed to serialize to CBOR")
+    }
+}
+
+impl Msg for HoverboardEvent {
+    fn id() -> u32 {
+        Self::id()
+    }
+
     fn name() -> &'static str {
-        "HoverboardReply"
+        Self::name()
     }
 }
 
@@ -234,12 +594,83 @@ pub struct HoverboardRequest {
     pub steer: Option<i32>,
 }
 
-impl Msg<HoverboardRequest> for HoverboardRequest {
-    fn id() -> u32 {
+impl HoverboardRequest {
+    pub fn id() -> u32 {
         2735870956
     }
-    fn name() -> &'static str {
+
+    pub fn name() -> &'static str {
         "HoverboardRequest"
+    }
+
+    pub fn from_bytes(data: &[u8]) -> anyhow::Result<Self> {
+        cbor2::from_reader(data).context("Failed to deserialize from CBOR")
+    }
+
+    pub fn to_bytes(&self) -> anyhow::Result<Vec<u8>> {
+        cbor2::to_vec(self).context("Failed to serialize to CBOR")
+    }
+}
+
+impl Msg for HoverboardRequest {
+    fn id() -> u32 {
+        Self::id()
+    }
+
+    fn name() -> &'static str {
+        Self::name()
+    }
+}
+
+
+
+#[derive(Debug, Clone, PartialEq, cbor2::Cbor)]
+pub struct Max31855Event {
+    /// Thermocouple temperature in Celsius
+    #[cbor(key = 0)]
+    pub thermocouple_temp: Option<f32>,
+    /// Internal temperature in Celsius
+    #[cbor(key = 1)]
+    pub internal_temp: Option<f32>,
+    /// Fault detected
+    #[cbor(key = 2)]
+    pub fault: Option<bool>,
+    /// Short to VCC detected
+    #[cbor(key = 3)]
+    pub fault_short_vcc: Option<bool>,
+    /// Short to GND detected
+    #[cbor(key = 4)]
+    pub fault_short_gnd: Option<bool>,
+    /// Open thermocouple detected
+    #[cbor(key = 5)]
+    pub fault_open_tc: Option<bool>,
+}
+
+impl Max31855Event {
+    pub fn id() -> u32 {
+        2831607083
+    }
+
+    pub fn name() -> &'static str {
+        "Max31855Event"
+    }
+
+    pub fn from_bytes(data: &[u8]) -> anyhow::Result<Self> {
+        cbor2::from_reader(data).context("Failed to deserialize from CBOR")
+    }
+
+    pub fn to_bytes(&self) -> anyhow::Result<Vec<u8>> {
+        cbor2::to_vec(self).context("Failed to serialize to CBOR")
+    }
+}
+
+impl Msg for Max31855Event {
+    fn id() -> u32 {
+        Self::id()
+    }
+
+    fn name() -> &'static str {
+        Self::name()
     }
 }
 
@@ -254,12 +685,31 @@ pub struct PingReply {
     pub timestamp: Option<u64>,
 }
 
-impl Msg<PingReply> for PingReply {
-    fn id() -> u32 {
+impl PingReply {
+    pub fn id() -> u32 {
         1594103907
     }
-    fn name() -> &'static str {
+
+    pub fn name() -> &'static str {
         "PingReply"
+    }
+
+    pub fn from_bytes(data: &[u8]) -> anyhow::Result<Self> {
+        cbor2::from_reader(data).context("Failed to deserialize from CBOR")
+    }
+
+    pub fn to_bytes(&self) -> anyhow::Result<Vec<u8>> {
+        cbor2::to_vec(self).context("Failed to serialize to CBOR")
+    }
+}
+
+impl Msg for PingReply {
+    fn id() -> u32 {
+        Self::id()
+    }
+
+    fn name() -> &'static str {
+        Self::name()
     }
 }
 
@@ -274,12 +724,31 @@ pub struct PingRequest {
     pub timestamp: Option<u64>,
 }
 
-impl Msg<PingRequest> for PingRequest {
-    fn id() -> u32 {
+impl PingRequest {
+    pub fn id() -> u32 {
         31253678
     }
-    fn name() -> &'static str {
+
+    pub fn name() -> &'static str {
         "PingRequest"
+    }
+
+    pub fn from_bytes(data: &[u8]) -> anyhow::Result<Self> {
+        cbor2::from_reader(data).context("Failed to deserialize from CBOR")
+    }
+
+    pub fn to_bytes(&self) -> anyhow::Result<Vec<u8>> {
+        cbor2::to_vec(self).context("Failed to serialize to CBOR")
+    }
+}
+
+impl Msg for PingRequest {
+    fn id() -> u32 {
+        Self::id()
+    }
+
+    fn name() -> &'static str {
+        Self::name()
     }
 }
 
@@ -355,12 +824,31 @@ pub struct Ps4Event {
     pub temp: Option<i32>,
 }
 
-impl Msg<Ps4Event> for Ps4Event {
-    fn id() -> u32 {
+impl Ps4Event {
+    pub fn id() -> u32 {
         4282593576
     }
-    fn name() -> &'static str {
+
+    pub fn name() -> &'static str {
         "Ps4Event"
+    }
+
+    pub fn from_bytes(data: &[u8]) -> anyhow::Result<Self> {
+        cbor2::from_reader(data).context("Failed to deserialize from CBOR")
+    }
+
+    pub fn to_bytes(&self) -> anyhow::Result<Vec<u8>> {
+        cbor2::to_vec(self).context("Failed to serialize to CBOR")
+    }
+}
+
+impl Msg for Ps4Event {
+    fn id() -> u32 {
+        Self::id()
+    }
+
+    fn name() -> &'static str {
+        Self::name()
     }
 }
 
@@ -387,12 +875,31 @@ pub struct Ps4Request {
     pub led_flash_off: Option<i32>,
 }
 
-impl Msg<Ps4Request> for Ps4Request {
-    fn id() -> u32 {
+impl Ps4Request {
+    pub fn id() -> u32 {
         1992038561
     }
-    fn name() -> &'static str {
+
+    pub fn name() -> &'static str {
         "Ps4Request"
+    }
+
+    pub fn from_bytes(data: &[u8]) -> anyhow::Result<Self> {
+        cbor2::from_reader(data).context("Failed to deserialize from CBOR")
+    }
+
+    pub fn to_bytes(&self) -> anyhow::Result<Vec<u8>> {
+        cbor2::to_vec(self).context("Failed to serialize to CBOR")
+    }
+}
+
+impl Msg for Ps4Request {
+    fn id() -> u32 {
+        Self::id()
+    }
+
+    fn name() -> &'static str {
+        Self::name()
     }
 }
 
@@ -414,12 +921,31 @@ pub struct SysEvent {
     pub build_date: Option<String>,
 }
 
-impl Msg<SysEvent> for SysEvent {
-    fn id() -> u32 {
+impl SysEvent {
+    pub fn id() -> u32 {
         924742914
     }
-    fn name() -> &'static str {
+
+    pub fn name() -> &'static str {
         "SysEvent"
+    }
+
+    pub fn from_bytes(data: &[u8]) -> anyhow::Result<Self> {
+        cbor2::from_reader(data).context("Failed to deserialize from CBOR")
+    }
+
+    pub fn to_bytes(&self) -> anyhow::Result<Vec<u8>> {
+        cbor2::to_vec(self).context("Failed to serialize to CBOR")
+    }
+}
+
+impl Msg for SysEvent {
+    fn id() -> u32 {
+        Self::id()
+    }
+
+    fn name() -> &'static str {
+        Self::name()
     }
 }
 
@@ -436,12 +962,31 @@ pub struct SysReply {
     pub message: Option<String>,
 }
 
-impl Msg<SysReply> for SysReply {
-    fn id() -> u32 {
+impl SysReply {
+    pub fn id() -> u32 {
         2952492394
     }
-    fn name() -> &'static str {
+
+    pub fn name() -> &'static str {
         "SysReply"
+    }
+
+    pub fn from_bytes(data: &[u8]) -> anyhow::Result<Self> {
+        cbor2::from_reader(data).context("Failed to deserialize from CBOR")
+    }
+
+    pub fn to_bytes(&self) -> anyhow::Result<Vec<u8>> {
+        cbor2::to_vec(self).context("Failed to serialize to CBOR")
+    }
+}
+
+impl Msg for SysReply {
+    fn id() -> u32 {
+        Self::id()
+    }
+
+    fn name() -> &'static str {
+        Self::name()
     }
 }
 
@@ -460,12 +1005,81 @@ pub struct SysRequest {
     pub console: Option<String>,
 }
 
-impl Msg<SysRequest> for SysRequest {
-    fn id() -> u32 {
+impl SysRequest {
+    pub fn id() -> u32 {
         2966412411
     }
-    fn name() -> &'static str {
+
+    pub fn name() -> &'static str {
         "SysRequest"
+    }
+
+    pub fn from_bytes(data: &[u8]) -> anyhow::Result<Self> {
+        cbor2::from_reader(data).context("Failed to deserialize from CBOR")
+    }
+
+    pub fn to_bytes(&self) -> anyhow::Result<Vec<u8>> {
+        cbor2::to_vec(self).context("Failed to serialize to CBOR")
+    }
+}
+
+impl Msg for SysRequest {
+    fn id() -> u32 {
+        Self::id()
+    }
+
+    fn name() -> &'static str {
+        Self::name()
+    }
+}
+
+
+
+#[derive(Debug, Clone, PartialEq, cbor2::Cbor)]
+pub struct WifiEvent {
+    #[cbor(key = 0)]
+    pub ip: Option<String>,
+    #[cbor(key = 1)]
+    pub gateway: Option<String>,
+    #[cbor(key = 2)]
+    pub netmask: Option<String>,
+    #[cbor(key = 3)]
+    pub ssid: Option<String>,
+    #[cbor(key = 4)]
+    pub bssid: Option<String>,
+    #[cbor(key = 5)]
+    pub channel: Option<i32>,
+    #[cbor(key = 6)]
+    pub rssi: Option<i32>,
+    #[cbor(key = 7)]
+    pub mac: Option<String>,
+}
+
+impl WifiEvent {
+    pub fn id() -> u32 {
+        3371536624
+    }
+
+    pub fn name() -> &'static str {
+        "WifiEvent"
+    }
+
+    pub fn from_bytes(data: &[u8]) -> anyhow::Result<Self> {
+        cbor2::from_reader(data).context("Failed to deserialize from CBOR")
+    }
+
+    pub fn to_bytes(&self) -> anyhow::Result<Vec<u8>> {
+        cbor2::to_vec(self).context("Failed to serialize to CBOR")
+    }
+}
+
+impl Msg for WifiEvent {
+    fn id() -> u32 {
+        Self::id()
+    }
+
+    fn name() -> &'static str {
+        Self::name()
     }
 }
 

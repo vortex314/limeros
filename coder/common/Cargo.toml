@@ -5,6 +5,7 @@ edition = "2024"
 
 
 [dependencies]
+generated = { path = "../generated" }
 serde = { version = "1.0.228", features = ["derive"] }
 serde_tuple ="*"
 cbor2 = { version = "*", features = ["derive"] }

@@ -67,6 +67,10 @@ impl RobotConfig {
         let interface_ref = endpoint.interfaces.first()?;
         self.resolve_interface(interface_ref)
     }
+
+    pub fn load_from_file(path: impl AsRef<Path>) -> anyhow::Result<Self> {
+        load_robot_config(path)
+    }
 }
 
 /// A hardware device with network identity and endpoints.
