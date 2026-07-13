@@ -8,7 +8,6 @@ common = { path = "../../common" }
 generated = { path = "../../generated" }
 anyhow = "1.0.103"
 log = "0.4.29"
-env_logger = "0.11.8"
 clap = { version = "4.5.53", features = ["derive"] }
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "time"] }
 chrono = "0.4.45"
