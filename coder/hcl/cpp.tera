@@ -18,26 +18,26 @@ static inline Result<Void> cbor_check(CborError err) {
 // ── Encode macro ───────────────────────────────────────────────────────────
 {%- macro encode_value(field) %}
 {%- if field.cpp_type == "uint32_t" -%}
-        cbor_check(cbor_encode_uint(&mapEncoder, {{ field.name }}.unwrap()));
+        cbor_check(cbor_encode_uint(&mapEncoder, value));
 {%- elif field.cpp_type == "int32_t" -%}
-        cbor_check(cbor_encode_int(&mapEncoder, {{ field.name }}.unwrap()));
+        cbor_check(cbor_encode_int(&mapEncoder, value));
 {%- elif field.cpp_type == "uint64_t" -%}
-        cbor_check(cbor_encode_uint(&mapEncoder, {{ field.name }}.unwrap()));
+        cbor_check(cbor_encode_uint(&mapEncoder, value));
 {%- elif field.cpp_type == "int64_t" -%}
-        cbor_check(cbor_encode_int(&mapEncoder, {{ field.name }}.unwrap()));
+        cbor_check(cbor_encode_int(&mapEncoder, value));
 {%- elif field.cpp_type == "float" -%}
-        cbor_check(cbor_encode_float(&mapEncoder, {{ field.name }}.unwrap()));
+        cbor_check(cbor_encode_float(&mapEncoder, value));
 {%- elif field.cpp_type == "std::string" -%}
-        cbor_check(cbor_encode_text_string(&mapEncoder, {{ field.name }}.unwrap().c_str(), {{ field.name }}.unwrap().length()));
+        cbor_check(cbor_encode_text_string(&mapEncoder, value.c_str(), value.length()));
 {%- elif field.cpp_type == "bool" -%}
-        cbor_check(cbor_encode_boolean(&mapEncoder, {{ field.name }}.unwrap()));
+        cbor_check(cbor_encode_boolean(&mapEncoder, value));
 {%- elif field.cpp_type == "std::vector<uint8_t>" -%}
-        cbor_check(cbor_encode_byte_string(&mapEncoder, {{ field.name }}.unwrap().data(), {{ field.name }}.unwrap().size()));
+        cbor_check(cbor_encode_byte_string(&mapEncoder, value.data(), value.size()));
 {%- elif field.cpp_type == "std::vector<uint32_t>" -%}
         {
             CborEncoder arrEncoder;
-            cbor_check(cbor_encoder_create_array(&mapEncoder, &arrEncoder, {{ field.name }}.unwrap().size()));
-            for (const auto& item : {{ field.name }}.unwrap()) {
+            cbor_check(cbor_encoder_create_array(&mapEncoder, &arrEncoder, value.size()));
+            for (const auto& item : value) {
                 cbor_check(cbor_encode_uint(&arrEncoder, item));
             }
             cbor_check(cbor_encoder_close_container(&mapEncoder, &arrEncoder));
@@ -45,8 +45,8 @@ static inline Result<Void> cbor_check(CborError err) {
 {%- elif field.cpp_type == "std::vector<int32_t>" -%}
         {
             CborEncoder arrEncoder;
-            cbor_check(cbor_encoder_create_array(&mapEncoder, &arrEncoder, {{ field.name }}.unwrap().size()));
-            for (const auto& item : {{ field.name }}.unwrap()) {
+            cbor_check(cbor_encoder_create_array(&mapEncoder, &arrEncoder, value.size()));
+            for (const auto& item : value) {
                 cbor_check(cbor_encode_int(&arrEncoder, item));
             }
             cbor_check(cbor_encoder_close_container(&mapEncoder, &arrEncoder));
@@ -54,8 +54,8 @@ static inline Result<Void> cbor_check(CborError err) {
 {%- elif field.cpp_type == "std::vector<uint64_t>" -%}
         {
             CborEncoder arrEncoder;
-            cbor_check(cbor_encoder_create_array(&mapEncoder, &arrEncoder, {{ field.name }}.unwrap().size()));
-            for (const auto& item : {{ field.name }}.unwrap()) {
+            cbor_check(cbor_encoder_create_array(&mapEncoder, &arrEncoder, value.size()));
+            for (const auto& item : value) {
                 cbor_check(cbor_encode_uint(&arrEncoder, item));
             }
             cbor_check(cbor_encoder_close_container(&mapEncoder, &arrEncoder));
@@ -63,8 +63,8 @@ static inline Result<Void> cbor_check(CborError err) {
 {%- elif field.cpp_type == "std::vector<int64_t>" -%}
         {
             CborEncoder arrEncoder;
-            cbor_check(cbor_encoder_create_array(&mapEncoder, &arrEncoder, {{ field.name }}.unwrap().size()));
-            for (const auto& item : {{ field.name }}.unwrap()) {
+            cbor_check(cbor_encoder_create_array(&mapEncoder, &arrEncoder, value.size()));
+            for (const auto& item : value) {
                 cbor_check(cbor_encode_int(&arrEncoder, item));
             }
             cbor_check(cbor_encoder_close_container(&mapEncoder, &arrEncoder));
@@ -72,8 +72,8 @@ static inline Result<Void> cbor_check(CborError err) {
 {%- elif field.cpp_type == "std::vector<float>" -%}
         {
             CborEncoder arrEncoder;
-            cbor_check(cbor_encoder_create_array(&mapEncoder, &arrEncoder, {{ field.name }}.unwrap().size()));
-            for (const auto& item : {{ field.name }}.unwrap()) {
+            cbor_check(cbor_encoder_create_array(&mapEncoder, &arrEncoder, value.size()));
+            for (const auto& item : value) {
                 cbor_check(cbor_encode_float(&arrEncoder, item));
             }
             cbor_check(cbor_encoder_close_container(&mapEncoder, &arrEncoder));
@@ -345,10 +345,9 @@ public:
     } FieldId;
 
 {%- for field in msg.fields %}
-{%- if field.description %}
-    /// {{ field.description }}
-{%- endif %}
-    Option<{{ field.cpp_type }}> {{ field.name }};
+    Option<{{ field.cpp_type }}> {{ field.name }};     {%- if field.description -%}
+            // {{ field.description }}
+{%- endif -%}
 {%- endfor %}
 
     /// Serialize this message into a CBOR map keyed by field id.
@@ -365,7 +364,6 @@ public:
 
 {%- for field in msg.fields %}
         {{ field.name }}.inspect([&](const auto& value) {
-            (void)value;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::{{ field.name | upper }}));
             {{ self::encode_value(field=field) }}
         });
