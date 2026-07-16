@@ -32,6 +32,7 @@ robot "ronald" {
     }
 
   endpoint "hoverboard" {
+      transport   = "/dev/ttyUSB0"
       services    = [$ { message.HoverboardRequest }, $ { message.SysRequest }]
       events      = [$ { message.HoverboardEvent }, $ { message.SysEvent }]
       replies     = [$ { message.GenericReply }, $ { message.SysReply }]
@@ -115,9 +116,9 @@ robot "ronald" {
     field "aux_input2_mid" { id = 30 type = "int32" description = "Input2 middle value" }
     field "aux_input2_max" { id = 31 type = "int32" description = "Input2 maximum value" }
     field "aux_input2_cmd" { id = 32 type = "int32" description = "Input2 command value" }
-    field "dc_curr" { id = 33 type = "float" description = "Total DC Link current A *100" }
-    field "rdc_curr" { id = 34 type = "float" description = "Right DC Link current A *100" }
-    field "ldc_curr" { id = 35 type = "float" description = "Left DC Link current A *100" }
+    field "dc_curr" { id = 33 type = "int32" description = "Total DC Link current A *100" }
+    field "rdc_curr" { id = 34 type = "int32" description = "Right DC Link current A *100" }
+    field "ldc_curr" { id = 35 type = "int32" description = "Left DC Link current A *100" }
     field "cmdl" { id = 36 type = "int32" description = "Left Motor Command RPM" }
     field "cmdr" { id = 37 type = "int32" description = "Right Motor Command RPM" }
     field "spd_avg" { id = 38 type = "int32" description = "Motor Measured Avg RPM" }
@@ -126,8 +127,8 @@ robot "ronald" {
     field "filter_rate" { id = 41 type = "int32" description = "Rate *10" }
     field "spd_coef" { id = 42 type = "int32" description = "Speed Coefficient *10" }
     field "str_coef" { id = 43 type = "int32" description = "Steer Coefficient *10" }
-    field "batv" { id = 44 type = "float" description = "Calibrated Battery Voltage *100" }
-    field "temp" { id = 45 type = "float" description = "Calibrated Temperature C *10" }
+    field "batv" { id = 44 type = "int32" description = "Calibrated Battery Voltage *100" }
+    field "temp" { id = 45 type = "int32" description = "Calibrated Temperature C *10" }
   }
 
   message CompassEvent {
@@ -141,6 +142,23 @@ robot "ronald" {
     field "accel_x" { id = 6 type = "float" description = "Accelerometer X axis in m/s^2" }
     field "accel_y" { id = 7 type = "float" description = "Accelerometer Y axis in m/s^2" }
     field "accel_z" { id = 8 type = "float" description = "Accelerometer Z axis in m/s^2" }
+  }
+
+  message ImuEvent {
+    description = "IMU event message"
+    field "gyro_x" { id = 0 type = "float" description = "Gyroscope X axis in deg/s" }
+    field "gyro_y" { id = 1 type = "float" description = "Gyroscope Y axis in deg/s" }
+    field "gyro_z" { id = 2 type = "float" description = "Gyroscope Z axis in deg/s" }
+    field "accel_x" { id = 3 type = "float" description = "Accelerometer X axis in m/s^2" }
+    field "accel_y" { id = 4 type = "float" description = "Accelerometer Y axis in m/s^2" }
+    field "accel_z" { id = 5 type = "float" description = "Accelerometer Z axis in m/s^2" }
+  }
+
+  message UsEvent {
+    description = "Ultrasonic sensor event message"
+    field "distance" { id = 0 type = "float" description = "Distance in meters" }
+    field "temperature" { id = 1 type = "float" description = "Temperature in Celsius" }
+    field "status" { id = 2 type = "int32" description = "Status code, 0 if no error" }
   }
 
   message "Ps4Event" {
@@ -212,9 +230,9 @@ robot "ronald" {
     field "utc" { id = 0 type = "uint64" }
     field "uptime" { id = 1 type = "uint64" }
     field "free_heap" { id = 2 type = "uint64" }
-    field "flash" { id = 3 type = "uint64" }
-    field "cpu_board" { id = 4 type = "string" }
-    field "build_date" { id = 5 type = "string" }
+    field "flash_size" { id = 3 type = "uint64" }
+    field "cpu_board_type" { id = 4 type = "string" }
+    field "build_date_time" { id = 5 type = "string" }
   }
 
   message PingRequest { // is send as a reply to EndpointAnnounce, on ip port and addr of the sender
@@ -293,6 +311,7 @@ robot "ronald" {
     field "id" { id = 0 type = "uint32"  description = "Unique identifier for the announcing endpoint"}
     description = "Endpoint announce message for service discovery"
     field "name" { id = 1 type = "string"  description = "Name of the announcing endpoint"}
+    field "description" { id = 6 type = "string"  description = "Description of the announcing endpoint"}
     field "services" { id = 2 type = "uint32[]"  description = "List of services provided by the endpoint"}
     field "events" { id = 3 type = "uint32[]"  description = "List of events emitted by the endpoint"}
     field "replies" { id = 4 type = "uint32[]"  description = "List of replies supported by the endpoint"}

@@ -85,7 +85,7 @@
                 "-t",
                 "cpp.tera",
                 "-o",
-                "../esp32-eventbus/src/msgs.h"],
+                "/home/lieven/workspace/hoverboard-firmware-hack-FOC/Inc/limero/msgs.h"],
             "group": {
                 "kind": "build",
                 //               "isDefault": true   

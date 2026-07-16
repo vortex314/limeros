@@ -1,10 +1,8 @@
 use anyhow::{Context, Result};
 use clap::Parser;
 use dashmap::DashMap;
-use fnv::FnvHasher;
 use log::{debug, info, warn};
 use std::collections::HashSet;
-use std::hash::{Hash, Hasher};
 use std::net::{Ipv4Addr, SocketAddr};
 use std::sync::Arc;
 use tokio::sync::mpsc::{Receiver, Sender};
@@ -42,10 +40,17 @@ struct Subscription {
     dst: Option<u32>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+        
+enum EndpointAddress {
+    SocketAddr(SocketAddr),
+    SerialPort(String),
+}
+
 #[derive(Debug, Clone)]
 struct KnownEndpoint {
     announce: EndpointAnnounce,
-    addr: SocketAddr,
+    addr: EndpointAddress,
 }
 
 fn normalize_symbol(value: &str) -> String {
@@ -140,7 +145,7 @@ impl Broker {
             let announce = EndpointAnnounce::from_bytes(&payload)?;
             if let Some(endpoint_id) = announce.id {
                 if self.known_endpoints.contains_key(&endpoint_id) {
-                    if self.known_endpoints.get(&endpoint_id).unwrap().addr != addr {
+                    if self.known_endpoints.get(&endpoint_id).unwrap().addr != EndpointAddress::SocketAddr(addr) {
                         info!(
                             "Endpoint {} ( {} ) already known, updating address to {}",announce.name.clone().unwrap_or_default(),
                             endpoint_id, addr
@@ -149,7 +154,7 @@ impl Broker {
                             endpoint_id,
                             KnownEndpoint {
                                 announce: announce.clone(),
-                                addr,
+                                addr: EndpointAddress::SocketAddr(addr),
                             },
                         );
                     }
@@ -159,7 +164,7 @@ impl Broker {
                         endpoint_id,
                         KnownEndpoint {
                             announce: announce.clone(),
-                            addr,
+                            addr: EndpointAddress::SocketAddr(addr),
                         },
                     );
                 }
@@ -310,7 +315,13 @@ impl Broker {
                 }
                 for endpoint_id in target_ids {
                     if let Some(target) = self_pub.known_endpoints.get(&endpoint_id) {
-                        if let Err(e) = self.node.send_unicast(&meta.raw, target.addr).await {
+                        if let Err(e) = self.node.send_unicast(&meta.raw, match &target.addr {
+                            EndpointAddress::SocketAddr(addr) => *addr,
+                            EndpointAddress::SerialPort(_) => {
+                                warn!("Cannot send unicast to serial port endpoint");
+                                continue;
+                            }
+                        }).await {
                             warn!(
                                 "forward to endpoint {} at ({:?}) failed: {}",
                                 endpoint_id, target.addr, e

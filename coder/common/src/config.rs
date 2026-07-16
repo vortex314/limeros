@@ -17,7 +17,7 @@
 
 use hcl::template::{Element, Template};
 use hcl::{Block, Body, Expression, TemplateExpr, TraversalOperator};
-use log::info;
+use log::{debug, info};
 use regex::Regex;
 use std::collections::HashMap;
 use std::fs;
@@ -214,7 +214,7 @@ pub fn parse_robot_body(body: &Body) -> anyhow::Result<RobotConfig> {
 
     // list all known names
     id_map.iter().for_each(|(id, name)| {
-        info!("Known endpoint: {} -> {}", id, name);
+        debug!("Known endpoint: {} -> {}", id, name);
     });
 
     Ok(RobotConfig {

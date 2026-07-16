@@ -3,448 +3,95 @@
 // Messages are encoded as CBOR maps keyed by field id.
 // Uses tinycbor for CBOR encoding/decoding.
 
+
+
+
+
+
 #pragma once
 
-#include <cbor.h>
-#include <cstdlib>
-#include <cstdint>
-#include <optional>
-#include <string>
-#include <type_traits>
-#include <vector>
-
- namespace msgs_detail {
-
-template <typename>
-inline constexpr bool always_false_v = false;
-
-template <typename T>
-struct is_vector : std::false_type {};
-
-template <typename T, typename A>
-struct is_vector<std::vector<T, A>> : std::true_type {};
-
-inline CborError encodeValue(CborEncoder& encoder, uint32_t value) {
-    return cbor_encode_uint(&encoder, static_cast<uint64_t>(value));
-}
-
-inline CborError encodeValue(CborEncoder& encoder, int32_t value) {
-    return cbor_encode_int(&encoder, static_cast<int64_t>(value));
-}
-
-inline CborError encodeValue(CborEncoder& encoder, uint64_t value) {
-    return cbor_encode_uint(&encoder, value);
-}
-
-inline CborError encodeValue(CborEncoder& encoder, int64_t value) {
-    return cbor_encode_int(&encoder, value);
-}
-
-inline CborError encodeValue(CborEncoder& encoder, bool value) {
-    return cbor_encode_boolean(&encoder, value);
-}
-
-inline CborError encodeValue(CborEncoder& encoder, float value) {
-    return cbor_encode_float(&encoder, value);
-}
-
-inline CborError encodeValue(CborEncoder& encoder, const std::string& value) {
-    return cbor_encode_text_string(&encoder, value.c_str(), value.size());
-}
-
-template <typename T>
-inline CborError encodeValue(CborEncoder& encoder, const std::vector<T>& value) {
-    CborEncoder arrayEncoder;
-    CborError err = cbor_encoder_create_array(
-        &encoder, &arrayEncoder, static_cast<size_t>(value.size()));
-    if (err != CborNoError) {
-        return err;
-    }
-
-    for (const auto& element : value) {
-        if constexpr (std::is_same_v<T, bool>) {
-            err = encodeValue(arrayEncoder, static_cast<bool>(element));
-        } else {
-            err = encodeValue(arrayEncoder, element);
-        }
-        if (err != CborNoError) {
-            return err;
-        }
-    }
-
-    return cbor_encoder_close_container(&encoder, &arrayEncoder);
-}
-
-template <typename T>
-inline CborError encodeOptional(CborEncoder& encoder,
-                                const std::optional<T>& value) {
-    if (!value.has_value()) {
-        return cbor_encode_null(&encoder);
-    }
-
-    if constexpr (std::is_same_v<T, uint32_t> ||
-                  std::is_same_v<T, int32_t> ||
-                  std::is_same_v<T, uint64_t> ||
-                  std::is_same_v<T, int64_t> ||
-                  std::is_same_v<T, bool> ||
-                  std::is_same_v<T, float> ||
-                  std::is_same_v<T, std::string> ||
-                  is_vector<T>::value) {
-        return encodeValue(encoder, value.value());
-    } else {
-        static_assert(always_false_v<T>, "Unsupported encodeOptional<T> type");
-    }
-}
-
-inline CborError encodeOptionalUInt32(CborEncoder& encoder,
-                                      const std::optional<uint32_t>& value) {
-    return encodeOptional(encoder, value);
-}
-
-inline void decodeOptionalUInt32(CborValue& value,
-                                 std::optional<uint32_t>& out) {
-    if (!cbor_value_is_null(&value)) {
-        uint64_t v;
-        cbor_value_get_uint64(&value, &v);
-        out = static_cast<uint32_t>(v);
-    }
-}
-
-inline CborError encodeOptionalInt32(CborEncoder& encoder,
-                                     const std::optional<int32_t>& value) {
-    return encodeOptional(encoder, value);
-}
-
-inline void decodeOptionalInt32(CborValue& value,
-                                std::optional<int32_t>& out) {
-    if (!cbor_value_is_null(&value)) {
-        int64_t v;
-        cbor_value_get_int64(&value, &v);
-        out = static_cast<int32_t>(v);
-    }
-}
-
-inline CborError encodeOptionalUInt64(CborEncoder& encoder,
-                                      const std::optional<uint64_t>& value) {
-    return encodeOptional(encoder, value);
-}
-
-inline void decodeOptionalUInt64(CborValue& value,
-                                 std::optional<uint64_t>& out) {
-    if (!cbor_value_is_null(&value)) {
-        cbor_value_get_uint64(&value, &out.emplace());
-    }
-}
-
-inline CborError encodeOptionalInt64(CborEncoder& encoder,
-                                     const std::optional<int64_t>& value) {
-    return encodeOptional(encoder, value);
-}
-
-inline void decodeOptionalInt64(CborValue& value,
-                                std::optional<int64_t>& out) {
-    if (!cbor_value_is_null(&value)) {
-        cbor_value_get_int64(&value, &out.emplace());
-    }
-}
-
-inline CborError encodeOptionalBool(CborEncoder& encoder,
-                                    const std::optional<bool>& value) {
-    return encodeOptional(encoder, value);
-}
-
-inline void decodeOptionalBool(CborValue& value,
-                               std::optional<bool>& out) {
-    if (!cbor_value_is_null(&value)) {
-        bool v;
-        cbor_value_get_boolean(&value, &v);
-        out = v;
-    }
-}
-
-inline CborError encodeOptionalFloat(CborEncoder& encoder,
-                                     const std::optional<float>& value) {
-    return encodeOptional(encoder, value);
-}
-
-inline void decodeOptionalFloat(CborValue& value,
-                                std::optional<float>& out) {
-    if (!cbor_value_is_null(&value)) {
-        cbor_value_get_float(&value, &out.emplace());
-    }
-}
-
-inline CborError encodeOptionalString(CborEncoder& encoder,
-                                      const std::optional<std::string>& value) {
-    return encodeOptional(encoder, value);
-}
-
-inline void decodeOptionalString(CborValue& value,
-                                 std::optional<std::string>& out) {
-    if (!cbor_value_is_null(&value)) {
-        char* buf = nullptr;
-        size_t len = 0;
-        cbor_value_dup_text_string(&value, &buf, &len, nullptr);
-        out = std::string(buf, len);
-        free(buf);
-    }
-}
-
-template <typename T>
-inline bool decodeScalar(CborValue& value, T& out) {
-    if constexpr (std::is_same_v<T, uint32_t>) {
-        if (!cbor_value_is_integer(&value)) return false;
-        uint64_t v;
-        if (cbor_value_get_uint64(&value, &v) != CborNoError) return false;
-        out = static_cast<uint32_t>(v);
-        return true;
-    } else if constexpr (std::is_same_v<T, int32_t>) {
-        if (!cbor_value_is_integer(&value)) return false;
-        int64_t v;
-        if (cbor_value_get_int64(&value, &v) != CborNoError) return false;
-        out = static_cast<int32_t>(v);
-        return true;
-    } else if constexpr (std::is_same_v<T, uint64_t>) {
-        if (!cbor_value_is_integer(&value)) return false;
-        return cbor_value_get_uint64(&value, &out) == CborNoError;
-    } else if constexpr (std::is_same_v<T, int64_t>) {
-        if (!cbor_value_is_integer(&value)) return false;
-        return cbor_value_get_int64(&value, &out) == CborNoError;
-    } else if constexpr (std::is_same_v<T, bool>) {
-        if (!cbor_value_is_boolean(&value)) return false;
-        return cbor_value_get_boolean(&value, &out) == CborNoError;
-    } else if constexpr (std::is_same_v<T, float>) {
-        if (!cbor_value_is_float(&value)) return false;
-        return cbor_value_get_float(&value, &out) == CborNoError;
-    } else if constexpr (std::is_same_v<T, std::string>) {
-        if (!cbor_value_is_text_string(&value)) return false;
-        char* buf = nullptr;
-        size_t len = 0;
-        if (cbor_value_dup_text_string(&value, &buf, &len, nullptr) != CborNoError) {
-            return false;
-        }
-        out = std::string(buf, len);
-        free(buf);
-        return true;
-    } else {
-        static_assert(always_false_v<T>, "Unsupported decodeScalar<T> type");
-    }
-}
-
-template <typename T>
-inline void decodeOptionalVector(CborValue& value,
-                                 std::optional<std::vector<T>>& out) {
-    if (cbor_value_is_null(&value) || !cbor_value_is_array(&value)) {
-        return;
-    }
-
-    CborValue array;
-    if (cbor_value_enter_container(&value, &array) != CborNoError) {
-        return;
-    }
-
-    std::vector<T> decoded;
-    while (!cbor_value_at_end(&array)) {
-        T item{};
-        if (decodeScalar(array, item)) {
-            decoded.push_back(std::move(item));
-        }
-
-        if (!cbor_value_at_end(&array)) {
-            cbor_value_advance(&array);
-        }
-    }
-
-    cbor_value_leave_container(&value, &array);
-    out = std::move(decoded);
-}
-
-inline CborError encodeOptionalUInt32Array(
-    CborEncoder& encoder,
-    const std::optional<std::vector<uint32_t>>& value) {
-    return encodeOptional(encoder, value);
-}
-
-inline void decodeOptionalUInt32Array(
-    CborValue& value,
-    std::optional<std::vector<uint32_t>>& out) {
-    decodeOptionalVector(value, out);
-}
-
-inline CborError encodeOptionalInt32Array(
-    CborEncoder& encoder,
-    const std::optional<std::vector<int32_t>>& value) {
-    return encodeOptional(encoder, value);
-}
-
-inline void decodeOptionalInt32Array(
-    CborValue& value,
-    std::optional<std::vector<int32_t>>& out) {
-    decodeOptionalVector(value, out);
-}
-
-inline CborError encodeOptionalUInt64Array(
-    CborEncoder& encoder,
-    const std::optional<std::vector<uint64_t>>& value) {
-    return encodeOptional(encoder, value);
-}
-
-inline void decodeOptionalUInt64Array(
-    CborValue& value,
-    std::optional<std::vector<uint64_t>>& out) {
-    decodeOptionalVector(value, out);
-}
-
-inline CborError encodeOptionalInt64Array(
-    CborEncoder& encoder,
-    const std::optional<std::vector<int64_t>>& value) {
-    return encodeOptional(encoder, value);
-}
-
-inline void decodeOptionalInt64Array(
-    CborValue& value,
-    std::optional<std::vector<int64_t>>& out) {
-    decodeOptionalVector(value, out);
-}
-
-inline CborError encodeOptionalFloatArray(
-    CborEncoder& encoder,
-    const std::optional<std::vector<float>>& value) {
-    return encodeOptional(encoder, value);
-}
-
-inline void decodeOptionalFloatArray(
-    CborValue& value,
-    std::optional<std::vector<float>>& out) {
-    decodeOptionalVector(value, out);
-}
-
-inline CborError encodeOptionalBoolArray(
-    CborEncoder& encoder,
-    const std::optional<std::vector<bool>>& value) {
-    return encodeOptional(encoder, value);
-}
-
-inline void decodeOptionalBoolArray(
-    CborValue& value,
-    std::optional<std::vector<bool>>& out) {
-    decodeOptionalVector(value, out);
-}
-
-inline CborError encodeOptionalStringArray(
-    CborEncoder& encoder,
-    const std::optional<std::vector<std::string>>& value) {
-    return encodeOptional(encoder, value);
-}
-
-inline void decodeOptionalStringArray(
-    CborValue& value,
-    std::optional<std::vector<std::string>>& out) {
-    decodeOptionalVector(value, out);
-}
-
-} // namespace msgs_detail
+#include <codec.h>
 
 
 
-
-
-
-struct BrokerSubscribeRequest {
+class  BrokerSubscribeRequest : public Serializeable {
+public:
+    static uint32_t id() { return FNV("BrokerSubscribeRequest"); };
+    static const char* name() { return "BrokerSubscribeRequest"; };
+    typedef enum FieldId {
+        SRC = 0,
+        MSG_TYPE = 1,
+    } FieldId;
     std::optional<uint32_t> src;
     std::optional<uint32_t> msg_type;
 
     /// Serialize this message into a CBOR map keyed by field id.
-    CborError toCbor(CborEncoder& parentEncoder) const {
-        size_t mapSize = 0;
+    Result<Void> encode(FrameEncoder& encoder) const {
+        encoder.begin_map().is_err()) {
+            return Result<Void>::Err("Failed to encode map size");
+        }
         if (src.has_value()) {
-            ++mapSize;
+            encoder.encode_uint32(0);
+            
+            encoder.encode_uint32(src);
         }
         if (msg_type.has_value()) {
-            ++mapSize;
+            encoder.encode_uint32(1);
+            
+            encoder.encode_uint32(msg_type);
         }
 
-        CborEncoder mapEncoder;
-        CborError err = cbor_encoder_create_map(
-            &parentEncoder, &mapEncoder, mapSize);
-        if (err != CborNoError) return err;
-        if (src.has_value()) {
-            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(0));
-            if (err != CborNoError) return err;
-
-            err = msgs_detail::encodeOptionalUInt32(mapEncoder, src);
-        }
-        if (err != CborNoError) return err;
-        if (msg_type.has_value()) {
-            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(1));
-            if (err != CborNoError) return err;
-
-            err = msgs_detail::encodeOptionalUInt32(mapEncoder, msg_type);
-        }
-        if (err != CborNoError) return err;
-        return cbor_encoder_close_container(&parentEncoder, &mapEncoder);
+        return encoder.end_map();
     }
 
     /// Deserialize a BrokerSubscribeRequest from a CBOR map value.
-    static BrokerSubscribeRequest fromCbor(CborValue& it) {
+    static Result<BrokerSubscribeRequest> decode(FrameDecoder& decoder) {
         BrokerSubscribeRequest msg;
-        CborValue map;
-        if (cbor_value_is_container(&it) &&
-            cbor_value_enter_container(&it, &map) == CborNoError)
-        {
-            while (!cbor_value_at_end(&map)) {
-                uint64_t key = 0;
-                if (cbor_value_is_unsigned_integer(&map)) {
-                    cbor_value_get_uint64(&map, &key);
-                } else if (cbor_value_is_integer(&map)) {
-                    int64_t signedKey = 0;
-                    cbor_value_get_int64(&map, &signedKey);
-                    if (signedKey < 0) {
-                        cbor_value_advance(&map);
-                        if (!cbor_value_at_end(&map)) {
-                            cbor_value_advance(&map);
-                        }
-                        continue;
-                    }
-                    key = static_cast<uint64_t>(signedKey);
-                } else {
-                    cbor_value_advance(&map);
-                    if (!cbor_value_at_end(&map)) {
-                        cbor_value_advance(&map);
-                    }
-                    continue;
-                }
-
-                cbor_value_advance(&map);
-                if (cbor_value_at_end(&map)) {
-                    break;
-                }
-
-                switch (key) {
-                    case 0:
-
-                    msgs_detail::decodeOptionalUInt32(map, msg.src);
-                        break;
-                    case 1:
-
-                    msgs_detail::decodeOptionalUInt32(map, msg.msg_type);
-                        break;
-                    default:
-                        break;
-                }
-
-                if (!cbor_value_at_end(&map)) {
-                    cbor_value_advance(&map);
-                }
-            }
-            cbor_value_leave_container(&it, &map);
+        auto map = decoder.begin_map();
+        if (map.is_err()) {
+            return Result<BrokerSubscribeRequest>::Err("Failed to decode map size");
         }
-        return msg;
+
+        for (uint32_t i = 0; i < map.value(); ++i) {
+            auto key = decoder.decode_uint32();
+            if (key.is_err()) {
+                return Result<BrokerSubscribeRequest>::Err("Failed to decode map key");
+            }
+
+            switch (key.value()) {
+                case 0:
+                    
+                    msgs_detail::decodeOptionalUInt32(map, msg.src);
+                    break;
+                case 1:
+                    
+                    msgs_detail::decodeOptionalUInt32(map, msg.msg_type);
+                    break;
+                default:
+                    // Unknown field id; skip the value.
+                    decoder.skip_value();
+                    break;          
+
     }
 };
 
 
-struct CompassEvent {
+
+class  CompassEvent : public Serializeable {
+public:
+    static uint32_t id() { return FNV("CompassEvent"); };
+    static const char* name() { return "CompassEvent"; };
+    typedef enum FieldId {
+        HEADING = 0,
+        PITCH = 1,
+        ROLL = 2,
+        MAG_X = 3,
+        MAG_Y = 4,
+        MAG_Z = 5,
+        ACCEL_X = 6,
+        ACCEL_Y = 7,
+        ACCEL_Z = 8,
+    } FieldId;
     /// Heading in degrees
     std::optional<float> heading;
     /// Pitch in degrees
@@ -465,304 +112,207 @@ struct CompassEvent {
     std::optional<float> accel_z;
 
     /// Serialize this message into a CBOR map keyed by field id.
-    CborError toCbor(CborEncoder& parentEncoder) const {
-        size_t mapSize = 0;
+    Result<Void> encode(FrameEncoder& encoder) const {
+        encoder.begin_map().is_err()) {
+            return Result<Void>::Err("Failed to encode map size");
+        }
         if (heading.has_value()) {
-            ++mapSize;
+            encoder.encode_uint32(0);
+            
+            encoder.encode_float(heading);
         }
         if (pitch.has_value()) {
-            ++mapSize;
+            encoder.encode_uint32(1);
+            
+            encoder.encode_float(pitch);
         }
         if (roll.has_value()) {
-            ++mapSize;
+            encoder.encode_uint32(2);
+            
+            encoder.encode_float(roll);
         }
         if (mag_x.has_value()) {
-            ++mapSize;
+            encoder.encode_uint32(3);
+            
+            encoder.encode_float(mag_x);
         }
         if (mag_y.has_value()) {
-            ++mapSize;
+            encoder.encode_uint32(4);
+            
+            encoder.encode_float(mag_y);
         }
         if (mag_z.has_value()) {
-            ++mapSize;
+            encoder.encode_uint32(5);
+            
+            encoder.encode_float(mag_z);
         }
         if (accel_x.has_value()) {
-            ++mapSize;
+            encoder.encode_uint32(6);
+            
+            encoder.encode_float(accel_x);
         }
         if (accel_y.has_value()) {
-            ++mapSize;
+            encoder.encode_uint32(7);
+            
+            encoder.encode_float(accel_y);
         }
         if (accel_z.has_value()) {
-            ++mapSize;
+            encoder.encode_uint32(8);
+            
+            encoder.encode_float(accel_z);
         }
 
-        CborEncoder mapEncoder;
-        CborError err = cbor_encoder_create_map(
-            &parentEncoder, &mapEncoder, mapSize);
-        if (err != CborNoError) return err;
-        if (heading.has_value()) {
-            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(0));
-            if (err != CborNoError) return err;
-
-            err = msgs_detail::encodeOptionalFloat(mapEncoder, heading);
-        }
-        if (err != CborNoError) return err;
-        if (pitch.has_value()) {
-            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(1));
-            if (err != CborNoError) return err;
-
-            err = msgs_detail::encodeOptionalFloat(mapEncoder, pitch);
-        }
-        if (err != CborNoError) return err;
-        if (roll.has_value()) {
-            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(2));
-            if (err != CborNoError) return err;
-
-            err = msgs_detail::encodeOptionalFloat(mapEncoder, roll);
-        }
-        if (err != CborNoError) return err;
-        if (mag_x.has_value()) {
-            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(3));
-            if (err != CborNoError) return err;
-
-            err = msgs_detail::encodeOptionalFloat(mapEncoder, mag_x);
-        }
-        if (err != CborNoError) return err;
-        if (mag_y.has_value()) {
-            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(4));
-            if (err != CborNoError) return err;
-
-            err = msgs_detail::encodeOptionalFloat(mapEncoder, mag_y);
-        }
-        if (err != CborNoError) return err;
-        if (mag_z.has_value()) {
-            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(5));
-            if (err != CborNoError) return err;
-
-            err = msgs_detail::encodeOptionalFloat(mapEncoder, mag_z);
-        }
-        if (err != CborNoError) return err;
-        if (accel_x.has_value()) {
-            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(6));
-            if (err != CborNoError) return err;
-
-            err = msgs_detail::encodeOptionalFloat(mapEncoder, accel_x);
-        }
-        if (err != CborNoError) return err;
-        if (accel_y.has_value()) {
-            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(7));
-            if (err != CborNoError) return err;
-
-            err = msgs_detail::encodeOptionalFloat(mapEncoder, accel_y);
-        }
-        if (err != CborNoError) return err;
-        if (accel_z.has_value()) {
-            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(8));
-            if (err != CborNoError) return err;
-
-            err = msgs_detail::encodeOptionalFloat(mapEncoder, accel_z);
-        }
-        if (err != CborNoError) return err;
-        return cbor_encoder_close_container(&parentEncoder, &mapEncoder);
+        return encoder.end_map();
     }
 
     /// Deserialize a CompassEvent from a CBOR map value.
-    static CompassEvent fromCbor(CborValue& it) {
+    static Result<CompassEvent> decode(FrameDecoder& decoder) {
         CompassEvent msg;
-        CborValue map;
-        if (cbor_value_is_container(&it) &&
-            cbor_value_enter_container(&it, &map) == CborNoError)
-        {
-            while (!cbor_value_at_end(&map)) {
-                uint64_t key = 0;
-                if (cbor_value_is_unsigned_integer(&map)) {
-                    cbor_value_get_uint64(&map, &key);
-                } else if (cbor_value_is_integer(&map)) {
-                    int64_t signedKey = 0;
-                    cbor_value_get_int64(&map, &signedKey);
-                    if (signedKey < 0) {
-                        cbor_value_advance(&map);
-                        if (!cbor_value_at_end(&map)) {
-                            cbor_value_advance(&map);
-                        }
-                        continue;
-                    }
-                    key = static_cast<uint64_t>(signedKey);
-                } else {
-                    cbor_value_advance(&map);
-                    if (!cbor_value_at_end(&map)) {
-                        cbor_value_advance(&map);
-                    }
-                    continue;
-                }
-
-                cbor_value_advance(&map);
-                if (cbor_value_at_end(&map)) {
-                    break;
-                }
-
-                switch (key) {
-                    case 0:
-
-                    msgs_detail::decodeOptionalFloat(map, msg.heading);
-                        break;
-                    case 1:
-
-                    msgs_detail::decodeOptionalFloat(map, msg.pitch);
-                        break;
-                    case 2:
-
-                    msgs_detail::decodeOptionalFloat(map, msg.roll);
-                        break;
-                    case 3:
-
-                    msgs_detail::decodeOptionalFloat(map, msg.mag_x);
-                        break;
-                    case 4:
-
-                    msgs_detail::decodeOptionalFloat(map, msg.mag_y);
-                        break;
-                    case 5:
-
-                    msgs_detail::decodeOptionalFloat(map, msg.mag_z);
-                        break;
-                    case 6:
-
-                    msgs_detail::decodeOptionalFloat(map, msg.accel_x);
-                        break;
-                    case 7:
-
-                    msgs_detail::decodeOptionalFloat(map, msg.accel_y);
-                        break;
-                    case 8:
-
-                    msgs_detail::decodeOptionalFloat(map, msg.accel_z);
-                        break;
-                    default:
-                        break;
-                }
-
-                if (!cbor_value_at_end(&map)) {
-                    cbor_value_advance(&map);
-                }
-            }
-            cbor_value_leave_container(&it, &map);
+        auto map = decoder.begin_map();
+        if (map.is_err()) {
+            return Result<CompassEvent>::Err("Failed to decode map size");
         }
-        return msg;
+
+        for (uint32_t i = 0; i < map.value(); ++i) {
+            auto key = decoder.decode_uint32();
+            if (key.is_err()) {
+                return Result<CompassEvent>::Err("Failed to decode map key");
+            }
+
+            switch (key.value()) {
+                case 0:
+                    
+                    msgs_detail::decodeOptionalFloat(map, msg.heading);
+                    break;
+                case 1:
+                    
+                    msgs_detail::decodeOptionalFloat(map, msg.pitch);
+                    break;
+                case 2:
+                    
+                    msgs_detail::decodeOptionalFloat(map, msg.roll);
+                    break;
+                case 3:
+                    
+                    msgs_detail::decodeOptionalFloat(map, msg.mag_x);
+                    break;
+                case 4:
+                    
+                    msgs_detail::decodeOptionalFloat(map, msg.mag_y);
+                    break;
+                case 5:
+                    
+                    msgs_detail::decodeOptionalFloat(map, msg.mag_z);
+                    break;
+                case 6:
+                    
+                    msgs_detail::decodeOptionalFloat(map, msg.accel_x);
+                    break;
+                case 7:
+                    
+                    msgs_detail::decodeOptionalFloat(map, msg.accel_y);
+                    break;
+                case 8:
+                    
+                    msgs_detail::decodeOptionalFloat(map, msg.accel_z);
+                    break;
+                default:
+                    // Unknown field id; skip the value.
+                    decoder.skip_value();
+                    break;          
+
     }
 };
 
 
-struct DeviceAliveEvent {
+
+class  DeviceAliveEvent : public Serializeable {
+public:
+    static uint32_t id() { return FNV("DeviceAliveEvent"); };
+    static const char* name() { return "DeviceAliveEvent"; };
+    typedef enum FieldId {
+        DEVICE = 0,
+        ENDPOINT = 1,
+        TIMESTAMP = 2,
+    } FieldId;
     std::optional<std::string> device;
     std::optional<std::string> endpoint;
     /// Timestamp in milliseconds since epoch
     std::optional<uint64_t> timestamp;
 
     /// Serialize this message into a CBOR map keyed by field id.
-    CborError toCbor(CborEncoder& parentEncoder) const {
-        size_t mapSize = 0;
+    Result<Void> encode(FrameEncoder& encoder) const {
+        encoder.begin_map().is_err()) {
+            return Result<Void>::Err("Failed to encode map size");
+        }
         if (device.has_value()) {
-            ++mapSize;
+            encoder.encode_uint32(0);
+            
+            encoder.encode_str(device);
         }
         if (endpoint.has_value()) {
-            ++mapSize;
+            encoder.encode_uint32(1);
+            
+            encoder.encode_str(endpoint);
         }
         if (timestamp.has_value()) {
-            ++mapSize;
+            encoder.encode_uint32(2);
+            
+            encoder.encode_uint64(timestamp);
         }
 
-        CborEncoder mapEncoder;
-        CborError err = cbor_encoder_create_map(
-            &parentEncoder, &mapEncoder, mapSize);
-        if (err != CborNoError) return err;
-        if (device.has_value()) {
-            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(0));
-            if (err != CborNoError) return err;
-
-            err = msgs_detail::encodeOptionalString(mapEncoder, device);
-        }
-        if (err != CborNoError) return err;
-        if (endpoint.has_value()) {
-            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(1));
-            if (err != CborNoError) return err;
-
-            err = msgs_detail::encodeOptionalString(mapEncoder, endpoint);
-        }
-        if (err != CborNoError) return err;
-        if (timestamp.has_value()) {
-            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(2));
-            if (err != CborNoError) return err;
-
-            err = msgs_detail::encodeOptionalUInt64(mapEncoder, timestamp);
-        }
-        if (err != CborNoError) return err;
-        return cbor_encoder_close_container(&parentEncoder, &mapEncoder);
+        return encoder.end_map();
     }
 
     /// Deserialize a DeviceAliveEvent from a CBOR map value.
-    static DeviceAliveEvent fromCbor(CborValue& it) {
+    static Result<DeviceAliveEvent> decode(FrameDecoder& decoder) {
         DeviceAliveEvent msg;
-        CborValue map;
-        if (cbor_value_is_container(&it) &&
-            cbor_value_enter_container(&it, &map) == CborNoError)
-        {
-            while (!cbor_value_at_end(&map)) {
-                uint64_t key = 0;
-                if (cbor_value_is_unsigned_integer(&map)) {
-                    cbor_value_get_uint64(&map, &key);
-                } else if (cbor_value_is_integer(&map)) {
-                    int64_t signedKey = 0;
-                    cbor_value_get_int64(&map, &signedKey);
-                    if (signedKey < 0) {
-                        cbor_value_advance(&map);
-                        if (!cbor_value_at_end(&map)) {
-                            cbor_value_advance(&map);
-                        }
-                        continue;
-                    }
-                    key = static_cast<uint64_t>(signedKey);
-                } else {
-                    cbor_value_advance(&map);
-                    if (!cbor_value_at_end(&map)) {
-                        cbor_value_advance(&map);
-                    }
-                    continue;
-                }
-
-                cbor_value_advance(&map);
-                if (cbor_value_at_end(&map)) {
-                    break;
-                }
-
-                switch (key) {
-                    case 0:
-
-                    msgs_detail::decodeOptionalString(map, msg.device);
-                        break;
-                    case 1:
-
-                    msgs_detail::decodeOptionalString(map, msg.endpoint);
-                        break;
-                    case 2:
-
-                    msgs_detail::decodeOptionalUInt64(map, msg.timestamp);
-                        break;
-                    default:
-                        break;
-                }
-
-                if (!cbor_value_at_end(&map)) {
-                    cbor_value_advance(&map);
-                }
-            }
-            cbor_value_leave_container(&it, &map);
+        auto map = decoder.begin_map();
+        if (map.is_err()) {
+            return Result<DeviceAliveEvent>::Err("Failed to decode map size");
         }
-        return msg;
+
+        for (uint32_t i = 0; i < map.value(); ++i) {
+            auto key = decoder.decode_uint32();
+            if (key.is_err()) {
+                return Result<DeviceAliveEvent>::Err("Failed to decode map key");
+            }
+
+            switch (key.value()) {
+                case 0:
+                    
+                    msgs_detail::decodeOptionalString(map, msg.device);
+                    break;
+                case 1:
+                    
+                    msgs_detail::decodeOptionalString(map, msg.endpoint);
+                    break;
+                case 2:
+                    
+                    msgs_detail::decodeOptionalUInt64(map, msg.timestamp);
+                    break;
+                default:
+                    // Unknown field id; skip the value.
+                    decoder.skip_value();
+                    break;          
+
     }
 };
 
 
-struct EndpointAnnounce {
+
+class  EndpointAnnounce : public Serializeable {
+public:
+    static uint32_t id() { return FNV("EndpointAnnounce"); };
+    static const char* name() { return "EndpointAnnounce"; };
+    typedef enum FieldId {
+        ID = 0,
+        NAME = 1,
+        SERVICES = 2,
+        EVENTS = 3,
+        REPLIES = 4,
+        SUBSCRIBES = 5,
+    } FieldId;
     /// Unique identifier for the announcing endpoint
     std::optional<uint32_t> id;
     /// Name of the announcing endpoint
@@ -777,222 +327,160 @@ struct EndpointAnnounce {
     std::optional<std::vector<uint32_t>> subscribes;
 
     /// Serialize this message into a CBOR map keyed by field id.
-    CborError toCbor(CborEncoder& parentEncoder) const {
-        size_t mapSize = 0;
+    Result<Void> encode(FrameEncoder& encoder) const {
+        encoder.begin_map().is_err()) {
+            return Result<Void>::Err("Failed to encode map size");
+        }
         if (id.has_value()) {
-            ++mapSize;
+            encoder.encode_uint32(0);
+            
+            encoder.encode_uint32(id);
         }
         if (name.has_value()) {
-            ++mapSize;
+            encoder.encode_uint32(1);
+            
+            encoder.encode_str(name);
         }
         if (services.has_value()) {
-            ++mapSize;
+            encoder.encode_uint32(2);
+            
         }
         if (events.has_value()) {
-            ++mapSize;
+            encoder.encode_uint32(3);
+            
         }
         if (replies.has_value()) {
-            ++mapSize;
+            encoder.encode_uint32(4);
+            
         }
         if (subscribes.has_value()) {
-            ++mapSize;
+            encoder.encode_uint32(5);
+            
         }
 
-        CborEncoder mapEncoder;
-        CborError err = cbor_encoder_create_map(
-            &parentEncoder, &mapEncoder, mapSize);
-        if (err != CborNoError) return err;
-        if (id.has_value()) {
-            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(0));
-            if (err != CborNoError) return err;
-
-            err = msgs_detail::encodeOptionalUInt32(mapEncoder, id);
-        }
-        if (err != CborNoError) return err;
-        if (name.has_value()) {
-            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(1));
-            if (err != CborNoError) return err;
-
-            err = msgs_detail::encodeOptionalString(mapEncoder, name);
-        }
-        if (err != CborNoError) return err;
-        if (services.has_value()) {
-            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(2));
-            if (err != CborNoError) return err;
-
-            err = msgs_detail::encodeOptionalUInt32Array(mapEncoder, services);
-        }
-        if (err != CborNoError) return err;
-        if (events.has_value()) {
-            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(3));
-            if (err != CborNoError) return err;
-
-            err = msgs_detail::encodeOptionalUInt32Array(mapEncoder, events);
-        }
-        if (err != CborNoError) return err;
-        if (replies.has_value()) {
-            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(4));
-            if (err != CborNoError) return err;
-
-            err = msgs_detail::encodeOptionalUInt32Array(mapEncoder, replies);
-        }
-        if (err != CborNoError) return err;
-        if (subscribes.has_value()) {
-            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(5));
-            if (err != CborNoError) return err;
-
-            err = msgs_detail::encodeOptionalUInt32Array(mapEncoder, subscribes);
-        }
-        if (err != CborNoError) return err;
-        return cbor_encoder_close_container(&parentEncoder, &mapEncoder);
+        return encoder.end_map();
     }
 
     /// Deserialize a EndpointAnnounce from a CBOR map value.
-    static EndpointAnnounce fromCbor(CborValue& it) {
+    static Result<EndpointAnnounce> decode(FrameDecoder& decoder) {
         EndpointAnnounce msg;
-        CborValue map;
-        if (cbor_value_is_container(&it) &&
-            cbor_value_enter_container(&it, &map) == CborNoError)
-        {
-            while (!cbor_value_at_end(&map)) {
-                uint64_t key = 0;
-                if (cbor_value_is_unsigned_integer(&map)) {
-                    cbor_value_get_uint64(&map, &key);
-                } else if (cbor_value_is_integer(&map)) {
-                    int64_t signedKey = 0;
-                    cbor_value_get_int64(&map, &signedKey);
-                    if (signedKey < 0) {
-                        cbor_value_advance(&map);
-                        if (!cbor_value_at_end(&map)) {
-                            cbor_value_advance(&map);
-                        }
-                        continue;
-                    }
-                    key = static_cast<uint64_t>(signedKey);
-                } else {
-                    cbor_value_advance(&map);
-                    if (!cbor_value_at_end(&map)) {
-                        cbor_value_advance(&map);
-                    }
-                    continue;
-                }
-
-                cbor_value_advance(&map);
-                if (cbor_value_at_end(&map)) {
-                    break;
-                }
-
-                switch (key) {
-                    case 0:
-
-                    msgs_detail::decodeOptionalUInt32(map, msg.id);
-                        break;
-                    case 1:
-
-                    msgs_detail::decodeOptionalString(map, msg.name);
-                        break;
-                    case 2:
-
-                    msgs_detail::decodeOptionalUInt32Array(map, msg.services);
-                        break;
-                    case 3:
-
-                    msgs_detail::decodeOptionalUInt32Array(map, msg.events);
-                        break;
-                    case 4:
-
-                    msgs_detail::decodeOptionalUInt32Array(map, msg.replies);
-                        break;
-                    case 5:
-
-                    msgs_detail::decodeOptionalUInt32Array(map, msg.subscribes);
-                        break;
-                    default:
-                        break;
-                }
-
-                if (!cbor_value_at_end(&map)) {
-                    cbor_value_advance(&map);
-                }
-            }
-            cbor_value_leave_container(&it, &map);
+        auto map = decoder.begin_map();
+        if (map.is_err()) {
+            return Result<EndpointAnnounce>::Err("Failed to decode map size");
         }
-        return msg;
+
+        for (uint32_t i = 0; i < map.value(); ++i) {
+            auto key = decoder.decode_uint32();
+            if (key.is_err()) {
+                return Result<EndpointAnnounce>::Err("Failed to decode map key");
+            }
+
+            switch (key.value()) {
+                case 0:
+                    
+                    msgs_detail::decodeOptionalUInt32(map, msg.id);
+                    break;
+                case 1:
+                    
+                    msgs_detail::decodeOptionalString(map, msg.name);
+                    break;
+                case 2:
+                    
+                    msgs_detail::decodeOptionalUInt32Array(map, msg.services);
+                    break;
+                case 3:
+                    
+                    msgs_detail::decodeOptionalUInt32Array(map, msg.events);
+                    break;
+                case 4:
+                    
+                    msgs_detail::decodeOptionalUInt32Array(map, msg.replies);
+                    break;
+                case 5:
+                    
+                    msgs_detail::decodeOptionalUInt32Array(map, msg.subscribes);
+                    break;
+                default:
+                    // Unknown field id; skip the value.
+                    decoder.skip_value();
+                    break;          
+
     }
 };
 
 
-struct EndpointAnnounceReply {
+
+class  EndpointAnnounceReply : public Serializeable {
+public:
+    static uint32_t id() { return FNV("EndpointAnnounceReply"); };
+    static const char* name() { return "EndpointAnnounceReply"; };
+    typedef enum FieldId {
+        UTC = 0,
+    } FieldId;
+    /// Timestamp in milliseconds since epoch
+    std::optional<uint64_t> utc;
 
     /// Serialize this message into a CBOR map keyed by field id.
-    CborError toCbor(CborEncoder& parentEncoder) const {
-        size_t mapSize = 0;
+    Result<Void> encode(FrameEncoder& encoder) const {
+        encoder.begin_map().is_err()) {
+            return Result<Void>::Err("Failed to encode map size");
+        }
+        if (utc.has_value()) {
+            encoder.encode_uint32(0);
+            
+            encoder.encode_uint64(utc);
+        }
 
-        CborEncoder mapEncoder;
-        CborError err = cbor_encoder_create_map(
-            &parentEncoder, &mapEncoder, mapSize);
-        if (err != CborNoError) return err;
-        return cbor_encoder_close_container(&parentEncoder, &mapEncoder);
+        return encoder.end_map();
     }
 
     /// Deserialize a EndpointAnnounceReply from a CBOR map value.
-    static EndpointAnnounceReply fromCbor(CborValue& it) {
+    static Result<EndpointAnnounceReply> decode(FrameDecoder& decoder) {
         EndpointAnnounceReply msg;
-        CborValue map;
-        if (cbor_value_is_container(&it) &&
-            cbor_value_enter_container(&it, &map) == CborNoError)
-        {
-            while (!cbor_value_at_end(&map)) {
-                uint64_t key = 0;
-                if (cbor_value_is_unsigned_integer(&map)) {
-                    cbor_value_get_uint64(&map, &key);
-                } else if (cbor_value_is_integer(&map)) {
-                    int64_t signedKey = 0;
-                    cbor_value_get_int64(&map, &signedKey);
-                    if (signedKey < 0) {
-                        cbor_value_advance(&map);
-                        if (!cbor_value_at_end(&map)) {
-                            cbor_value_advance(&map);
-                        }
-                        continue;
-                    }
-                    key = static_cast<uint64_t>(signedKey);
-                } else {
-                    cbor_value_advance(&map);
-                    if (!cbor_value_at_end(&map)) {
-                        cbor_value_advance(&map);
-                    }
-                    continue;
-                }
-
-                cbor_value_advance(&map);
-                if (cbor_value_at_end(&map)) {
-                    break;
-                }
-
-                switch (key) {
-                    default:
-                        break;
-                }
-
-                if (!cbor_value_at_end(&map)) {
-                    cbor_value_advance(&map);
-                }
-            }
-            cbor_value_leave_container(&it, &map);
+        auto map = decoder.begin_map();
+        if (map.is_err()) {
+            return Result<EndpointAnnounceReply>::Err("Failed to decode map size");
         }
-        return msg;
+
+        for (uint32_t i = 0; i < map.value(); ++i) {
+            auto key = decoder.decode_uint32();
+            if (key.is_err()) {
+                return Result<EndpointAnnounceReply>::Err("Failed to decode map key");
+            }
+
+            switch (key.value()) {
+                case 0:
+                    
+                    msgs_detail::decodeOptionalUInt64(map, msg.utc);
+                    break;
+                default:
+                    // Unknown field id; skip the value.
+                    decoder.skip_value();
+                    break;          
+
     }
 };
 
 
-struct Envelope {
+
+class  Envelope : public Serializeable {
+public:
+    static uint32_t id() { return FNV("Envelope"); };
+    static const char* name() { return "Envelope"; };
+    typedef enum FieldId {
+        SRC = 0,
+        DST = 1,
+        MSG_TYPE = 2,
+        REQUEST_ID = 3,
+        INSTANCE_ID = 4,
+        PAYLOAD = 5,
+    } FieldId;
     /// Source endpoint name
-    std::optional<std::string> src;
+    std::optional<uint32_t> src;
     /// Destination endpoint name
-    std::optional<std::string> dst;
+    std::optional<uint32_t> dst;
     /// Message type name
-    std::optional<std::string> msg_type;
+    std::optional<uint32_t> msg_type;
     /// Request ID for matching request/reply
     std::optional<uint32_t> request_id;
     /// Instance ID for matching request/reply
@@ -1001,150 +489,102 @@ struct Envelope {
     std::optional<std::vector<uint8_t>> payload;
 
     /// Serialize this message into a CBOR map keyed by field id.
-    CborError toCbor(CborEncoder& parentEncoder) const {
-        size_t mapSize = 0;
+    Result<Void> encode(FrameEncoder& encoder) const {
+        encoder.begin_map().is_err()) {
+            return Result<Void>::Err("Failed to encode map size");
+        }
         if (src.has_value()) {
-            ++mapSize;
+            encoder.encode_uint32(0);
+            
+            encoder.encode_uint32(src);
         }
         if (dst.has_value()) {
-            ++mapSize;
+            encoder.encode_uint32(1);
+            
+            encoder.encode_uint32(dst);
         }
         if (msg_type.has_value()) {
-            ++mapSize;
+            encoder.encode_uint32(2);
+            
+            encoder.encode_uint32(msg_type);
         }
         if (request_id.has_value()) {
-            ++mapSize;
+            encoder.encode_uint32(3);
+            
+            encoder.encode_uint32(request_id);
         }
         if (instance_id.has_value()) {
-            ++mapSize;
+            encoder.encode_uint32(4);
+            
+            encoder.encode_uint32(instance_id);
         }
         if (payload.has_value()) {
-            ++mapSize;
+            encoder.encode_uint32(5);
+            
+            encoder.encode_bstr(&payload);
         }
 
-        CborEncoder mapEncoder;
-        CborError err = cbor_encoder_create_map(
-            &parentEncoder, &mapEncoder, mapSize);
-        if (err != CborNoError) return err;
-        if (src.has_value()) {
-            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(0));
-            if (err != CborNoError) return err;
-
-            err = msgs_detail::encodeOptionalString(mapEncoder, src);
-        }
-        if (err != CborNoError) return err;
-        if (dst.has_value()) {
-            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(1));
-            if (err != CborNoError) return err;
-
-            err = msgs_detail::encodeOptionalString(mapEncoder, dst);
-        }
-        if (err != CborNoError) return err;
-        if (msg_type.has_value()) {
-            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(2));
-            if (err != CborNoError) return err;
-
-            err = msgs_detail::encodeOptionalString(mapEncoder, msg_type);
-        }
-        if (err != CborNoError) return err;
-        if (request_id.has_value()) {
-            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(3));
-            if (err != CborNoError) return err;
-
-            err = msgs_detail::encodeOptionalUInt32(mapEncoder, request_id);
-        }
-        if (err != CborNoError) return err;
-        if (instance_id.has_value()) {
-            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(4));
-            if (err != CborNoError) return err;
-
-            err = msgs_detail::encodeOptionalUInt32(mapEncoder, instance_id);
-        }
-        if (err != CborNoError) return err;
-        if (payload.has_value()) {
-            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(5));
-            if (err != CborNoError) return err;
-
-        }
-        if (err != CborNoError) return err;
-        return cbor_encoder_close_container(&parentEncoder, &mapEncoder);
+        return encoder.end_map();
     }
 
     /// Deserialize a Envelope from a CBOR map value.
-    static Envelope fromCbor(CborValue& it) {
+    static Result<Envelope> decode(FrameDecoder& decoder) {
         Envelope msg;
-        CborValue map;
-        if (cbor_value_is_container(&it) &&
-            cbor_value_enter_container(&it, &map) == CborNoError)
-        {
-            while (!cbor_value_at_end(&map)) {
-                uint64_t key = 0;
-                if (cbor_value_is_unsigned_integer(&map)) {
-                    cbor_value_get_uint64(&map, &key);
-                } else if (cbor_value_is_integer(&map)) {
-                    int64_t signedKey = 0;
-                    cbor_value_get_int64(&map, &signedKey);
-                    if (signedKey < 0) {
-                        cbor_value_advance(&map);
-                        if (!cbor_value_at_end(&map)) {
-                            cbor_value_advance(&map);
-                        }
-                        continue;
-                    }
-                    key = static_cast<uint64_t>(signedKey);
-                } else {
-                    cbor_value_advance(&map);
-                    if (!cbor_value_at_end(&map)) {
-                        cbor_value_advance(&map);
-                    }
-                    continue;
-                }
-
-                cbor_value_advance(&map);
-                if (cbor_value_at_end(&map)) {
-                    break;
-                }
-
-                switch (key) {
-                    case 0:
-
-                    msgs_detail::decodeOptionalString(map, msg.src);
-                        break;
-                    case 1:
-
-                    msgs_detail::decodeOptionalString(map, msg.dst);
-                        break;
-                    case 2:
-
-                    msgs_detail::decodeOptionalString(map, msg.msg_type);
-                        break;
-                    case 3:
-
-                    msgs_detail::decodeOptionalUInt32(map, msg.request_id);
-                        break;
-                    case 4:
-
-                    msgs_detail::decodeOptionalUInt32(map, msg.instance_id);
-                        break;
-                    case 5:
-
-                        break;
-                    default:
-                        break;
-                }
-
-                if (!cbor_value_at_end(&map)) {
-                    cbor_value_advance(&map);
-                }
-            }
-            cbor_value_leave_container(&it, &map);
+        auto map = decoder.begin_map();
+        if (map.is_err()) {
+            return Result<Envelope>::Err("Failed to decode map size");
         }
-        return msg;
+
+        for (uint32_t i = 0; i < map.value(); ++i) {
+            auto key = decoder.decode_uint32();
+            if (key.is_err()) {
+                return Result<Envelope>::Err("Failed to decode map key");
+            }
+
+            switch (key.value()) {
+                case 0:
+                    
+                    msgs_detail::decodeOptionalUInt32(map, msg.src);
+                    break;
+                case 1:
+                    
+                    msgs_detail::decodeOptionalUInt32(map, msg.dst);
+                    break;
+                case 2:
+                    
+                    msgs_detail::decodeOptionalUInt32(map, msg.msg_type);
+                    break;
+                case 3:
+                    
+                    msgs_detail::decodeOptionalUInt32(map, msg.request_id);
+                    break;
+                case 4:
+                    
+                    msgs_detail::decodeOptionalUInt32(map, msg.instance_id);
+                    break;
+                case 5:
+                    
+                    break;
+                default:
+                    // Unknown field id; skip the value.
+                    decoder.skip_value();
+                    break;          
+
     }
 };
 
 
-struct GenericReply {
+
+class  GenericReply : public Serializeable {
+public:
+    static uint32_t id() { return FNV("GenericReply"); };
+    static const char* name() { return "GenericReply"; };
+    typedef enum FieldId {
+        REQ_ID = 0,
+        ERROR_CODE = 1,
+        MESSAGE = 2,
+        MSG_TYPE = 3,
+    } FieldId;
     /// For request/reply matching, 0 if not a request/reply
     std::optional<uint32_t> req_id;
     /// Error code, 0 if no error
@@ -1155,124 +595,84 @@ struct GenericReply {
     std::optional<uint32_t> msg_type;
 
     /// Serialize this message into a CBOR map keyed by field id.
-    CborError toCbor(CborEncoder& parentEncoder) const {
-        size_t mapSize = 0;
+    Result<Void> encode(FrameEncoder& encoder) const {
+        encoder.begin_map().is_err()) {
+            return Result<Void>::Err("Failed to encode map size");
+        }
         if (req_id.has_value()) {
-            ++mapSize;
+            encoder.encode_uint32(0);
+            
+            encoder.encode_uint32(req_id);
         }
         if (error_code.has_value()) {
-            ++mapSize;
+            encoder.encode_uint32(1);
+            
+            encoder.encode_uint32(error_code);
         }
         if (message.has_value()) {
-            ++mapSize;
+            encoder.encode_uint32(2);
+            
+            encoder.encode_str(message);
         }
         if (msg_type.has_value()) {
-            ++mapSize;
+            encoder.encode_uint32(3);
+            
+            encoder.encode_uint32(msg_type);
         }
 
-        CborEncoder mapEncoder;
-        CborError err = cbor_encoder_create_map(
-            &parentEncoder, &mapEncoder, mapSize);
-        if (err != CborNoError) return err;
-        if (req_id.has_value()) {
-            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(0));
-            if (err != CborNoError) return err;
-
-            err = msgs_detail::encodeOptionalUInt32(mapEncoder, req_id);
-        }
-        if (err != CborNoError) return err;
-        if (error_code.has_value()) {
-            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(1));
-            if (err != CborNoError) return err;
-
-            err = msgs_detail::encodeOptionalUInt32(mapEncoder, error_code);
-        }
-        if (err != CborNoError) return err;
-        if (message.has_value()) {
-            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(2));
-            if (err != CborNoError) return err;
-
-            err = msgs_detail::encodeOptionalString(mapEncoder, message);
-        }
-        if (err != CborNoError) return err;
-        if (msg_type.has_value()) {
-            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(3));
-            if (err != CborNoError) return err;
-
-            err = msgs_detail::encodeOptionalUInt32(mapEncoder, msg_type);
-        }
-        if (err != CborNoError) return err;
-        return cbor_encoder_close_container(&parentEncoder, &mapEncoder);
+        return encoder.end_map();
     }
 
     /// Deserialize a GenericReply from a CBOR map value.
-    static GenericReply fromCbor(CborValue& it) {
+    static Result<GenericReply> decode(FrameDecoder& decoder) {
         GenericReply msg;
-        CborValue map;
-        if (cbor_value_is_container(&it) &&
-            cbor_value_enter_container(&it, &map) == CborNoError)
-        {
-            while (!cbor_value_at_end(&map)) {
-                uint64_t key = 0;
-                if (cbor_value_is_unsigned_integer(&map)) {
-                    cbor_value_get_uint64(&map, &key);
-                } else if (cbor_value_is_integer(&map)) {
-                    int64_t signedKey = 0;
-                    cbor_value_get_int64(&map, &signedKey);
-                    if (signedKey < 0) {
-                        cbor_value_advance(&map);
-                        if (!cbor_value_at_end(&map)) {
-                            cbor_value_advance(&map);
-                        }
-                        continue;
-                    }
-                    key = static_cast<uint64_t>(signedKey);
-                } else {
-                    cbor_value_advance(&map);
-                    if (!cbor_value_at_end(&map)) {
-                        cbor_value_advance(&map);
-                    }
-                    continue;
-                }
-
-                cbor_value_advance(&map);
-                if (cbor_value_at_end(&map)) {
-                    break;
-                }
-
-                switch (key) {
-                    case 0:
-
-                    msgs_detail::decodeOptionalUInt32(map, msg.req_id);
-                        break;
-                    case 1:
-
-                    msgs_detail::decodeOptionalUInt32(map, msg.error_code);
-                        break;
-                    case 2:
-
-                    msgs_detail::decodeOptionalString(map, msg.message);
-                        break;
-                    case 3:
-
-                    msgs_detail::decodeOptionalUInt32(map, msg.msg_type);
-                        break;
-                    default:
-                        break;
-                }
-
-                if (!cbor_value_at_end(&map)) {
-                    cbor_value_advance(&map);
-                }
-            }
-            cbor_value_leave_container(&it, &map);
+        auto map = decoder.begin_map();
+        if (map.is_err()) {
+            return Result<GenericReply>::Err("Failed to decode map size");
         }
-        return msg;
+
+        for (uint32_t i = 0; i < map.value(); ++i) {
+            auto key = decoder.decode_uint32();
+            if (key.is_err()) {
+                return Result<GenericReply>::Err("Failed to decode map key");
+            }
+
+            switch (key.value()) {
+                case 0:
+                    
+                    msgs_detail::decodeOptionalUInt32(map, msg.req_id);
+                    break;
+                case 1:
+                    
+                    msgs_detail::decodeOptionalUInt32(map, msg.error_code);
+                    break;
+                case 2:
+                    
+                    msgs_detail::decodeOptionalString(map, msg.message);
+                    break;
+                case 3:
+                    
+                    msgs_detail::decodeOptionalUInt32(map, msg.msg_type);
+                    break;
+                default:
+                    // Unknown field id; skip the value.
+                    decoder.skip_value();
+                    break;          
+
     }
 };
 
 
-struct HeatingEvent {
+
+class  HeatingEvent : public Serializeable {
+public:
+    static uint32_t id() { return FNV("HeatingEvent"); };
+    static const char* name() { return "HeatingEvent"; };
+    typedef enum FieldId {
+        TEMPERATURE = 0,
+        SETPOINT = 1,
+        HEATING = 2,
+    } FieldId;
     /// Current temperature in Celsius
     std::optional<float> temperature;
     /// Setpoint temperature in Celsius
@@ -1281,110 +681,118 @@ struct HeatingEvent {
     std::optional<bool> heating;
 
     /// Serialize this message into a CBOR map keyed by field id.
-    CborError toCbor(CborEncoder& parentEncoder) const {
-        size_t mapSize = 0;
+    Result<Void> encode(FrameEncoder& encoder) const {
+        encoder.begin_map().is_err()) {
+            return Result<Void>::Err("Failed to encode map size");
+        }
         if (temperature.has_value()) {
-            ++mapSize;
+            encoder.encode_uint32(0);
+            
+            encoder.encode_float(temperature);
         }
         if (setpoint.has_value()) {
-            ++mapSize;
+            encoder.encode_uint32(1);
+            
+            encoder.encode_float(setpoint);
         }
         if (heating.has_value()) {
-            ++mapSize;
+            encoder.encode_uint32(2);
+            
+            encoder.encode_bool(heating);
         }
 
-        CborEncoder mapEncoder;
-        CborError err = cbor_encoder_create_map(
-            &parentEncoder, &mapEncoder, mapSize);
-        if (err != CborNoError) return err;
-        if (temperature.has_value()) {
-            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(0));
-            if (err != CborNoError) return err;
-
-            err = msgs_detail::encodeOptionalFloat(mapEncoder, temperature);
-        }
-        if (err != CborNoError) return err;
-        if (setpoint.has_value()) {
-            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(1));
-            if (err != CborNoError) return err;
-
-            err = msgs_detail::encodeOptionalFloat(mapEncoder, setpoint);
-        }
-        if (err != CborNoError) return err;
-        if (heating.has_value()) {
-            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(2));
-            if (err != CborNoError) return err;
-
-            err = msgs_detail::encodeOptionalBool(mapEncoder, heating);
-        }
-        if (err != CborNoError) return err;
-        return cbor_encoder_close_container(&parentEncoder, &mapEncoder);
+        return encoder.end_map();
     }
 
     /// Deserialize a HeatingEvent from a CBOR map value.
-    static HeatingEvent fromCbor(CborValue& it) {
+    static Result<HeatingEvent> decode(FrameDecoder& decoder) {
         HeatingEvent msg;
-        CborValue map;
-        if (cbor_value_is_container(&it) &&
-            cbor_value_enter_container(&it, &map) == CborNoError)
-        {
-            while (!cbor_value_at_end(&map)) {
-                uint64_t key = 0;
-                if (cbor_value_is_unsigned_integer(&map)) {
-                    cbor_value_get_uint64(&map, &key);
-                } else if (cbor_value_is_integer(&map)) {
-                    int64_t signedKey = 0;
-                    cbor_value_get_int64(&map, &signedKey);
-                    if (signedKey < 0) {
-                        cbor_value_advance(&map);
-                        if (!cbor_value_at_end(&map)) {
-                            cbor_value_advance(&map);
-                        }
-                        continue;
-                    }
-                    key = static_cast<uint64_t>(signedKey);
-                } else {
-                    cbor_value_advance(&map);
-                    if (!cbor_value_at_end(&map)) {
-                        cbor_value_advance(&map);
-                    }
-                    continue;
-                }
-
-                cbor_value_advance(&map);
-                if (cbor_value_at_end(&map)) {
-                    break;
-                }
-
-                switch (key) {
-                    case 0:
-
-                    msgs_detail::decodeOptionalFloat(map, msg.temperature);
-                        break;
-                    case 1:
-
-                    msgs_detail::decodeOptionalFloat(map, msg.setpoint);
-                        break;
-                    case 2:
-
-                    msgs_detail::decodeOptionalBool(map, msg.heating);
-                        break;
-                    default:
-                        break;
-                }
-
-                if (!cbor_value_at_end(&map)) {
-                    cbor_value_advance(&map);
-                }
-            }
-            cbor_value_leave_container(&it, &map);
+        auto map = decoder.begin_map();
+        if (map.is_err()) {
+            return Result<HeatingEvent>::Err("Failed to decode map size");
         }
-        return msg;
+
+        for (uint32_t i = 0; i < map.value(); ++i) {
+            auto key = decoder.decode_uint32();
+            if (key.is_err()) {
+                return Result<HeatingEvent>::Err("Failed to decode map key");
+            }
+
+            switch (key.value()) {
+                case 0:
+                    
+                    msgs_detail::decodeOptionalFloat(map, msg.temperature);
+                    break;
+                case 1:
+                    
+                    msgs_detail::decodeOptionalFloat(map, msg.setpoint);
+                    break;
+                case 2:
+                    
+                    msgs_detail::decodeOptionalBool(map, msg.heating);
+                    break;
+                default:
+                    // Unknown field id; skip the value.
+                    decoder.skip_value();
+                    break;          
+
     }
 };
 
 
-struct HoverboardEvent {
+
+class  HoverboardEvent : public Serializeable {
+public:
+    static uint32_t id() { return FNV("HoverboardEvent"); };
+    static const char* name() { return "HoverboardEvent"; };
+    typedef enum FieldId {
+        CTRL_MOD = 0,
+        CTRL_TYP = 1,
+        CUR_MOT_MAX = 2,
+        RPM_MOT_MAX = 3,
+        FI_WEAK_ENA = 4,
+        FI_WEAK_HI = 5,
+        FI_WEAK_LO = 6,
+        FI_WEAK_MAX = 7,
+        PHASE_ADV_MAX_DEG = 8,
+        INPUT1_RAW = 9,
+        INPUT1_TYP = 10,
+        INPUT1_MIN = 11,
+        INPUT1_MID = 12,
+        INPUT1_MAX = 13,
+        INPUT1_CMD = 14,
+        INPUT2_RAW = 15,
+        INPUT2_TYP = 16,
+        INPUT2_MIN = 17,
+        INPUT2_MID = 18,
+        INPUT2_MAX = 19,
+        INPUT2_CMD = 20,
+        AUX_INPUT1_RAW = 21,
+        AUX_INPUT1_TYP = 22,
+        AUX_INPUT1_MIN = 23,
+        AUX_INPUT1_MID = 24,
+        AUX_INPUT1_MAX = 25,
+        AUX_INPUT1_CMD = 26,
+        AUX_INPUT2_RAW = 27,
+        AUX_INPUT2_TYP = 28,
+        AUX_INPUT2_MIN = 29,
+        AUX_INPUT2_MID = 30,
+        AUX_INPUT2_MAX = 31,
+        AUX_INPUT2_CMD = 32,
+        DC_CURR = 33,
+        RDC_CURR = 34,
+        LDC_CURR = 35,
+        CMDL = 36,
+        CMDR = 37,
+        SPD_AVG = 38,
+        SPDL = 39,
+        SPDR = 40,
+        FILTER_RATE = 41,
+        SPD_COEF = 42,
+        STR_COEF = 43,
+        BATV = 44,
+        TEMP = 45,
+    } FieldId;
     /// 1:Voltage 2:Speed 3:Torque
     std::optional<int32_t> ctrl_mod;
     /// 0:Commutation 1:Sinusoidal 2:FOC
@@ -1452,11 +860,11 @@ struct HoverboardEvent {
     /// Input2 command value
     std::optional<int32_t> aux_input2_cmd;
     /// Total DC Link current A *100
-    std::optional<float> dc_curr;
+    std::optional<int32_t> dc_curr;
     /// Right DC Link current A *100
-    std::optional<float> rdc_curr;
+    std::optional<int32_t> rdc_curr;
     /// Left DC Link current A *100
-    std::optional<float> ldc_curr;
+    std::optional<int32_t> ldc_curr;
     /// Left Motor Command RPM
     std::optional<int32_t> cmdl;
     /// Right Motor Command RPM
@@ -1474,717 +882,467 @@ struct HoverboardEvent {
     /// Steer Coefficient *10
     std::optional<int32_t> str_coef;
     /// Calibrated Battery Voltage *100
-    std::optional<float> batv;
+    std::optional<int32_t> batv;
     /// Calibrated Temperature C *10
-    std::optional<float> temp;
+    std::optional<int32_t> temp;
 
     /// Serialize this message into a CBOR map keyed by field id.
-    CborError toCbor(CborEncoder& parentEncoder) const {
-        size_t mapSize = 0;
+    Result<Void> encode(FrameEncoder& encoder) const {
+        encoder.begin_map().is_err()) {
+            return Result<Void>::Err("Failed to encode map size");
+        }
         if (ctrl_mod.has_value()) {
-            ++mapSize;
+            encoder.encode_uint32(0);
+            
+            encoder.encode_int32(ctrl_mod);
         }
         if (ctrl_typ.has_value()) {
-            ++mapSize;
+            encoder.encode_uint32(1);
+            
+            encoder.encode_int32(ctrl_typ);
         }
         if (cur_mot_max.has_value()) {
-            ++mapSize;
+            encoder.encode_uint32(2);
+            
+            encoder.encode_int32(cur_mot_max);
         }
         if (rpm_mot_max.has_value()) {
-            ++mapSize;
+            encoder.encode_uint32(3);
+            
+            encoder.encode_int32(rpm_mot_max);
         }
         if (fi_weak_ena.has_value()) {
-            ++mapSize;
+            encoder.encode_uint32(4);
+            
+            encoder.encode_int32(fi_weak_ena);
         }
         if (fi_weak_hi.has_value()) {
-            ++mapSize;
+            encoder.encode_uint32(5);
+            
+            encoder.encode_int32(fi_weak_hi);
         }
         if (fi_weak_lo.has_value()) {
-            ++mapSize;
+            encoder.encode_uint32(6);
+            
+            encoder.encode_int32(fi_weak_lo);
         }
         if (fi_weak_max.has_value()) {
-            ++mapSize;
+            encoder.encode_uint32(7);
+            
+            encoder.encode_int32(fi_weak_max);
         }
         if (phase_adv_max_deg.has_value()) {
-            ++mapSize;
+            encoder.encode_uint32(8);
+            
+            encoder.encode_int32(phase_adv_max_deg);
         }
         if (input1_raw.has_value()) {
-            ++mapSize;
+            encoder.encode_uint32(9);
+            
+            encoder.encode_int32(input1_raw);
         }
         if (input1_typ.has_value()) {
-            ++mapSize;
+            encoder.encode_uint32(10);
+            
+            encoder.encode_int32(input1_typ);
         }
         if (input1_min.has_value()) {
-            ++mapSize;
+            encoder.encode_uint32(11);
+            
+            encoder.encode_int32(input1_min);
         }
         if (input1_mid.has_value()) {
-            ++mapSize;
+            encoder.encode_uint32(12);
+            
+            encoder.encode_int32(input1_mid);
         }
         if (input1_max.has_value()) {
-            ++mapSize;
+            encoder.encode_uint32(13);
+            
+            encoder.encode_int32(input1_max);
         }
         if (input1_cmd.has_value()) {
-            ++mapSize;
+            encoder.encode_uint32(14);
+            
+            encoder.encode_int32(input1_cmd);
         }
         if (input2_raw.has_value()) {
-            ++mapSize;
+            encoder.encode_uint32(15);
+            
+            encoder.encode_int32(input2_raw);
         }
         if (input2_typ.has_value()) {
-            ++mapSize;
+            encoder.encode_uint32(16);
+            
+            encoder.encode_int32(input2_typ);
         }
         if (input2_min.has_value()) {
-            ++mapSize;
+            encoder.encode_uint32(17);
+            
+            encoder.encode_int32(input2_min);
         }
         if (input2_mid.has_value()) {
-            ++mapSize;
+            encoder.encode_uint32(18);
+            
+            encoder.encode_int32(input2_mid);
         }
         if (input2_max.has_value()) {
-            ++mapSize;
+            encoder.encode_uint32(19);
+            
+            encoder.encode_int32(input2_max);
         }
         if (input2_cmd.has_value()) {
-            ++mapSize;
+            encoder.encode_uint32(20);
+            
+            encoder.encode_int32(input2_cmd);
         }
         if (aux_input1_raw.has_value()) {
-            ++mapSize;
+            encoder.encode_uint32(21);
+            
+            encoder.encode_int32(aux_input1_raw);
         }
         if (aux_input1_typ.has_value()) {
-            ++mapSize;
+            encoder.encode_uint32(22);
+            
+            encoder.encode_int32(aux_input1_typ);
         }
         if (aux_input1_min.has_value()) {
-            ++mapSize;
+            encoder.encode_uint32(23);
+            
+            encoder.encode_int32(aux_input1_min);
         }
         if (aux_input1_mid.has_value()) {
-            ++mapSize;
+            encoder.encode_uint32(24);
+            
+            encoder.encode_int32(aux_input1_mid);
         }
         if (aux_input1_max.has_value()) {
-            ++mapSize;
+            encoder.encode_uint32(25);
+            
+            encoder.encode_int32(aux_input1_max);
         }
         if (aux_input1_cmd.has_value()) {
-            ++mapSize;
+            encoder.encode_uint32(26);
+            
+            encoder.encode_int32(aux_input1_cmd);
         }
         if (aux_input2_raw.has_value()) {
-            ++mapSize;
+            encoder.encode_uint32(27);
+            
+            encoder.encode_int32(aux_input2_raw);
         }
         if (aux_input2_typ.has_value()) {
-            ++mapSize;
+            encoder.encode_uint32(28);
+            
+            encoder.encode_int32(aux_input2_typ);
         }
         if (aux_input2_min.has_value()) {
-            ++mapSize;
+            encoder.encode_uint32(29);
+            
+            encoder.encode_int32(aux_input2_min);
         }
         if (aux_input2_mid.has_value()) {
-            ++mapSize;
+            encoder.encode_uint32(30);
+            
+            encoder.encode_int32(aux_input2_mid);
         }
         if (aux_input2_max.has_value()) {
-            ++mapSize;
+            encoder.encode_uint32(31);
+            
+            encoder.encode_int32(aux_input2_max);
         }
         if (aux_input2_cmd.has_value()) {
-            ++mapSize;
+            encoder.encode_uint32(32);
+            
+            encoder.encode_int32(aux_input2_cmd);
         }
         if (dc_curr.has_value()) {
-            ++mapSize;
+            encoder.encode_uint32(33);
+            
+            encoder.encode_int32(dc_curr);
         }
         if (rdc_curr.has_value()) {
-            ++mapSize;
+            encoder.encode_uint32(34);
+            
+            encoder.encode_int32(rdc_curr);
         }
         if (ldc_curr.has_value()) {
-            ++mapSize;
+            encoder.encode_uint32(35);
+            
+            encoder.encode_int32(ldc_curr);
         }
         if (cmdl.has_value()) {
-            ++mapSize;
+            encoder.encode_uint32(36);
+            
+            encoder.encode_int32(cmdl);
         }
         if (cmdr.has_value()) {
-            ++mapSize;
+            encoder.encode_uint32(37);
+            
+            encoder.encode_int32(cmdr);
         }
         if (spd_avg.has_value()) {
-            ++mapSize;
+            encoder.encode_uint32(38);
+            
+            encoder.encode_int32(spd_avg);
         }
         if (spdl.has_value()) {
-            ++mapSize;
+            encoder.encode_uint32(39);
+            
+            encoder.encode_int32(spdl);
         }
         if (spdr.has_value()) {
-            ++mapSize;
+            encoder.encode_uint32(40);
+            
+            encoder.encode_int32(spdr);
         }
         if (filter_rate.has_value()) {
-            ++mapSize;
+            encoder.encode_uint32(41);
+            
+            encoder.encode_int32(filter_rate);
         }
         if (spd_coef.has_value()) {
-            ++mapSize;
+            encoder.encode_uint32(42);
+            
+            encoder.encode_int32(spd_coef);
         }
         if (str_coef.has_value()) {
-            ++mapSize;
+            encoder.encode_uint32(43);
+            
+            encoder.encode_int32(str_coef);
         }
         if (batv.has_value()) {
-            ++mapSize;
+            encoder.encode_uint32(44);
+            
+            encoder.encode_int32(batv);
         }
         if (temp.has_value()) {
-            ++mapSize;
+            encoder.encode_uint32(45);
+            
+            encoder.encode_int32(temp);
         }
 
-        CborEncoder mapEncoder;
-        CborError err = cbor_encoder_create_map(
-            &parentEncoder, &mapEncoder, mapSize);
-        if (err != CborNoError) return err;
-        if (ctrl_mod.has_value()) {
-            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(0));
-            if (err != CborNoError) return err;
-
-            err = msgs_detail::encodeOptionalInt32(mapEncoder, ctrl_mod);
-        }
-        if (err != CborNoError) return err;
-        if (ctrl_typ.has_value()) {
-            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(1));
-            if (err != CborNoError) return err;
-
-            err = msgs_detail::encodeOptionalInt32(mapEncoder, ctrl_typ);
-        }
-        if (err != CborNoError) return err;
-        if (cur_mot_max.has_value()) {
-            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(2));
-            if (err != CborNoError) return err;
-
-            err = msgs_detail::encodeOptionalInt32(mapEncoder, cur_mot_max);
-        }
-        if (err != CborNoError) return err;
-        if (rpm_mot_max.has_value()) {
-            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(3));
-            if (err != CborNoError) return err;
-
-            err = msgs_detail::encodeOptionalInt32(mapEncoder, rpm_mot_max);
-        }
-        if (err != CborNoError) return err;
-        if (fi_weak_ena.has_value()) {
-            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(4));
-            if (err != CborNoError) return err;
-
-            err = msgs_detail::encodeOptionalInt32(mapEncoder, fi_weak_ena);
-        }
-        if (err != CborNoError) return err;
-        if (fi_weak_hi.has_value()) {
-            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(5));
-            if (err != CborNoError) return err;
-
-            err = msgs_detail::encodeOptionalInt32(mapEncoder, fi_weak_hi);
-        }
-        if (err != CborNoError) return err;
-        if (fi_weak_lo.has_value()) {
-            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(6));
-            if (err != CborNoError) return err;
-
-            err = msgs_detail::encodeOptionalInt32(mapEncoder, fi_weak_lo);
-        }
-        if (err != CborNoError) return err;
-        if (fi_weak_max.has_value()) {
-            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(7));
-            if (err != CborNoError) return err;
-
-            err = msgs_detail::encodeOptionalInt32(mapEncoder, fi_weak_max);
-        }
-        if (err != CborNoError) return err;
-        if (phase_adv_max_deg.has_value()) {
-            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(8));
-            if (err != CborNoError) return err;
-
-            err = msgs_detail::encodeOptionalInt32(mapEncoder, phase_adv_max_deg);
-        }
-        if (err != CborNoError) return err;
-        if (input1_raw.has_value()) {
-            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(9));
-            if (err != CborNoError) return err;
-
-            err = msgs_detail::encodeOptionalInt32(mapEncoder, input1_raw);
-        }
-        if (err != CborNoError) return err;
-        if (input1_typ.has_value()) {
-            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(10));
-            if (err != CborNoError) return err;
-
-            err = msgs_detail::encodeOptionalInt32(mapEncoder, input1_typ);
-        }
-        if (err != CborNoError) return err;
-        if (input1_min.has_value()) {
-            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(11));
-            if (err != CborNoError) return err;
-
-            err = msgs_detail::encodeOptionalInt32(mapEncoder, input1_min);
-        }
-        if (err != CborNoError) return err;
-        if (input1_mid.has_value()) {
-            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(12));
-            if (err != CborNoError) return err;
-
-            err = msgs_detail::encodeOptionalInt32(mapEncoder, input1_mid);
-        }
-        if (err != CborNoError) return err;
-        if (input1_max.has_value()) {
-            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(13));
-            if (err != CborNoError) return err;
-
-            err = msgs_detail::encodeOptionalInt32(mapEncoder, input1_max);
-        }
-        if (err != CborNoError) return err;
-        if (input1_cmd.has_value()) {
-            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(14));
-            if (err != CborNoError) return err;
-
-            err = msgs_detail::encodeOptionalInt32(mapEncoder, input1_cmd);
-        }
-        if (err != CborNoError) return err;
-        if (input2_raw.has_value()) {
-            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(15));
-            if (err != CborNoError) return err;
-
-            err = msgs_detail::encodeOptionalInt32(mapEncoder, input2_raw);
-        }
-        if (err != CborNoError) return err;
-        if (input2_typ.has_value()) {
-            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(16));
-            if (err != CborNoError) return err;
-
-            err = msgs_detail::encodeOptionalInt32(mapEncoder, input2_typ);
-        }
-        if (err != CborNoError) return err;
-        if (input2_min.has_value()) {
-            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(17));
-            if (err != CborNoError) return err;
-
-            err = msgs_detail::encodeOptionalInt32(mapEncoder, input2_min);
-        }
-        if (err != CborNoError) return err;
-        if (input2_mid.has_value()) {
-            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(18));
-            if (err != CborNoError) return err;
-
-            err = msgs_detail::encodeOptionalInt32(mapEncoder, input2_mid);
-        }
-        if (err != CborNoError) return err;
-        if (input2_max.has_value()) {
-            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(19));
-            if (err != CborNoError) return err;
-
-            err = msgs_detail::encodeOptionalInt32(mapEncoder, input2_max);
-        }
-        if (err != CborNoError) return err;
-        if (input2_cmd.has_value()) {
-            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(20));
-            if (err != CborNoError) return err;
-
-            err = msgs_detail::encodeOptionalInt32(mapEncoder, input2_cmd);
-        }
-        if (err != CborNoError) return err;
-        if (aux_input1_raw.has_value()) {
-            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(21));
-            if (err != CborNoError) return err;
-
-            err = msgs_detail::encodeOptionalInt32(mapEncoder, aux_input1_raw);
-        }
-        if (err != CborNoError) return err;
-        if (aux_input1_typ.has_value()) {
-            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(22));
-            if (err != CborNoError) return err;
-
-            err = msgs_detail::encodeOptionalInt32(mapEncoder, aux_input1_typ);
-        }
-        if (err != CborNoError) return err;
-        if (aux_input1_min.has_value()) {
-            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(23));
-            if (err != CborNoError) return err;
-
-            err = msgs_detail::encodeOptionalInt32(mapEncoder, aux_input1_min);
-        }
-        if (err != CborNoError) return err;
-        if (aux_input1_mid.has_value()) {
-            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(24));
-            if (err != CborNoError) return err;
-
-            err = msgs_detail::encodeOptionalInt32(mapEncoder, aux_input1_mid);
-        }
-        if (err != CborNoError) return err;
-        if (aux_input1_max.has_value()) {
-            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(25));
-            if (err != CborNoError) return err;
-
-            err = msgs_detail::encodeOptionalInt32(mapEncoder, aux_input1_max);
-        }
-        if (err != CborNoError) return err;
-        if (aux_input1_cmd.has_value()) {
-            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(26));
-            if (err != CborNoError) return err;
-
-            err = msgs_detail::encodeOptionalInt32(mapEncoder, aux_input1_cmd);
-        }
-        if (err != CborNoError) return err;
-        if (aux_input2_raw.has_value()) {
-            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(27));
-            if (err != CborNoError) return err;
-
-            err = msgs_detail::encodeOptionalInt32(mapEncoder, aux_input2_raw);
-        }
-        if (err != CborNoError) return err;
-        if (aux_input2_typ.has_value()) {
-            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(28));
-            if (err != CborNoError) return err;
-
-            err = msgs_detail::encodeOptionalInt32(mapEncoder, aux_input2_typ);
-        }
-        if (err != CborNoError) return err;
-        if (aux_input2_min.has_value()) {
-            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(29));
-            if (err != CborNoError) return err;
-
-            err = msgs_detail::encodeOptionalInt32(mapEncoder, aux_input2_min);
-        }
-        if (err != CborNoError) return err;
-        if (aux_input2_mid.has_value()) {
-            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(30));
-            if (err != CborNoError) return err;
-
-            err = msgs_detail::encodeOptionalInt32(mapEncoder, aux_input2_mid);
-        }
-        if (err != CborNoError) return err;
-        if (aux_input2_max.has_value()) {
-            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(31));
-            if (err != CborNoError) return err;
-
-            err = msgs_detail::encodeOptionalInt32(mapEncoder, aux_input2_max);
-        }
-        if (err != CborNoError) return err;
-        if (aux_input2_cmd.has_value()) {
-            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(32));
-            if (err != CborNoError) return err;
-
-            err = msgs_detail::encodeOptionalInt32(mapEncoder, aux_input2_cmd);
-        }
-        if (err != CborNoError) return err;
-        if (dc_curr.has_value()) {
-            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(33));
-            if (err != CborNoError) return err;
-
-            err = msgs_detail::encodeOptionalFloat(mapEncoder, dc_curr);
-        }
-        if (err != CborNoError) return err;
-        if (rdc_curr.has_value()) {
-            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(34));
-            if (err != CborNoError) return err;
-
-            err = msgs_detail::encodeOptionalFloat(mapEncoder, rdc_curr);
-        }
-        if (err != CborNoError) return err;
-        if (ldc_curr.has_value()) {
-            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(35));
-            if (err != CborNoError) return err;
-
-            err = msgs_detail::encodeOptionalFloat(mapEncoder, ldc_curr);
-        }
-        if (err != CborNoError) return err;
-        if (cmdl.has_value()) {
-            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(36));
-            if (err != CborNoError) return err;
-
-            err = msgs_detail::encodeOptionalInt32(mapEncoder, cmdl);
-        }
-        if (err != CborNoError) return err;
-        if (cmdr.has_value()) {
-            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(37));
-            if (err != CborNoError) return err;
-
-            err = msgs_detail::encodeOptionalInt32(mapEncoder, cmdr);
-        }
-        if (err != CborNoError) return err;
-        if (spd_avg.has_value()) {
-            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(38));
-            if (err != CborNoError) return err;
-
-            err = msgs_detail::encodeOptionalInt32(mapEncoder, spd_avg);
-        }
-        if (err != CborNoError) return err;
-        if (spdl.has_value()) {
-            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(39));
-            if (err != CborNoError) return err;
-
-            err = msgs_detail::encodeOptionalInt32(mapEncoder, spdl);
-        }
-        if (err != CborNoError) return err;
-        if (spdr.has_value()) {
-            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(40));
-            if (err != CborNoError) return err;
-
-            err = msgs_detail::encodeOptionalInt32(mapEncoder, spdr);
-        }
-        if (err != CborNoError) return err;
-        if (filter_rate.has_value()) {
-            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(41));
-            if (err != CborNoError) return err;
-
-            err = msgs_detail::encodeOptionalInt32(mapEncoder, filter_rate);
-        }
-        if (err != CborNoError) return err;
-        if (spd_coef.has_value()) {
-            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(42));
-            if (err != CborNoError) return err;
-
-            err = msgs_detail::encodeOptionalInt32(mapEncoder, spd_coef);
-        }
-        if (err != CborNoError) return err;
-        if (str_coef.has_value()) {
-            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(43));
-            if (err != CborNoError) return err;
-
-            err = msgs_detail::encodeOptionalInt32(mapEncoder, str_coef);
-        }
-        if (err != CborNoError) return err;
-        if (batv.has_value()) {
-            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(44));
-            if (err != CborNoError) return err;
-
-            err = msgs_detail::encodeOptionalFloat(mapEncoder, batv);
-        }
-        if (err != CborNoError) return err;
-        if (temp.has_value()) {
-            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(45));
-            if (err != CborNoError) return err;
-
-            err = msgs_detail::encodeOptionalFloat(mapEncoder, temp);
-        }
-        if (err != CborNoError) return err;
-        return cbor_encoder_close_container(&parentEncoder, &mapEncoder);
+        return encoder.end_map();
     }
 
     /// Deserialize a HoverboardEvent from a CBOR map value.
-    static HoverboardEvent fromCbor(CborValue& it) {
+    static Result<HoverboardEvent> decode(FrameDecoder& decoder) {
         HoverboardEvent msg;
-        CborValue map;
-        if (cbor_value_is_container(&it) &&
-            cbor_value_enter_container(&it, &map) == CborNoError)
-        {
-            while (!cbor_value_at_end(&map)) {
-                uint64_t key = 0;
-                if (cbor_value_is_unsigned_integer(&map)) {
-                    cbor_value_get_uint64(&map, &key);
-                } else if (cbor_value_is_integer(&map)) {
-                    int64_t signedKey = 0;
-                    cbor_value_get_int64(&map, &signedKey);
-                    if (signedKey < 0) {
-                        cbor_value_advance(&map);
-                        if (!cbor_value_at_end(&map)) {
-                            cbor_value_advance(&map);
-                        }
-                        continue;
-                    }
-                    key = static_cast<uint64_t>(signedKey);
-                } else {
-                    cbor_value_advance(&map);
-                    if (!cbor_value_at_end(&map)) {
-                        cbor_value_advance(&map);
-                    }
-                    continue;
-                }
-
-                cbor_value_advance(&map);
-                if (cbor_value_at_end(&map)) {
-                    break;
-                }
-
-                switch (key) {
-                    case 0:
-
-                    msgs_detail::decodeOptionalInt32(map, msg.ctrl_mod);
-                        break;
-                    case 1:
-
-                    msgs_detail::decodeOptionalInt32(map, msg.ctrl_typ);
-                        break;
-                    case 2:
-
-                    msgs_detail::decodeOptionalInt32(map, msg.cur_mot_max);
-                        break;
-                    case 3:
-
-                    msgs_detail::decodeOptionalInt32(map, msg.rpm_mot_max);
-                        break;
-                    case 4:
-
-                    msgs_detail::decodeOptionalInt32(map, msg.fi_weak_ena);
-                        break;
-                    case 5:
-
-                    msgs_detail::decodeOptionalInt32(map, msg.fi_weak_hi);
-                        break;
-                    case 6:
-
-                    msgs_detail::decodeOptionalInt32(map, msg.fi_weak_lo);
-                        break;
-                    case 7:
-
-                    msgs_detail::decodeOptionalInt32(map, msg.fi_weak_max);
-                        break;
-                    case 8:
-
-                    msgs_detail::decodeOptionalInt32(map, msg.phase_adv_max_deg);
-                        break;
-                    case 9:
-
-                    msgs_detail::decodeOptionalInt32(map, msg.input1_raw);
-                        break;
-                    case 10:
-
-                    msgs_detail::decodeOptionalInt32(map, msg.input1_typ);
-                        break;
-                    case 11:
-
-                    msgs_detail::decodeOptionalInt32(map, msg.input1_min);
-                        break;
-                    case 12:
-
-                    msgs_detail::decodeOptionalInt32(map, msg.input1_mid);
-                        break;
-                    case 13:
-
-                    msgs_detail::decodeOptionalInt32(map, msg.input1_max);
-                        break;
-                    case 14:
-
-                    msgs_detail::decodeOptionalInt32(map, msg.input1_cmd);
-                        break;
-                    case 15:
-
-                    msgs_detail::decodeOptionalInt32(map, msg.input2_raw);
-                        break;
-                    case 16:
-
-                    msgs_detail::decodeOptionalInt32(map, msg.input2_typ);
-                        break;
-                    case 17:
-
-                    msgs_detail::decodeOptionalInt32(map, msg.input2_min);
-                        break;
-                    case 18:
-
-                    msgs_detail::decodeOptionalInt32(map, msg.input2_mid);
-                        break;
-                    case 19:
-
-                    msgs_detail::decodeOptionalInt32(map, msg.input2_max);
-                        break;
-                    case 20:
-
-                    msgs_detail::decodeOptionalInt32(map, msg.input2_cmd);
-                        break;
-                    case 21:
-
-                    msgs_detail::decodeOptionalInt32(map, msg.aux_input1_raw);
-                        break;
-                    case 22:
-
-                    msgs_detail::decodeOptionalInt32(map, msg.aux_input1_typ);
-                        break;
-                    case 23:
-
-                    msgs_detail::decodeOptionalInt32(map, msg.aux_input1_min);
-                        break;
-                    case 24:
-
-                    msgs_detail::decodeOptionalInt32(map, msg.aux_input1_mid);
-                        break;
-                    case 25:
-
-                    msgs_detail::decodeOptionalInt32(map, msg.aux_input1_max);
-                        break;
-                    case 26:
-
-                    msgs_detail::decodeOptionalInt32(map, msg.aux_input1_cmd);
-                        break;
-                    case 27:
-
-                    msgs_detail::decodeOptionalInt32(map, msg.aux_input2_raw);
-                        break;
-                    case 28:
-
-                    msgs_detail::decodeOptionalInt32(map, msg.aux_input2_typ);
-                        break;
-                    case 29:
-
-                    msgs_detail::decodeOptionalInt32(map, msg.aux_input2_min);
-                        break;
-                    case 30:
-
-                    msgs_detail::decodeOptionalInt32(map, msg.aux_input2_mid);
-                        break;
-                    case 31:
-
-                    msgs_detail::decodeOptionalInt32(map, msg.aux_input2_max);
-                        break;
-                    case 32:
-
-                    msgs_detail::decodeOptionalInt32(map, msg.aux_input2_cmd);
-                        break;
-                    case 33:
-
-                    msgs_detail::decodeOptionalFloat(map, msg.dc_curr);
-                        break;
-                    case 34:
-
-                    msgs_detail::decodeOptionalFloat(map, msg.rdc_curr);
-                        break;
-                    case 35:
-
-                    msgs_detail::decodeOptionalFloat(map, msg.ldc_curr);
-                        break;
-                    case 36:
-
-                    msgs_detail::decodeOptionalInt32(map, msg.cmdl);
-                        break;
-                    case 37:
-
-                    msgs_detail::decodeOptionalInt32(map, msg.cmdr);
-                        break;
-                    case 38:
-
-                    msgs_detail::decodeOptionalInt32(map, msg.spd_avg);
-                        break;
-                    case 39:
-
-                    msgs_detail::decodeOptionalInt32(map, msg.spdl);
-                        break;
-                    case 40:
-
-                    msgs_detail::decodeOptionalInt32(map, msg.spdr);
-                        break;
-                    case 41:
-
-                    msgs_detail::decodeOptionalInt32(map, msg.filter_rate);
-                        break;
-                    case 42:
-
-                    msgs_detail::decodeOptionalInt32(map, msg.spd_coef);
-                        break;
-                    case 43:
-
-                    msgs_detail::decodeOptionalInt32(map, msg.str_coef);
-                        break;
-                    case 44:
-
-                    msgs_detail::decodeOptionalFloat(map, msg.batv);
-                        break;
-                    case 45:
-
-                    msgs_detail::decodeOptionalFloat(map, msg.temp);
-                        break;
-                    default:
-                        break;
-                }
-
-                if (!cbor_value_at_end(&map)) {
-                    cbor_value_advance(&map);
-                }
-            }
-            cbor_value_leave_container(&it, &map);
+        auto map = decoder.begin_map();
+        if (map.is_err()) {
+            return Result<HoverboardEvent>::Err("Failed to decode map size");
         }
-        return msg;
+
+        for (uint32_t i = 0; i < map.value(); ++i) {
+            auto key = decoder.decode_uint32();
+            if (key.is_err()) {
+                return Result<HoverboardEvent>::Err("Failed to decode map key");
+            }
+
+            switch (key.value()) {
+                case 0:
+                    
+                    msgs_detail::decodeOptionalInt32(map, msg.ctrl_mod);
+                    break;
+                case 1:
+                    
+                    msgs_detail::decodeOptionalInt32(map, msg.ctrl_typ);
+                    break;
+                case 2:
+                    
+                    msgs_detail::decodeOptionalInt32(map, msg.cur_mot_max);
+                    break;
+                case 3:
+                    
+                    msgs_detail::decodeOptionalInt32(map, msg.rpm_mot_max);
+                    break;
+                case 4:
+                    
+                    msgs_detail::decodeOptionalInt32(map, msg.fi_weak_ena);
+                    break;
+                case 5:
+                    
+                    msgs_detail::decodeOptionalInt32(map, msg.fi_weak_hi);
+                    break;
+                case 6:
+                    
+                    msgs_detail::decodeOptionalInt32(map, msg.fi_weak_lo);
+                    break;
+                case 7:
+                    
+                    msgs_detail::decodeOptionalInt32(map, msg.fi_weak_max);
+                    break;
+                case 8:
+                    
+                    msgs_detail::decodeOptionalInt32(map, msg.phase_adv_max_deg);
+                    break;
+                case 9:
+                    
+                    msgs_detail::decodeOptionalInt32(map, msg.input1_raw);
+                    break;
+                case 10:
+                    
+                    msgs_detail::decodeOptionalInt32(map, msg.input1_typ);
+                    break;
+                case 11:
+                    
+                    msgs_detail::decodeOptionalInt32(map, msg.input1_min);
+                    break;
+                case 12:
+                    
+                    msgs_detail::decodeOptionalInt32(map, msg.input1_mid);
+                    break;
+                case 13:
+                    
+                    msgs_detail::decodeOptionalInt32(map, msg.input1_max);
+                    break;
+                case 14:
+                    
+                    msgs_detail::decodeOptionalInt32(map, msg.input1_cmd);
+                    break;
+                case 15:
+                    
+                    msgs_detail::decodeOptionalInt32(map, msg.input2_raw);
+                    break;
+                case 16:
+                    
+                    msgs_detail::decodeOptionalInt32(map, msg.input2_typ);
+                    break;
+                case 17:
+                    
+                    msgs_detail::decodeOptionalInt32(map, msg.input2_min);
+                    break;
+                case 18:
+                    
+                    msgs_detail::decodeOptionalInt32(map, msg.input2_mid);
+                    break;
+                case 19:
+                    
+                    msgs_detail::decodeOptionalInt32(map, msg.input2_max);
+                    break;
+                case 20:
+                    
+                    msgs_detail::decodeOptionalInt32(map, msg.input2_cmd);
+                    break;
+                case 21:
+                    
+                    msgs_detail::decodeOptionalInt32(map, msg.aux_input1_raw);
+                    break;
+                case 22:
+                    
+                    msgs_detail::decodeOptionalInt32(map, msg.aux_input1_typ);
+                    break;
+                case 23:
+                    
+                    msgs_detail::decodeOptionalInt32(map, msg.aux_input1_min);
+                    break;
+                case 24:
+                    
+                    msgs_detail::decodeOptionalInt32(map, msg.aux_input1_mid);
+                    break;
+                case 25:
+                    
+                    msgs_detail::decodeOptionalInt32(map, msg.aux_input1_max);
+                    break;
+                case 26:
+                    
+                    msgs_detail::decodeOptionalInt32(map, msg.aux_input1_cmd);
+                    break;
+                case 27:
+                    
+                    msgs_detail::decodeOptionalInt32(map, msg.aux_input2_raw);
+                    break;
+                case 28:
+                    
+                    msgs_detail::decodeOptionalInt32(map, msg.aux_input2_typ);
+                    break;
+                case 29:
+                    
+                    msgs_detail::decodeOptionalInt32(map, msg.aux_input2_min);
+                    break;
+                case 30:
+                    
+                    msgs_detail::decodeOptionalInt32(map, msg.aux_input2_mid);
+                    break;
+                case 31:
+                    
+                    msgs_detail::decodeOptionalInt32(map, msg.aux_input2_max);
+                    break;
+                case 32:
+                    
+                    msgs_detail::decodeOptionalInt32(map, msg.aux_input2_cmd);
+                    break;
+                case 33:
+                    
+                    msgs_detail::decodeOptionalInt32(map, msg.dc_curr);
+                    break;
+                case 34:
+                    
+                    msgs_detail::decodeOptionalInt32(map, msg.rdc_curr);
+                    break;
+                case 35:
+                    
+                    msgs_detail::decodeOptionalInt32(map, msg.ldc_curr);
+                    break;
+                case 36:
+                    
+                    msgs_detail::decodeOptionalInt32(map, msg.cmdl);
+                    break;
+                case 37:
+                    
+                    msgs_detail::decodeOptionalInt32(map, msg.cmdr);
+                    break;
+                case 38:
+                    
+                    msgs_detail::decodeOptionalInt32(map, msg.spd_avg);
+                    break;
+                case 39:
+                    
+                    msgs_detail::decodeOptionalInt32(map, msg.spdl);
+                    break;
+                case 40:
+                    
+                    msgs_detail::decodeOptionalInt32(map, msg.spdr);
+                    break;
+                case 41:
+                    
+                    msgs_detail::decodeOptionalInt32(map, msg.filter_rate);
+                    break;
+                case 42:
+                    
+                    msgs_detail::decodeOptionalInt32(map, msg.spd_coef);
+                    break;
+                case 43:
+                    
+                    msgs_detail::decodeOptionalInt32(map, msg.str_coef);
+                    break;
+                case 44:
+                    
+                    msgs_detail::decodeOptionalInt32(map, msg.batv);
+                    break;
+                case 45:
+                    
+                    msgs_detail::decodeOptionalInt32(map, msg.temp);
+                    break;
+                default:
+                    // Unknown field id; skip the value.
+                    decoder.skip_value();
+                    break;          
+
     }
 };
 
 
-struct HoverboardRequest {
+
+class  HoverboardRequest : public Serializeable {
+public:
+    static uint32_t id() { return FNV("HoverboardRequest"); };
+    static const char* name() { return "HoverboardRequest"; };
+    typedef enum FieldId {
+        REQ_ID = 0,
+        SPEED = 1,
+        STEER = 2,
+    } FieldId;
     /// For request/reply matching, 0 if not a request/reply
     std::optional<uint32_t> req_id;
     /// Speed command for the hoverboard
@@ -2193,110 +1351,191 @@ struct HoverboardRequest {
     std::optional<int32_t> steer;
 
     /// Serialize this message into a CBOR map keyed by field id.
-    CborError toCbor(CborEncoder& parentEncoder) const {
-        size_t mapSize = 0;
+    Result<Void> encode(FrameEncoder& encoder) const {
+        encoder.begin_map().is_err()) {
+            return Result<Void>::Err("Failed to encode map size");
+        }
         if (req_id.has_value()) {
-            ++mapSize;
+            encoder.encode_uint32(0);
+            
+            encoder.encode_uint32(req_id);
         }
         if (speed.has_value()) {
-            ++mapSize;
+            encoder.encode_uint32(1);
+            
+            encoder.encode_int32(speed);
         }
         if (steer.has_value()) {
-            ++mapSize;
+            encoder.encode_uint32(2);
+            
+            encoder.encode_int32(steer);
         }
 
-        CborEncoder mapEncoder;
-        CborError err = cbor_encoder_create_map(
-            &parentEncoder, &mapEncoder, mapSize);
-        if (err != CborNoError) return err;
-        if (req_id.has_value()) {
-            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(0));
-            if (err != CborNoError) return err;
-
-            err = msgs_detail::encodeOptionalUInt32(mapEncoder, req_id);
-        }
-        if (err != CborNoError) return err;
-        if (speed.has_value()) {
-            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(1));
-            if (err != CborNoError) return err;
-
-            err = msgs_detail::encodeOptionalInt32(mapEncoder, speed);
-        }
-        if (err != CborNoError) return err;
-        if (steer.has_value()) {
-            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(2));
-            if (err != CborNoError) return err;
-
-            err = msgs_detail::encodeOptionalInt32(mapEncoder, steer);
-        }
-        if (err != CborNoError) return err;
-        return cbor_encoder_close_container(&parentEncoder, &mapEncoder);
+        return encoder.end_map();
     }
 
     /// Deserialize a HoverboardRequest from a CBOR map value.
-    static HoverboardRequest fromCbor(CborValue& it) {
+    static Result<HoverboardRequest> decode(FrameDecoder& decoder) {
         HoverboardRequest msg;
-        CborValue map;
-        if (cbor_value_is_container(&it) &&
-            cbor_value_enter_container(&it, &map) == CborNoError)
-        {
-            while (!cbor_value_at_end(&map)) {
-                uint64_t key = 0;
-                if (cbor_value_is_unsigned_integer(&map)) {
-                    cbor_value_get_uint64(&map, &key);
-                } else if (cbor_value_is_integer(&map)) {
-                    int64_t signedKey = 0;
-                    cbor_value_get_int64(&map, &signedKey);
-                    if (signedKey < 0) {
-                        cbor_value_advance(&map);
-                        if (!cbor_value_at_end(&map)) {
-                            cbor_value_advance(&map);
-                        }
-                        continue;
-                    }
-                    key = static_cast<uint64_t>(signedKey);
-                } else {
-                    cbor_value_advance(&map);
-                    if (!cbor_value_at_end(&map)) {
-                        cbor_value_advance(&map);
-                    }
-                    continue;
-                }
-
-                cbor_value_advance(&map);
-                if (cbor_value_at_end(&map)) {
-                    break;
-                }
-
-                switch (key) {
-                    case 0:
-
-                    msgs_detail::decodeOptionalUInt32(map, msg.req_id);
-                        break;
-                    case 1:
-
-                    msgs_detail::decodeOptionalInt32(map, msg.speed);
-                        break;
-                    case 2:
-
-                    msgs_detail::decodeOptionalInt32(map, msg.steer);
-                        break;
-                    default:
-                        break;
-                }
-
-                if (!cbor_value_at_end(&map)) {
-                    cbor_value_advance(&map);
-                }
-            }
-            cbor_value_leave_container(&it, &map);
+        auto map = decoder.begin_map();
+        if (map.is_err()) {
+            return Result<HoverboardRequest>::Err("Failed to decode map size");
         }
-        return msg;
+
+        for (uint32_t i = 0; i < map.value(); ++i) {
+            auto key = decoder.decode_uint32();
+            if (key.is_err()) {
+                return Result<HoverboardRequest>::Err("Failed to decode map key");
+            }
+
+            switch (key.value()) {
+                case 0:
+                    
+                    msgs_detail::decodeOptionalUInt32(map, msg.req_id);
+                    break;
+                case 1:
+                    
+                    msgs_detail::decodeOptionalInt32(map, msg.speed);
+                    break;
+                case 2:
+                    
+                    msgs_detail::decodeOptionalInt32(map, msg.steer);
+                    break;
+                default:
+                    // Unknown field id; skip the value.
+                    decoder.skip_value();
+                    break;          
+
     }
 };
 
 
-struct Max31855Event {
+
+class  ImuEvent : public Serializeable {
+public:
+    static uint32_t id() { return FNV("ImuEvent"); };
+    static const char* name() { return "ImuEvent"; };
+    typedef enum FieldId {
+        GYRO_X = 0,
+        GYRO_Y = 1,
+        GYRO_Z = 2,
+        ACCEL_X = 3,
+        ACCEL_Y = 4,
+        ACCEL_Z = 5,
+    } FieldId;
+    /// Gyroscope X axis in deg/s
+    std::optional<float> gyro_x;
+    /// Gyroscope Y axis in deg/s
+    std::optional<float> gyro_y;
+    /// Gyroscope Z axis in deg/s
+    std::optional<float> gyro_z;
+    /// Accelerometer X axis in m/s^2
+    std::optional<float> accel_x;
+    /// Accelerometer Y axis in m/s^2
+    std::optional<float> accel_y;
+    /// Accelerometer Z axis in m/s^2
+    std::optional<float> accel_z;
+
+    /// Serialize this message into a CBOR map keyed by field id.
+    Result<Void> encode(FrameEncoder& encoder) const {
+        encoder.begin_map().is_err()) {
+            return Result<Void>::Err("Failed to encode map size");
+        }
+        if (gyro_x.has_value()) {
+            encoder.encode_uint32(0);
+            
+            encoder.encode_float(gyro_x);
+        }
+        if (gyro_y.has_value()) {
+            encoder.encode_uint32(1);
+            
+            encoder.encode_float(gyro_y);
+        }
+        if (gyro_z.has_value()) {
+            encoder.encode_uint32(2);
+            
+            encoder.encode_float(gyro_z);
+        }
+        if (accel_x.has_value()) {
+            encoder.encode_uint32(3);
+            
+            encoder.encode_float(accel_x);
+        }
+        if (accel_y.has_value()) {
+            encoder.encode_uint32(4);
+            
+            encoder.encode_float(accel_y);
+        }
+        if (accel_z.has_value()) {
+            encoder.encode_uint32(5);
+            
+            encoder.encode_float(accel_z);
+        }
+
+        return encoder.end_map();
+    }
+
+    /// Deserialize a ImuEvent from a CBOR map value.
+    static Result<ImuEvent> decode(FrameDecoder& decoder) {
+        ImuEvent msg;
+        auto map = decoder.begin_map();
+        if (map.is_err()) {
+            return Result<ImuEvent>::Err("Failed to decode map size");
+        }
+
+        for (uint32_t i = 0; i < map.value(); ++i) {
+            auto key = decoder.decode_uint32();
+            if (key.is_err()) {
+                return Result<ImuEvent>::Err("Failed to decode map key");
+            }
+
+            switch (key.value()) {
+                case 0:
+                    
+                    msgs_detail::decodeOptionalFloat(map, msg.gyro_x);
+                    break;
+                case 1:
+                    
+                    msgs_detail::decodeOptionalFloat(map, msg.gyro_y);
+                    break;
+                case 2:
+                    
+                    msgs_detail::decodeOptionalFloat(map, msg.gyro_z);
+                    break;
+                case 3:
+                    
+                    msgs_detail::decodeOptionalFloat(map, msg.accel_x);
+                    break;
+                case 4:
+                    
+                    msgs_detail::decodeOptionalFloat(map, msg.accel_y);
+                    break;
+                case 5:
+                    
+                    msgs_detail::decodeOptionalFloat(map, msg.accel_z);
+                    break;
+                default:
+                    // Unknown field id; skip the value.
+                    decoder.skip_value();
+                    break;          
+
+    }
+};
+
+
+
+class  Max31855Event : public Serializeable {
+public:
+    static uint32_t id() { return FNV("Max31855Event"); };
+    static const char* name() { return "Max31855Event"; };
+    typedef enum FieldId {
+        THERMOCOUPLE_TEMP = 0,
+        INTERNAL_TEMP = 1,
+        FAULT = 2,
+        FAULT_SHORT_VCC = 3,
+        FAULT_SHORT_GND = 4,
+        FAULT_OPEN_TC = 5,
+    } FieldId;
     /// Thermocouple temperature in Celsius
     std::optional<float> thermocouple_temp;
     /// Internal temperature in Celsius
@@ -2311,342 +1550,260 @@ struct Max31855Event {
     std::optional<bool> fault_open_tc;
 
     /// Serialize this message into a CBOR map keyed by field id.
-    CborError toCbor(CborEncoder& parentEncoder) const {
-        size_t mapSize = 0;
+    Result<Void> encode(FrameEncoder& encoder) const {
+        encoder.begin_map().is_err()) {
+            return Result<Void>::Err("Failed to encode map size");
+        }
         if (thermocouple_temp.has_value()) {
-            ++mapSize;
+            encoder.encode_uint32(0);
+            
+            encoder.encode_float(thermocouple_temp);
         }
         if (internal_temp.has_value()) {
-            ++mapSize;
+            encoder.encode_uint32(1);
+            
+            encoder.encode_float(internal_temp);
         }
         if (fault.has_value()) {
-            ++mapSize;
+            encoder.encode_uint32(2);
+            
+            encoder.encode_bool(fault);
         }
         if (fault_short_vcc.has_value()) {
-            ++mapSize;
+            encoder.encode_uint32(3);
+            
+            encoder.encode_bool(fault_short_vcc);
         }
         if (fault_short_gnd.has_value()) {
-            ++mapSize;
+            encoder.encode_uint32(4);
+            
+            encoder.encode_bool(fault_short_gnd);
         }
         if (fault_open_tc.has_value()) {
-            ++mapSize;
+            encoder.encode_uint32(5);
+            
+            encoder.encode_bool(fault_open_tc);
         }
 
-        CborEncoder mapEncoder;
-        CborError err = cbor_encoder_create_map(
-            &parentEncoder, &mapEncoder, mapSize);
-        if (err != CborNoError) return err;
-        if (thermocouple_temp.has_value()) {
-            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(0));
-            if (err != CborNoError) return err;
-
-            err = msgs_detail::encodeOptionalFloat(mapEncoder, thermocouple_temp);
-        }
-        if (err != CborNoError) return err;
-        if (internal_temp.has_value()) {
-            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(1));
-            if (err != CborNoError) return err;
-
-            err = msgs_detail::encodeOptionalFloat(mapEncoder, internal_temp);
-        }
-        if (err != CborNoError) return err;
-        if (fault.has_value()) {
-            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(2));
-            if (err != CborNoError) return err;
-
-            err = msgs_detail::encodeOptionalBool(mapEncoder, fault);
-        }
-        if (err != CborNoError) return err;
-        if (fault_short_vcc.has_value()) {
-            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(3));
-            if (err != CborNoError) return err;
-
-            err = msgs_detail::encodeOptionalBool(mapEncoder, fault_short_vcc);
-        }
-        if (err != CborNoError) return err;
-        if (fault_short_gnd.has_value()) {
-            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(4));
-            if (err != CborNoError) return err;
-
-            err = msgs_detail::encodeOptionalBool(mapEncoder, fault_short_gnd);
-        }
-        if (err != CborNoError) return err;
-        if (fault_open_tc.has_value()) {
-            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(5));
-            if (err != CborNoError) return err;
-
-            err = msgs_detail::encodeOptionalBool(mapEncoder, fault_open_tc);
-        }
-        if (err != CborNoError) return err;
-        return cbor_encoder_close_container(&parentEncoder, &mapEncoder);
+        return encoder.end_map();
     }
 
     /// Deserialize a Max31855Event from a CBOR map value.
-    static Max31855Event fromCbor(CborValue& it) {
+    static Result<Max31855Event> decode(FrameDecoder& decoder) {
         Max31855Event msg;
-        CborValue map;
-        if (cbor_value_is_container(&it) &&
-            cbor_value_enter_container(&it, &map) == CborNoError)
-        {
-            while (!cbor_value_at_end(&map)) {
-                uint64_t key = 0;
-                if (cbor_value_is_unsigned_integer(&map)) {
-                    cbor_value_get_uint64(&map, &key);
-                } else if (cbor_value_is_integer(&map)) {
-                    int64_t signedKey = 0;
-                    cbor_value_get_int64(&map, &signedKey);
-                    if (signedKey < 0) {
-                        cbor_value_advance(&map);
-                        if (!cbor_value_at_end(&map)) {
-                            cbor_value_advance(&map);
-                        }
-                        continue;
-                    }
-                    key = static_cast<uint64_t>(signedKey);
-                } else {
-                    cbor_value_advance(&map);
-                    if (!cbor_value_at_end(&map)) {
-                        cbor_value_advance(&map);
-                    }
-                    continue;
-                }
-
-                cbor_value_advance(&map);
-                if (cbor_value_at_end(&map)) {
-                    break;
-                }
-
-                switch (key) {
-                    case 0:
-
-                    msgs_detail::decodeOptionalFloat(map, msg.thermocouple_temp);
-                        break;
-                    case 1:
-
-                    msgs_detail::decodeOptionalFloat(map, msg.internal_temp);
-                        break;
-                    case 2:
-
-                    msgs_detail::decodeOptionalBool(map, msg.fault);
-                        break;
-                    case 3:
-
-                    msgs_detail::decodeOptionalBool(map, msg.fault_short_vcc);
-                        break;
-                    case 4:
-
-                    msgs_detail::decodeOptionalBool(map, msg.fault_short_gnd);
-                        break;
-                    case 5:
-
-                    msgs_detail::decodeOptionalBool(map, msg.fault_open_tc);
-                        break;
-                    default:
-                        break;
-                }
-
-                if (!cbor_value_at_end(&map)) {
-                    cbor_value_advance(&map);
-                }
-            }
-            cbor_value_leave_container(&it, &map);
+        auto map = decoder.begin_map();
+        if (map.is_err()) {
+            return Result<Max31855Event>::Err("Failed to decode map size");
         }
-        return msg;
+
+        for (uint32_t i = 0; i < map.value(); ++i) {
+            auto key = decoder.decode_uint32();
+            if (key.is_err()) {
+                return Result<Max31855Event>::Err("Failed to decode map key");
+            }
+
+            switch (key.value()) {
+                case 0:
+                    
+                    msgs_detail::decodeOptionalFloat(map, msg.thermocouple_temp);
+                    break;
+                case 1:
+                    
+                    msgs_detail::decodeOptionalFloat(map, msg.internal_temp);
+                    break;
+                case 2:
+                    
+                    msgs_detail::decodeOptionalBool(map, msg.fault);
+                    break;
+                case 3:
+                    
+                    msgs_detail::decodeOptionalBool(map, msg.fault_short_vcc);
+                    break;
+                case 4:
+                    
+                    msgs_detail::decodeOptionalBool(map, msg.fault_short_gnd);
+                    break;
+                case 5:
+                    
+                    msgs_detail::decodeOptionalBool(map, msg.fault_open_tc);
+                    break;
+                default:
+                    // Unknown field id; skip the value.
+                    decoder.skip_value();
+                    break;          
+
     }
 };
 
 
-struct PingReply {
+
+class  PingReply : public Serializeable {
+public:
+    static uint32_t id() { return FNV("PingReply"); };
+    static const char* name() { return "PingReply"; };
+    typedef enum FieldId {
+        REQ_ID = 0,
+        TIMESTAMP = 1,
+    } FieldId;
     std::optional<uint32_t> req_id;
     /// Timestamp in milliseconds since epoch
     std::optional<uint64_t> timestamp;
 
     /// Serialize this message into a CBOR map keyed by field id.
-    CborError toCbor(CborEncoder& parentEncoder) const {
-        size_t mapSize = 0;
+    Result<Void> encode(FrameEncoder& encoder) const {
+        encoder.begin_map().is_err()) {
+            return Result<Void>::Err("Failed to encode map size");
+        }
         if (req_id.has_value()) {
-            ++mapSize;
+            encoder.encode_uint32(0);
+            
+            encoder.encode_uint32(req_id);
         }
         if (timestamp.has_value()) {
-            ++mapSize;
+            encoder.encode_uint32(1);
+            
+            encoder.encode_uint64(timestamp);
         }
 
-        CborEncoder mapEncoder;
-        CborError err = cbor_encoder_create_map(
-            &parentEncoder, &mapEncoder, mapSize);
-        if (err != CborNoError) return err;
-        if (req_id.has_value()) {
-            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(0));
-            if (err != CborNoError) return err;
-
-            err = msgs_detail::encodeOptionalUInt32(mapEncoder, req_id);
-        }
-        if (err != CborNoError) return err;
-        if (timestamp.has_value()) {
-            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(1));
-            if (err != CborNoError) return err;
-
-            err = msgs_detail::encodeOptionalUInt64(mapEncoder, timestamp);
-        }
-        if (err != CborNoError) return err;
-        return cbor_encoder_close_container(&parentEncoder, &mapEncoder);
+        return encoder.end_map();
     }
 
     /// Deserialize a PingReply from a CBOR map value.
-    static PingReply fromCbor(CborValue& it) {
+    static Result<PingReply> decode(FrameDecoder& decoder) {
         PingReply msg;
-        CborValue map;
-        if (cbor_value_is_container(&it) &&
-            cbor_value_enter_container(&it, &map) == CborNoError)
-        {
-            while (!cbor_value_at_end(&map)) {
-                uint64_t key = 0;
-                if (cbor_value_is_unsigned_integer(&map)) {
-                    cbor_value_get_uint64(&map, &key);
-                } else if (cbor_value_is_integer(&map)) {
-                    int64_t signedKey = 0;
-                    cbor_value_get_int64(&map, &signedKey);
-                    if (signedKey < 0) {
-                        cbor_value_advance(&map);
-                        if (!cbor_value_at_end(&map)) {
-                            cbor_value_advance(&map);
-                        }
-                        continue;
-                    }
-                    key = static_cast<uint64_t>(signedKey);
-                } else {
-                    cbor_value_advance(&map);
-                    if (!cbor_value_at_end(&map)) {
-                        cbor_value_advance(&map);
-                    }
-                    continue;
-                }
-
-                cbor_value_advance(&map);
-                if (cbor_value_at_end(&map)) {
-                    break;
-                }
-
-                switch (key) {
-                    case 0:
-
-                    msgs_detail::decodeOptionalUInt32(map, msg.req_id);
-                        break;
-                    case 1:
-
-                    msgs_detail::decodeOptionalUInt64(map, msg.timestamp);
-                        break;
-                    default:
-                        break;
-                }
-
-                if (!cbor_value_at_end(&map)) {
-                    cbor_value_advance(&map);
-                }
-            }
-            cbor_value_leave_container(&it, &map);
+        auto map = decoder.begin_map();
+        if (map.is_err()) {
+            return Result<PingReply>::Err("Failed to decode map size");
         }
-        return msg;
+
+        for (uint32_t i = 0; i < map.value(); ++i) {
+            auto key = decoder.decode_uint32();
+            if (key.is_err()) {
+                return Result<PingReply>::Err("Failed to decode map key");
+            }
+
+            switch (key.value()) {
+                case 0:
+                    
+                    msgs_detail::decodeOptionalUInt32(map, msg.req_id);
+                    break;
+                case 1:
+                    
+                    msgs_detail::decodeOptionalUInt64(map, msg.timestamp);
+                    break;
+                default:
+                    // Unknown field id; skip the value.
+                    decoder.skip_value();
+                    break;          
+
     }
 };
 
 
-struct PingRequest {
+
+class  PingRequest : public Serializeable {
+public:
+    static uint32_t id() { return FNV("PingRequest"); };
+    static const char* name() { return "PingRequest"; };
+    typedef enum FieldId {
+        REQ_ID = 0,
+        TIMESTAMP = 1,
+    } FieldId;
     std::optional<uint32_t> req_id;
     /// Timestamp in milliseconds since epoch
     std::optional<uint64_t> timestamp;
 
     /// Serialize this message into a CBOR map keyed by field id.
-    CborError toCbor(CborEncoder& parentEncoder) const {
-        size_t mapSize = 0;
+    Result<Void> encode(FrameEncoder& encoder) const {
+        encoder.begin_map().is_err()) {
+            return Result<Void>::Err("Failed to encode map size");
+        }
         if (req_id.has_value()) {
-            ++mapSize;
+            encoder.encode_uint32(0);
+            
+            encoder.encode_uint32(req_id);
         }
         if (timestamp.has_value()) {
-            ++mapSize;
+            encoder.encode_uint32(1);
+            
+            encoder.encode_uint64(timestamp);
         }
 
-        CborEncoder mapEncoder;
-        CborError err = cbor_encoder_create_map(
-            &parentEncoder, &mapEncoder, mapSize);
-        if (err != CborNoError) return err;
-        if (req_id.has_value()) {
-            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(0));
-            if (err != CborNoError) return err;
-
-            err = msgs_detail::encodeOptionalUInt32(mapEncoder, req_id);
-        }
-        if (err != CborNoError) return err;
-        if (timestamp.has_value()) {
-            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(1));
-            if (err != CborNoError) return err;
-
-            err = msgs_detail::encodeOptionalUInt64(mapEncoder, timestamp);
-        }
-        if (err != CborNoError) return err;
-        return cbor_encoder_close_container(&parentEncoder, &mapEncoder);
+        return encoder.end_map();
     }
 
     /// Deserialize a PingRequest from a CBOR map value.
-    static PingRequest fromCbor(CborValue& it) {
+    static Result<PingRequest> decode(FrameDecoder& decoder) {
         PingRequest msg;
-        CborValue map;
-        if (cbor_value_is_container(&it) &&
-            cbor_value_enter_container(&it, &map) == CborNoError)
-        {
-            while (!cbor_value_at_end(&map)) {
-                uint64_t key = 0;
-                if (cbor_value_is_unsigned_integer(&map)) {
-                    cbor_value_get_uint64(&map, &key);
-                } else if (cbor_value_is_integer(&map)) {
-                    int64_t signedKey = 0;
-                    cbor_value_get_int64(&map, &signedKey);
-                    if (signedKey < 0) {
-                        cbor_value_advance(&map);
-                        if (!cbor_value_at_end(&map)) {
-                            cbor_value_advance(&map);
-                        }
-                        continue;
-                    }
-                    key = static_cast<uint64_t>(signedKey);
-                } else {
-                    cbor_value_advance(&map);
-                    if (!cbor_value_at_end(&map)) {
-                        cbor_value_advance(&map);
-                    }
-                    continue;
-                }
-
-                cbor_value_advance(&map);
-                if (cbor_value_at_end(&map)) {
-                    break;
-                }
-
-                switch (key) {
-                    case 0:
-
-                    msgs_detail::decodeOptionalUInt32(map, msg.req_id);
-                        break;
-                    case 1:
-
-                    msgs_detail::decodeOptionalUInt64(map, msg.timestamp);
-                        break;
-                    default:
-                        break;
-                }
-
-                if (!cbor_value_at_end(&map)) {
-                    cbor_value_advance(&map);
-                }
-            }
-            cbor_value_leave_container(&it, &map);
+        auto map = decoder.begin_map();
+        if (map.is_err()) {
+            return Result<PingRequest>::Err("Failed to decode map size");
         }
-        return msg;
+
+        for (uint32_t i = 0; i < map.value(); ++i) {
+            auto key = decoder.decode_uint32();
+            if (key.is_err()) {
+                return Result<PingRequest>::Err("Failed to decode map key");
+            }
+
+            switch (key.value()) {
+                case 0:
+                    
+                    msgs_detail::decodeOptionalUInt32(map, msg.req_id);
+                    break;
+                case 1:
+                    
+                    msgs_detail::decodeOptionalUInt64(map, msg.timestamp);
+                    break;
+                default:
+                    // Unknown field id; skip the value.
+                    decoder.skip_value();
+                    break;          
+
     }
 };
 
 
-struct Ps4Event {
+
+class  Ps4Event : public Serializeable {
+public:
+    static uint32_t id() { return FNV("Ps4Event"); };
+    static const char* name() { return "Ps4Event"; };
+    typedef enum FieldId {
+        BUTTON_LEFT = 0,
+        BUTTON_RIGHT = 1,
+        BUTTON_UP = 2,
+        BUTTON_DOWN = 3,
+        BUTTON_SQUARE = 4,
+        BUTTON_CROSS = 5,
+        BUTTON_CIRCLE = 6,
+        BUTTON_TRIANGLE = 7,
+        BUTTON_LEFT_SHOULDER = 8,
+        BUTTON_RIGHT_SHOULDER = 9,
+        BUTTON_LEFT_TRIGGER = 10,
+        BUTTON_RIGHT_TRIGGER = 11,
+        BUTTON_LEFT_JOYSTICK = 12,
+        BUTTON_RIGHT_JOYSTICK = 13,
+        BUTTON_SHARE = 14,
+        BUTTON_OPTIONS = 15,
+        BUTTON_TOUCHPAD = 16,
+        BUTTON_PS = 17,
+        AXIS_LX = 18,
+        AXIS_LY = 19,
+        AXIS_RX = 20,
+        AXIS_RY = 21,
+        GYRO_X = 22,
+        GYRO_Y = 23,
+        GYRO_Z = 24,
+        ACCEL_X = 25,
+        ACCEL_Y = 26,
+        ACCEL_Z = 27,
+        CONNECTED = 28,
+        BATTERY_LEVEL = 29,
+        BLUETOOTH = 30,
+        DEBUG = 31,
+        TEMP = 32,
+    } FieldId;
     std::optional<bool> button_left;
     std::optional<bool> button_right;
     std::optional<bool> button_up;
@@ -2682,530 +1839,350 @@ struct Ps4Event {
     std::optional<int32_t> temp;
 
     /// Serialize this message into a CBOR map keyed by field id.
-    CborError toCbor(CborEncoder& parentEncoder) const {
-        size_t mapSize = 0;
+    Result<Void> encode(FrameEncoder& encoder) const {
+        encoder.begin_map().is_err()) {
+            return Result<Void>::Err("Failed to encode map size");
+        }
         if (button_left.has_value()) {
-            ++mapSize;
+            encoder.encode_uint32(0);
+            
+            encoder.encode_bool(button_left);
         }
         if (button_right.has_value()) {
-            ++mapSize;
+            encoder.encode_uint32(1);
+            
+            encoder.encode_bool(button_right);
         }
         if (button_up.has_value()) {
-            ++mapSize;
+            encoder.encode_uint32(2);
+            
+            encoder.encode_bool(button_up);
         }
         if (button_down.has_value()) {
-            ++mapSize;
+            encoder.encode_uint32(3);
+            
+            encoder.encode_bool(button_down);
         }
         if (button_square.has_value()) {
-            ++mapSize;
+            encoder.encode_uint32(4);
+            
+            encoder.encode_bool(button_square);
         }
         if (button_cross.has_value()) {
-            ++mapSize;
+            encoder.encode_uint32(5);
+            
+            encoder.encode_bool(button_cross);
         }
         if (button_circle.has_value()) {
-            ++mapSize;
+            encoder.encode_uint32(6);
+            
+            encoder.encode_bool(button_circle);
         }
         if (button_triangle.has_value()) {
-            ++mapSize;
+            encoder.encode_uint32(7);
+            
+            encoder.encode_bool(button_triangle);
         }
         if (button_left_shoulder.has_value()) {
-            ++mapSize;
+            encoder.encode_uint32(8);
+            
+            encoder.encode_bool(button_left_shoulder);
         }
         if (button_right_shoulder.has_value()) {
-            ++mapSize;
+            encoder.encode_uint32(9);
+            
+            encoder.encode_bool(button_right_shoulder);
         }
         if (button_left_trigger.has_value()) {
-            ++mapSize;
+            encoder.encode_uint32(10);
+            
+            encoder.encode_bool(button_left_trigger);
         }
         if (button_right_trigger.has_value()) {
-            ++mapSize;
+            encoder.encode_uint32(11);
+            
+            encoder.encode_bool(button_right_trigger);
         }
         if (button_left_joystick.has_value()) {
-            ++mapSize;
+            encoder.encode_uint32(12);
+            
+            encoder.encode_bool(button_left_joystick);
         }
         if (button_right_joystick.has_value()) {
-            ++mapSize;
+            encoder.encode_uint32(13);
+            
+            encoder.encode_bool(button_right_joystick);
         }
         if (button_share.has_value()) {
-            ++mapSize;
+            encoder.encode_uint32(14);
+            
+            encoder.encode_bool(button_share);
         }
         if (button_options.has_value()) {
-            ++mapSize;
+            encoder.encode_uint32(15);
+            
+            encoder.encode_bool(button_options);
         }
         if (button_touchpad.has_value()) {
-            ++mapSize;
+            encoder.encode_uint32(16);
+            
+            encoder.encode_bool(button_touchpad);
         }
         if (button_ps.has_value()) {
-            ++mapSize;
+            encoder.encode_uint32(17);
+            
+            encoder.encode_bool(button_ps);
         }
         if (axis_lx.has_value()) {
-            ++mapSize;
+            encoder.encode_uint32(18);
+            
+            encoder.encode_int32(axis_lx);
         }
         if (axis_ly.has_value()) {
-            ++mapSize;
+            encoder.encode_uint32(19);
+            
+            encoder.encode_int32(axis_ly);
         }
         if (axis_rx.has_value()) {
-            ++mapSize;
+            encoder.encode_uint32(20);
+            
+            encoder.encode_int32(axis_rx);
         }
         if (axis_ry.has_value()) {
-            ++mapSize;
+            encoder.encode_uint32(21);
+            
+            encoder.encode_int32(axis_ry);
         }
         if (gyro_x.has_value()) {
-            ++mapSize;
+            encoder.encode_uint32(22);
+            
+            encoder.encode_int32(gyro_x);
         }
         if (gyro_y.has_value()) {
-            ++mapSize;
+            encoder.encode_uint32(23);
+            
+            encoder.encode_int32(gyro_y);
         }
         if (gyro_z.has_value()) {
-            ++mapSize;
+            encoder.encode_uint32(24);
+            
+            encoder.encode_int32(gyro_z);
         }
         if (accel_x.has_value()) {
-            ++mapSize;
+            encoder.encode_uint32(25);
+            
+            encoder.encode_int32(accel_x);
         }
         if (accel_y.has_value()) {
-            ++mapSize;
+            encoder.encode_uint32(26);
+            
+            encoder.encode_int32(accel_y);
         }
         if (accel_z.has_value()) {
-            ++mapSize;
+            encoder.encode_uint32(27);
+            
+            encoder.encode_int32(accel_z);
         }
         if (connected.has_value()) {
-            ++mapSize;
+            encoder.encode_uint32(28);
+            
+            encoder.encode_bool(connected);
         }
         if (battery_level.has_value()) {
-            ++mapSize;
+            encoder.encode_uint32(29);
+            
+            encoder.encode_int32(battery_level);
         }
         if (bluetooth.has_value()) {
-            ++mapSize;
+            encoder.encode_uint32(30);
+            
+            encoder.encode_bool(bluetooth);
         }
         if (debug.has_value()) {
-            ++mapSize;
+            encoder.encode_uint32(31);
+            
+            encoder.encode_str(debug);
         }
         if (temp.has_value()) {
-            ++mapSize;
+            encoder.encode_uint32(32);
+            
+            encoder.encode_int32(temp);
         }
 
-        CborEncoder mapEncoder;
-        CborError err = cbor_encoder_create_map(
-            &parentEncoder, &mapEncoder, mapSize);
-        if (err != CborNoError) return err;
-        if (button_left.has_value()) {
-            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(0));
-            if (err != CborNoError) return err;
-
-            err = msgs_detail::encodeOptionalBool(mapEncoder, button_left);
-        }
-        if (err != CborNoError) return err;
-        if (button_right.has_value()) {
-            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(1));
-            if (err != CborNoError) return err;
-
-            err = msgs_detail::encodeOptionalBool(mapEncoder, button_right);
-        }
-        if (err != CborNoError) return err;
-        if (button_up.has_value()) {
-            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(2));
-            if (err != CborNoError) return err;
-
-            err = msgs_detail::encodeOptionalBool(mapEncoder, button_up);
-        }
-        if (err != CborNoError) return err;
-        if (button_down.has_value()) {
-            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(3));
-            if (err != CborNoError) return err;
-
-            err = msgs_detail::encodeOptionalBool(mapEncoder, button_down);
-        }
-        if (err != CborNoError) return err;
-        if (button_square.has_value()) {
-            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(4));
-            if (err != CborNoError) return err;
-
-            err = msgs_detail::encodeOptionalBool(mapEncoder, button_square);
-        }
-        if (err != CborNoError) return err;
-        if (button_cross.has_value()) {
-            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(5));
-            if (err != CborNoError) return err;
-
-            err = msgs_detail::encodeOptionalBool(mapEncoder, button_cross);
-        }
-        if (err != CborNoError) return err;
-        if (button_circle.has_value()) {
-            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(6));
-            if (err != CborNoError) return err;
-
-            err = msgs_detail::encodeOptionalBool(mapEncoder, button_circle);
-        }
-        if (err != CborNoError) return err;
-        if (button_triangle.has_value()) {
-            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(7));
-            if (err != CborNoError) return err;
-
-            err = msgs_detail::encodeOptionalBool(mapEncoder, button_triangle);
-        }
-        if (err != CborNoError) return err;
-        if (button_left_shoulder.has_value()) {
-            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(8));
-            if (err != CborNoError) return err;
-
-            err = msgs_detail::encodeOptionalBool(mapEncoder, button_left_shoulder);
-        }
-        if (err != CborNoError) return err;
-        if (button_right_shoulder.has_value()) {
-            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(9));
-            if (err != CborNoError) return err;
-
-            err = msgs_detail::encodeOptionalBool(mapEncoder, button_right_shoulder);
-        }
-        if (err != CborNoError) return err;
-        if (button_left_trigger.has_value()) {
-            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(10));
-            if (err != CborNoError) return err;
-
-            err = msgs_detail::encodeOptionalBool(mapEncoder, button_left_trigger);
-        }
-        if (err != CborNoError) return err;
-        if (button_right_trigger.has_value()) {
-            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(11));
-            if (err != CborNoError) return err;
-
-            err = msgs_detail::encodeOptionalBool(mapEncoder, button_right_trigger);
-        }
-        if (err != CborNoError) return err;
-        if (button_left_joystick.has_value()) {
-            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(12));
-            if (err != CborNoError) return err;
-
-            err = msgs_detail::encodeOptionalBool(mapEncoder, button_left_joystick);
-        }
-        if (err != CborNoError) return err;
-        if (button_right_joystick.has_value()) {
-            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(13));
-            if (err != CborNoError) return err;
-
-            err = msgs_detail::encodeOptionalBool(mapEncoder, button_right_joystick);
-        }
-        if (err != CborNoError) return err;
-        if (button_share.has_value()) {
-            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(14));
-            if (err != CborNoError) return err;
-
-            err = msgs_detail::encodeOptionalBool(mapEncoder, button_share);
-        }
-        if (err != CborNoError) return err;
-        if (button_options.has_value()) {
-            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(15));
-            if (err != CborNoError) return err;
-
-            err = msgs_detail::encodeOptionalBool(mapEncoder, button_options);
-        }
-        if (err != CborNoError) return err;
-        if (button_touchpad.has_value()) {
-            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(16));
-            if (err != CborNoError) return err;
-
-            err = msgs_detail::encodeOptionalBool(mapEncoder, button_touchpad);
-        }
-        if (err != CborNoError) return err;
-        if (button_ps.has_value()) {
-            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(17));
-            if (err != CborNoError) return err;
-
-            err = msgs_detail::encodeOptionalBool(mapEncoder, button_ps);
-        }
-        if (err != CborNoError) return err;
-        if (axis_lx.has_value()) {
-            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(18));
-            if (err != CborNoError) return err;
-
-            err = msgs_detail::encodeOptionalInt32(mapEncoder, axis_lx);
-        }
-        if (err != CborNoError) return err;
-        if (axis_ly.has_value()) {
-            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(19));
-            if (err != CborNoError) return err;
-
-            err = msgs_detail::encodeOptionalInt32(mapEncoder, axis_ly);
-        }
-        if (err != CborNoError) return err;
-        if (axis_rx.has_value()) {
-            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(20));
-            if (err != CborNoError) return err;
-
-            err = msgs_detail::encodeOptionalInt32(mapEncoder, axis_rx);
-        }
-        if (err != CborNoError) return err;
-        if (axis_ry.has_value()) {
-            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(21));
-            if (err != CborNoError) return err;
-
-            err = msgs_detail::encodeOptionalInt32(mapEncoder, axis_ry);
-        }
-        if (err != CborNoError) return err;
-        if (gyro_x.has_value()) {
-            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(22));
-            if (err != CborNoError) return err;
-
-            err = msgs_detail::encodeOptionalInt32(mapEncoder, gyro_x);
-        }
-        if (err != CborNoError) return err;
-        if (gyro_y.has_value()) {
-            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(23));
-            if (err != CborNoError) return err;
-
-            err = msgs_detail::encodeOptionalInt32(mapEncoder, gyro_y);
-        }
-        if (err != CborNoError) return err;
-        if (gyro_z.has_value()) {
-            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(24));
-            if (err != CborNoError) return err;
-
-            err = msgs_detail::encodeOptionalInt32(mapEncoder, gyro_z);
-        }
-        if (err != CborNoError) return err;
-        if (accel_x.has_value()) {
-            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(25));
-            if (err != CborNoError) return err;
-
-            err = msgs_detail::encodeOptionalInt32(mapEncoder, accel_x);
-        }
-        if (err != CborNoError) return err;
-        if (accel_y.has_value()) {
-            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(26));
-            if (err != CborNoError) return err;
-
-            err = msgs_detail::encodeOptionalInt32(mapEncoder, accel_y);
-        }
-        if (err != CborNoError) return err;
-        if (accel_z.has_value()) {
-            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(27));
-            if (err != CborNoError) return err;
-
-            err = msgs_detail::encodeOptionalInt32(mapEncoder, accel_z);
-        }
-        if (err != CborNoError) return err;
-        if (connected.has_value()) {
-            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(28));
-            if (err != CborNoError) return err;
-
-            err = msgs_detail::encodeOptionalBool(mapEncoder, connected);
-        }
-        if (err != CborNoError) return err;
-        if (battery_level.has_value()) {
-            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(29));
-            if (err != CborNoError) return err;
-
-            err = msgs_detail::encodeOptionalInt32(mapEncoder, battery_level);
-        }
-        if (err != CborNoError) return err;
-        if (bluetooth.has_value()) {
-            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(30));
-            if (err != CborNoError) return err;
-
-            err = msgs_detail::encodeOptionalBool(mapEncoder, bluetooth);
-        }
-        if (err != CborNoError) return err;
-        if (debug.has_value()) {
-            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(31));
-            if (err != CborNoError) return err;
-
-            err = msgs_detail::encodeOptionalString(mapEncoder, debug);
-        }
-        if (err != CborNoError) return err;
-        if (temp.has_value()) {
-            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(32));
-            if (err != CborNoError) return err;
-
-            err = msgs_detail::encodeOptionalInt32(mapEncoder, temp);
-        }
-        if (err != CborNoError) return err;
-        return cbor_encoder_close_container(&parentEncoder, &mapEncoder);
+        return encoder.end_map();
     }
 
     /// Deserialize a Ps4Event from a CBOR map value.
-    static Ps4Event fromCbor(CborValue& it) {
+    static Result<Ps4Event> decode(FrameDecoder& decoder) {
         Ps4Event msg;
-        CborValue map;
-        if (cbor_value_is_container(&it) &&
-            cbor_value_enter_container(&it, &map) == CborNoError)
-        {
-            while (!cbor_value_at_end(&map)) {
-                uint64_t key = 0;
-                if (cbor_value_is_unsigned_integer(&map)) {
-                    cbor_value_get_uint64(&map, &key);
-                } else if (cbor_value_is_integer(&map)) {
-                    int64_t signedKey = 0;
-                    cbor_value_get_int64(&map, &signedKey);
-                    if (signedKey < 0) {
-                        cbor_value_advance(&map);
-                        if (!cbor_value_at_end(&map)) {
-                            cbor_value_advance(&map);
-                        }
-                        continue;
-                    }
-                    key = static_cast<uint64_t>(signedKey);
-                } else {
-                    cbor_value_advance(&map);
-                    if (!cbor_value_at_end(&map)) {
-                        cbor_value_advance(&map);
-                    }
-                    continue;
-                }
-
-                cbor_value_advance(&map);
-                if (cbor_value_at_end(&map)) {
-                    break;
-                }
-
-                switch (key) {
-                    case 0:
-
-                    msgs_detail::decodeOptionalBool(map, msg.button_left);
-                        break;
-                    case 1:
-
-                    msgs_detail::decodeOptionalBool(map, msg.button_right);
-                        break;
-                    case 2:
-
-                    msgs_detail::decodeOptionalBool(map, msg.button_up);
-                        break;
-                    case 3:
-
-                    msgs_detail::decodeOptionalBool(map, msg.button_down);
-                        break;
-                    case 4:
-
-                    msgs_detail::decodeOptionalBool(map, msg.button_square);
-                        break;
-                    case 5:
-
-                    msgs_detail::decodeOptionalBool(map, msg.button_cross);
-                        break;
-                    case 6:
-
-                    msgs_detail::decodeOptionalBool(map, msg.button_circle);
-                        break;
-                    case 7:
-
-                    msgs_detail::decodeOptionalBool(map, msg.button_triangle);
-                        break;
-                    case 8:
-
-                    msgs_detail::decodeOptionalBool(map, msg.button_left_shoulder);
-                        break;
-                    case 9:
-
-                    msgs_detail::decodeOptionalBool(map, msg.button_right_shoulder);
-                        break;
-                    case 10:
-
-                    msgs_detail::decodeOptionalBool(map, msg.button_left_trigger);
-                        break;
-                    case 11:
-
-                    msgs_detail::decodeOptionalBool(map, msg.button_right_trigger);
-                        break;
-                    case 12:
-
-                    msgs_detail::decodeOptionalBool(map, msg.button_left_joystick);
-                        break;
-                    case 13:
-
-                    msgs_detail::decodeOptionalBool(map, msg.button_right_joystick);
-                        break;
-                    case 14:
-
-                    msgs_detail::decodeOptionalBool(map, msg.button_share);
-                        break;
-                    case 15:
-
-                    msgs_detail::decodeOptionalBool(map, msg.button_options);
-                        break;
-                    case 16:
-
-                    msgs_detail::decodeOptionalBool(map, msg.button_touchpad);
-                        break;
-                    case 17:
-
-                    msgs_detail::decodeOptionalBool(map, msg.button_ps);
-                        break;
-                    case 18:
-
-                    msgs_detail::decodeOptionalInt32(map, msg.axis_lx);
-                        break;
-                    case 19:
-
-                    msgs_detail::decodeOptionalInt32(map, msg.axis_ly);
-                        break;
-                    case 20:
-
-                    msgs_detail::decodeOptionalInt32(map, msg.axis_rx);
-                        break;
-                    case 21:
-
-                    msgs_detail::decodeOptionalInt32(map, msg.axis_ry);
-                        break;
-                    case 22:
-
-                    msgs_detail::decodeOptionalInt32(map, msg.gyro_x);
-                        break;
-                    case 23:
-
-                    msgs_detail::decodeOptionalInt32(map, msg.gyro_y);
-                        break;
-                    case 24:
-
-                    msgs_detail::decodeOptionalInt32(map, msg.gyro_z);
-                        break;
-                    case 25:
-
-                    msgs_detail::decodeOptionalInt32(map, msg.accel_x);
-                        break;
-                    case 26:
-
-                    msgs_detail::decodeOptionalInt32(map, msg.accel_y);
-                        break;
-                    case 27:
-
-                    msgs_detail::decodeOptionalInt32(map, msg.accel_z);
-                        break;
-                    case 28:
-
-                    msgs_detail::decodeOptionalBool(map, msg.connected);
-                        break;
-                    case 29:
-
-                    msgs_detail::decodeOptionalInt32(map, msg.battery_level);
-                        break;
-                    case 30:
-
-                    msgs_detail::decodeOptionalBool(map, msg.bluetooth);
-                        break;
-                    case 31:
-
-                    msgs_detail::decodeOptionalString(map, msg.debug);
-                        break;
-                    case 32:
-
-                    msgs_detail::decodeOptionalInt32(map, msg.temp);
-                        break;
-                    default:
-                        break;
-                }
-
-                if (!cbor_value_at_end(&map)) {
-                    cbor_value_advance(&map);
-                }
-            }
-            cbor_value_leave_container(&it, &map);
+        auto map = decoder.begin_map();
+        if (map.is_err()) {
+            return Result<Ps4Event>::Err("Failed to decode map size");
         }
-        return msg;
+
+        for (uint32_t i = 0; i < map.value(); ++i) {
+            auto key = decoder.decode_uint32();
+            if (key.is_err()) {
+                return Result<Ps4Event>::Err("Failed to decode map key");
+            }
+
+            switch (key.value()) {
+                case 0:
+                    
+                    msgs_detail::decodeOptionalBool(map, msg.button_left);
+                    break;
+                case 1:
+                    
+                    msgs_detail::decodeOptionalBool(map, msg.button_right);
+                    break;
+                case 2:
+                    
+                    msgs_detail::decodeOptionalBool(map, msg.button_up);
+                    break;
+                case 3:
+                    
+                    msgs_detail::decodeOptionalBool(map, msg.button_down);
+                    break;
+                case 4:
+                    
+                    msgs_detail::decodeOptionalBool(map, msg.button_square);
+                    break;
+                case 5:
+                    
+                    msgs_detail::decodeOptionalBool(map, msg.button_cross);
+                    break;
+                case 6:
+                    
+                    msgs_detail::decodeOptionalBool(map, msg.button_circle);
+                    break;
+                case 7:
+                    
+                    msgs_detail::decodeOptionalBool(map, msg.button_triangle);
+                    break;
+                case 8:
+                    
+                    msgs_detail::decodeOptionalBool(map, msg.button_left_shoulder);
+                    break;
+                case 9:
+                    
+                    msgs_detail::decodeOptionalBool(map, msg.button_right_shoulder);
+                    break;
+                case 10:
+                    
+                    msgs_detail::decodeOptionalBool(map, msg.button_left_trigger);
+                    break;
+                case 11:
+                    
+                    msgs_detail::decodeOptionalBool(map, msg.button_right_trigger);
+                    break;
+                case 12:
+                    
+                    msgs_detail::decodeOptionalBool(map, msg.button_left_joystick);
+                    break;
+                case 13:
+                    
+                    msgs_detail::decodeOptionalBool(map, msg.button_right_joystick);
+                    break;
+                case 14:
+                    
+                    msgs_detail::decodeOptionalBool(map, msg.button_share);
+                    break;
+                case 15:
+                    
+                    msgs_detail::decodeOptionalBool(map, msg.button_options);
+                    break;
+                case 16:
+                    
+                    msgs_detail::decodeOptionalBool(map, msg.button_touchpad);
+                    break;
+                case 17:
+                    
+                    msgs_detail::decodeOptionalBool(map, msg.button_ps);
+                    break;
+                case 18:
+                    
+                    msgs_detail::decodeOptionalInt32(map, msg.axis_lx);
+                    break;
+                case 19:
+                    
+                    msgs_detail::decodeOptionalInt32(map, msg.axis_ly);
+                    break;
+                case 20:
+                    
+                    msgs_detail::decodeOptionalInt32(map, msg.axis_rx);
+                    break;
+                case 21:
+                    
+                    msgs_detail::decodeOptionalInt32(map, msg.axis_ry);
+                    break;
+                case 22:
+                    
+                    msgs_detail::decodeOptionalInt32(map, msg.gyro_x);
+                    break;
+                case 23:
+                    
+                    msgs_detail::decodeOptionalInt32(map, msg.gyro_y);
+                    break;
+                case 24:
+                    
+                    msgs_detail::decodeOptionalInt32(map, msg.gyro_z);
+                    break;
+                case 25:
+                    
+                    msgs_detail::decodeOptionalInt32(map, msg.accel_x);
+                    break;
+                case 26:
+                    
+                    msgs_detail::decodeOptionalInt32(map, msg.accel_y);
+                    break;
+                case 27:
+                    
+                    msgs_detail::decodeOptionalInt32(map, msg.accel_z);
+                    break;
+                case 28:
+                    
+                    msgs_detail::decodeOptionalBool(map, msg.connected);
+                    break;
+                case 29:
+                    
+                    msgs_detail::decodeOptionalInt32(map, msg.battery_level);
+                    break;
+                case 30:
+                    
+                    msgs_detail::decodeOptionalBool(map, msg.bluetooth);
+                    break;
+                case 31:
+                    
+                    msgs_detail::decodeOptionalString(map, msg.debug);
+                    break;
+                case 32:
+                    
+                    msgs_detail::decodeOptionalInt32(map, msg.temp);
+                    break;
+                default:
+                    // Unknown field id; skip the value.
+                    decoder.skip_value();
+                    break;          
+
     }
 };
 
 
-struct Ps4Request {
+
+class  Ps4Request : public Serializeable {
+public:
+    static uint32_t id() { return FNV("Ps4Request"); };
+    static const char* name() { return "Ps4Request"; };
+    typedef enum FieldId {
+        REQ_ID = 0,
+        RUMBLE_SMALL = 1,
+        RUMBLE_LARGE = 2,
+        LED_RED = 3,
+        LED_GREEN = 4,
+        LED_BLUE = 5,
+        LED_FLASH_ON = 6,
+        LED_FLASH_OFF = 7,
+    } FieldId;
     /// For request/reply matching, 0 if not a request/reply
     std::optional<uint32_t> req_id;
     std::optional<int32_t> rumble_small;
@@ -3217,180 +2194,123 @@ struct Ps4Request {
     std::optional<int32_t> led_flash_off;
 
     /// Serialize this message into a CBOR map keyed by field id.
-    CborError toCbor(CborEncoder& parentEncoder) const {
-        size_t mapSize = 0;
+    Result<Void> encode(FrameEncoder& encoder) const {
+        encoder.begin_map().is_err()) {
+            return Result<Void>::Err("Failed to encode map size");
+        }
         if (req_id.has_value()) {
-            ++mapSize;
+            encoder.encode_uint32(0);
+            
+            encoder.encode_uint32(req_id);
         }
         if (rumble_small.has_value()) {
-            ++mapSize;
+            encoder.encode_uint32(1);
+            
+            encoder.encode_int32(rumble_small);
         }
         if (rumble_large.has_value()) {
-            ++mapSize;
+            encoder.encode_uint32(2);
+            
+            encoder.encode_int32(rumble_large);
         }
         if (led_red.has_value()) {
-            ++mapSize;
+            encoder.encode_uint32(3);
+            
+            encoder.encode_int32(led_red);
         }
         if (led_green.has_value()) {
-            ++mapSize;
+            encoder.encode_uint32(4);
+            
+            encoder.encode_int32(led_green);
         }
         if (led_blue.has_value()) {
-            ++mapSize;
+            encoder.encode_uint32(5);
+            
+            encoder.encode_int32(led_blue);
         }
         if (led_flash_on.has_value()) {
-            ++mapSize;
+            encoder.encode_uint32(6);
+            
+            encoder.encode_int32(led_flash_on);
         }
         if (led_flash_off.has_value()) {
-            ++mapSize;
+            encoder.encode_uint32(7);
+            
+            encoder.encode_int32(led_flash_off);
         }
 
-        CborEncoder mapEncoder;
-        CborError err = cbor_encoder_create_map(
-            &parentEncoder, &mapEncoder, mapSize);
-        if (err != CborNoError) return err;
-        if (req_id.has_value()) {
-            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(0));
-            if (err != CborNoError) return err;
-
-            err = msgs_detail::encodeOptionalUInt32(mapEncoder, req_id);
-        }
-        if (err != CborNoError) return err;
-        if (rumble_small.has_value()) {
-            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(1));
-            if (err != CborNoError) return err;
-
-            err = msgs_detail::encodeOptionalInt32(mapEncoder, rumble_small);
-        }
-        if (err != CborNoError) return err;
-        if (rumble_large.has_value()) {
-            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(2));
-            if (err != CborNoError) return err;
-
-            err = msgs_detail::encodeOptionalInt32(mapEncoder, rumble_large);
-        }
-        if (err != CborNoError) return err;
-        if (led_red.has_value()) {
-            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(3));
-            if (err != CborNoError) return err;
-
-            err = msgs_detail::encodeOptionalInt32(mapEncoder, led_red);
-        }
-        if (err != CborNoError) return err;
-        if (led_green.has_value()) {
-            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(4));
-            if (err != CborNoError) return err;
-
-            err = msgs_detail::encodeOptionalInt32(mapEncoder, led_green);
-        }
-        if (err != CborNoError) return err;
-        if (led_blue.has_value()) {
-            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(5));
-            if (err != CborNoError) return err;
-
-            err = msgs_detail::encodeOptionalInt32(mapEncoder, led_blue);
-        }
-        if (err != CborNoError) return err;
-        if (led_flash_on.has_value()) {
-            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(6));
-            if (err != CborNoError) return err;
-
-            err = msgs_detail::encodeOptionalInt32(mapEncoder, led_flash_on);
-        }
-        if (err != CborNoError) return err;
-        if (led_flash_off.has_value()) {
-            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(7));
-            if (err != CborNoError) return err;
-
-            err = msgs_detail::encodeOptionalInt32(mapEncoder, led_flash_off);
-        }
-        if (err != CborNoError) return err;
-        return cbor_encoder_close_container(&parentEncoder, &mapEncoder);
+        return encoder.end_map();
     }
 
     /// Deserialize a Ps4Request from a CBOR map value.
-    static Ps4Request fromCbor(CborValue& it) {
+    static Result<Ps4Request> decode(FrameDecoder& decoder) {
         Ps4Request msg;
-        CborValue map;
-        if (cbor_value_is_container(&it) &&
-            cbor_value_enter_container(&it, &map) == CborNoError)
-        {
-            while (!cbor_value_at_end(&map)) {
-                uint64_t key = 0;
-                if (cbor_value_is_unsigned_integer(&map)) {
-                    cbor_value_get_uint64(&map, &key);
-                } else if (cbor_value_is_integer(&map)) {
-                    int64_t signedKey = 0;
-                    cbor_value_get_int64(&map, &signedKey);
-                    if (signedKey < 0) {
-                        cbor_value_advance(&map);
-                        if (!cbor_value_at_end(&map)) {
-                            cbor_value_advance(&map);
-                        }
-                        continue;
-                    }
-                    key = static_cast<uint64_t>(signedKey);
-                } else {
-                    cbor_value_advance(&map);
-                    if (!cbor_value_at_end(&map)) {
-                        cbor_value_advance(&map);
-                    }
-                    continue;
-                }
-
-                cbor_value_advance(&map);
-                if (cbor_value_at_end(&map)) {
-                    break;
-                }
-
-                switch (key) {
-                    case 0:
-
-                    msgs_detail::decodeOptionalUInt32(map, msg.req_id);
-                        break;
-                    case 1:
-
-                    msgs_detail::decodeOptionalInt32(map, msg.rumble_small);
-                        break;
-                    case 2:
-
-                    msgs_detail::decodeOptionalInt32(map, msg.rumble_large);
-                        break;
-                    case 3:
-
-                    msgs_detail::decodeOptionalInt32(map, msg.led_red);
-                        break;
-                    case 4:
-
-                    msgs_detail::decodeOptionalInt32(map, msg.led_green);
-                        break;
-                    case 5:
-
-                    msgs_detail::decodeOptionalInt32(map, msg.led_blue);
-                        break;
-                    case 6:
-
-                    msgs_detail::decodeOptionalInt32(map, msg.led_flash_on);
-                        break;
-                    case 7:
-
-                    msgs_detail::decodeOptionalInt32(map, msg.led_flash_off);
-                        break;
-                    default:
-                        break;
-                }
-
-                if (!cbor_value_at_end(&map)) {
-                    cbor_value_advance(&map);
-                }
-            }
-            cbor_value_leave_container(&it, &map);
+        auto map = decoder.begin_map();
+        if (map.is_err()) {
+            return Result<Ps4Request>::Err("Failed to decode map size");
         }
-        return msg;
+
+        for (uint32_t i = 0; i < map.value(); ++i) {
+            auto key = decoder.decode_uint32();
+            if (key.is_err()) {
+                return Result<Ps4Request>::Err("Failed to decode map key");
+            }
+
+            switch (key.value()) {
+                case 0:
+                    
+                    msgs_detail::decodeOptionalUInt32(map, msg.req_id);
+                    break;
+                case 1:
+                    
+                    msgs_detail::decodeOptionalInt32(map, msg.rumble_small);
+                    break;
+                case 2:
+                    
+                    msgs_detail::decodeOptionalInt32(map, msg.rumble_large);
+                    break;
+                case 3:
+                    
+                    msgs_detail::decodeOptionalInt32(map, msg.led_red);
+                    break;
+                case 4:
+                    
+                    msgs_detail::decodeOptionalInt32(map, msg.led_green);
+                    break;
+                case 5:
+                    
+                    msgs_detail::decodeOptionalInt32(map, msg.led_blue);
+                    break;
+                case 6:
+                    
+                    msgs_detail::decodeOptionalInt32(map, msg.led_flash_on);
+                    break;
+                case 7:
+                    
+                    msgs_detail::decodeOptionalInt32(map, msg.led_flash_off);
+                    break;
+                default:
+                    // Unknown field id; skip the value.
+                    decoder.skip_value();
+                    break;          
+
     }
 };
 
 
-struct SysEvent {
+
+class  SysEvent : public Serializeable {
+public:
+    static uint32_t id() { return FNV("SysEvent"); };
+    static const char* name() { return "SysEvent"; };
+    typedef enum FieldId {
+        UTC = 0,
+        UPTIME = 1,
+        FREE_HEAP = 2,
+        FLASH = 3,
+        CPU_BOARD = 4,
+        BUILD_DATE = 5,
+    } FieldId;
     std::optional<uint64_t> utc;
     std::optional<uint64_t> uptime;
     std::optional<uint64_t> free_heap;
@@ -3399,262 +2319,178 @@ struct SysEvent {
     std::optional<std::string> build_date;
 
     /// Serialize this message into a CBOR map keyed by field id.
-    CborError toCbor(CborEncoder& parentEncoder) const {
-        size_t mapSize = 0;
+    Result<Void> encode(FrameEncoder& encoder) const {
+        encoder.begin_map().is_err()) {
+            return Result<Void>::Err("Failed to encode map size");
+        }
         if (utc.has_value()) {
-            ++mapSize;
+            encoder.encode_uint32(0);
+            
+            encoder.encode_uint64(utc);
         }
         if (uptime.has_value()) {
-            ++mapSize;
+            encoder.encode_uint32(1);
+            
+            encoder.encode_uint64(uptime);
         }
         if (free_heap.has_value()) {
-            ++mapSize;
+            encoder.encode_uint32(2);
+            
+            encoder.encode_uint64(free_heap);
         }
         if (flash.has_value()) {
-            ++mapSize;
+            encoder.encode_uint32(3);
+            
+            encoder.encode_uint64(flash);
         }
         if (cpu_board.has_value()) {
-            ++mapSize;
+            encoder.encode_uint32(4);
+            
+            encoder.encode_str(cpu_board);
         }
         if (build_date.has_value()) {
-            ++mapSize;
+            encoder.encode_uint32(5);
+            
+            encoder.encode_str(build_date);
         }
 
-        CborEncoder mapEncoder;
-        CborError err = cbor_encoder_create_map(
-            &parentEncoder, &mapEncoder, mapSize);
-        if (err != CborNoError) return err;
-        if (utc.has_value()) {
-            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(0));
-            if (err != CborNoError) return err;
-
-            err = msgs_detail::encodeOptionalUInt64(mapEncoder, utc);
-        }
-        if (err != CborNoError) return err;
-        if (uptime.has_value()) {
-            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(1));
-            if (err != CborNoError) return err;
-
-            err = msgs_detail::encodeOptionalUInt64(mapEncoder, uptime);
-        }
-        if (err != CborNoError) return err;
-        if (free_heap.has_value()) {
-            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(2));
-            if (err != CborNoError) return err;
-
-            err = msgs_detail::encodeOptionalUInt64(mapEncoder, free_heap);
-        }
-        if (err != CborNoError) return err;
-        if (flash.has_value()) {
-            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(3));
-            if (err != CborNoError) return err;
-
-            err = msgs_detail::encodeOptionalUInt64(mapEncoder, flash);
-        }
-        if (err != CborNoError) return err;
-        if (cpu_board.has_value()) {
-            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(4));
-            if (err != CborNoError) return err;
-
-            err = msgs_detail::encodeOptionalString(mapEncoder, cpu_board);
-        }
-        if (err != CborNoError) return err;
-        if (build_date.has_value()) {
-            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(5));
-            if (err != CborNoError) return err;
-
-            err = msgs_detail::encodeOptionalString(mapEncoder, build_date);
-        }
-        if (err != CborNoError) return err;
-        return cbor_encoder_close_container(&parentEncoder, &mapEncoder);
+        return encoder.end_map();
     }
 
     /// Deserialize a SysEvent from a CBOR map value.
-    static SysEvent fromCbor(CborValue& it) {
+    static Result<SysEvent> decode(FrameDecoder& decoder) {
         SysEvent msg;
-        CborValue map;
-        if (cbor_value_is_container(&it) &&
-            cbor_value_enter_container(&it, &map) == CborNoError)
-        {
-            while (!cbor_value_at_end(&map)) {
-                uint64_t key = 0;
-                if (cbor_value_is_unsigned_integer(&map)) {
-                    cbor_value_get_uint64(&map, &key);
-                } else if (cbor_value_is_integer(&map)) {
-                    int64_t signedKey = 0;
-                    cbor_value_get_int64(&map, &signedKey);
-                    if (signedKey < 0) {
-                        cbor_value_advance(&map);
-                        if (!cbor_value_at_end(&map)) {
-                            cbor_value_advance(&map);
-                        }
-                        continue;
-                    }
-                    key = static_cast<uint64_t>(signedKey);
-                } else {
-                    cbor_value_advance(&map);
-                    if (!cbor_value_at_end(&map)) {
-                        cbor_value_advance(&map);
-                    }
-                    continue;
-                }
-
-                cbor_value_advance(&map);
-                if (cbor_value_at_end(&map)) {
-                    break;
-                }
-
-                switch (key) {
-                    case 0:
-
-                    msgs_detail::decodeOptionalUInt64(map, msg.utc);
-                        break;
-                    case 1:
-
-                    msgs_detail::decodeOptionalUInt64(map, msg.uptime);
-                        break;
-                    case 2:
-
-                    msgs_detail::decodeOptionalUInt64(map, msg.free_heap);
-                        break;
-                    case 3:
-
-                    msgs_detail::decodeOptionalUInt64(map, msg.flash);
-                        break;
-                    case 4:
-
-                    msgs_detail::decodeOptionalString(map, msg.cpu_board);
-                        break;
-                    case 5:
-
-                    msgs_detail::decodeOptionalString(map, msg.build_date);
-                        break;
-                    default:
-                        break;
-                }
-
-                if (!cbor_value_at_end(&map)) {
-                    cbor_value_advance(&map);
-                }
-            }
-            cbor_value_leave_container(&it, &map);
+        auto map = decoder.begin_map();
+        if (map.is_err()) {
+            return Result<SysEvent>::Err("Failed to decode map size");
         }
-        return msg;
+
+        for (uint32_t i = 0; i < map.value(); ++i) {
+            auto key = decoder.decode_uint32();
+            if (key.is_err()) {
+                return Result<SysEvent>::Err("Failed to decode map key");
+            }
+
+            switch (key.value()) {
+                case 0:
+                    
+                    msgs_detail::decodeOptionalUInt64(map, msg.utc);
+                    break;
+                case 1:
+                    
+                    msgs_detail::decodeOptionalUInt64(map, msg.uptime);
+                    break;
+                case 2:
+                    
+                    msgs_detail::decodeOptionalUInt64(map, msg.free_heap);
+                    break;
+                case 3:
+                    
+                    msgs_detail::decodeOptionalUInt64(map, msg.flash);
+                    break;
+                case 4:
+                    
+                    msgs_detail::decodeOptionalString(map, msg.cpu_board);
+                    break;
+                case 5:
+                    
+                    msgs_detail::decodeOptionalString(map, msg.build_date);
+                    break;
+                default:
+                    // Unknown field id; skip the value.
+                    decoder.skip_value();
+                    break;          
+
     }
 };
 
 
-struct SysReply {
+
+class  SysReply : public Serializeable {
+public:
+    static uint32_t id() { return FNV("SysReply"); };
+    static const char* name() { return "SysReply"; };
+    typedef enum FieldId {
+        REQ_ID = 0,
+        RC = 1,
+        MESSAGE = 2,
+    } FieldId;
     /// For request/reply matching, 0 if not a request/reply
     std::optional<uint32_t> req_id;
     std::optional<int32_t> rc;
     std::optional<std::string> message;
 
     /// Serialize this message into a CBOR map keyed by field id.
-    CborError toCbor(CborEncoder& parentEncoder) const {
-        size_t mapSize = 0;
+    Result<Void> encode(FrameEncoder& encoder) const {
+        encoder.begin_map().is_err()) {
+            return Result<Void>::Err("Failed to encode map size");
+        }
         if (req_id.has_value()) {
-            ++mapSize;
+            encoder.encode_uint32(0);
+            
+            encoder.encode_uint32(req_id);
         }
         if (rc.has_value()) {
-            ++mapSize;
+            encoder.encode_uint32(1);
+            
+            encoder.encode_int32(rc);
         }
         if (message.has_value()) {
-            ++mapSize;
+            encoder.encode_uint32(2);
+            
+            encoder.encode_str(message);
         }
 
-        CborEncoder mapEncoder;
-        CborError err = cbor_encoder_create_map(
-            &parentEncoder, &mapEncoder, mapSize);
-        if (err != CborNoError) return err;
-        if (req_id.has_value()) {
-            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(0));
-            if (err != CborNoError) return err;
-
-            err = msgs_detail::encodeOptionalUInt32(mapEncoder, req_id);
-        }
-        if (err != CborNoError) return err;
-        if (rc.has_value()) {
-            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(1));
-            if (err != CborNoError) return err;
-
-            err = msgs_detail::encodeOptionalInt32(mapEncoder, rc);
-        }
-        if (err != CborNoError) return err;
-        if (message.has_value()) {
-            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(2));
-            if (err != CborNoError) return err;
-
-            err = msgs_detail::encodeOptionalString(mapEncoder, message);
-        }
-        if (err != CborNoError) return err;
-        return cbor_encoder_close_container(&parentEncoder, &mapEncoder);
+        return encoder.end_map();
     }
 
     /// Deserialize a SysReply from a CBOR map value.
-    static SysReply fromCbor(CborValue& it) {
+    static Result<SysReply> decode(FrameDecoder& decoder) {
         SysReply msg;
-        CborValue map;
-        if (cbor_value_is_container(&it) &&
-            cbor_value_enter_container(&it, &map) == CborNoError)
-        {
-            while (!cbor_value_at_end(&map)) {
-                uint64_t key = 0;
-                if (cbor_value_is_unsigned_integer(&map)) {
-                    cbor_value_get_uint64(&map, &key);
-                } else if (cbor_value_is_integer(&map)) {
-                    int64_t signedKey = 0;
-                    cbor_value_get_int64(&map, &signedKey);
-                    if (signedKey < 0) {
-                        cbor_value_advance(&map);
-                        if (!cbor_value_at_end(&map)) {
-                            cbor_value_advance(&map);
-                        }
-                        continue;
-                    }
-                    key = static_cast<uint64_t>(signedKey);
-                } else {
-                    cbor_value_advance(&map);
-                    if (!cbor_value_at_end(&map)) {
-                        cbor_value_advance(&map);
-                    }
-                    continue;
-                }
-
-                cbor_value_advance(&map);
-                if (cbor_value_at_end(&map)) {
-                    break;
-                }
-
-                switch (key) {
-                    case 0:
-
-                    msgs_detail::decodeOptionalUInt32(map, msg.req_id);
-                        break;
-                    case 1:
-
-                    msgs_detail::decodeOptionalInt32(map, msg.rc);
-                        break;
-                    case 2:
-
-                    msgs_detail::decodeOptionalString(map, msg.message);
-                        break;
-                    default:
-                        break;
-                }
-
-                if (!cbor_value_at_end(&map)) {
-                    cbor_value_advance(&map);
-                }
-            }
-            cbor_value_leave_container(&it, &map);
+        auto map = decoder.begin_map();
+        if (map.is_err()) {
+            return Result<SysReply>::Err("Failed to decode map size");
         }
-        return msg;
+
+        for (uint32_t i = 0; i < map.value(); ++i) {
+            auto key = decoder.decode_uint32();
+            if (key.is_err()) {
+                return Result<SysReply>::Err("Failed to decode map key");
+            }
+
+            switch (key.value()) {
+                case 0:
+                    
+                    msgs_detail::decodeOptionalUInt32(map, msg.req_id);
+                    break;
+                case 1:
+                    
+                    msgs_detail::decodeOptionalInt32(map, msg.rc);
+                    break;
+                case 2:
+                    
+                    msgs_detail::decodeOptionalString(map, msg.message);
+                    break;
+                default:
+                    // Unknown field id; skip the value.
+                    decoder.skip_value();
+                    break;          
+
     }
 };
 
 
-struct SysRequest {
+
+class  SysRequest : public Serializeable {
+public:
+    static uint32_t id() { return FNV("SysRequest"); };
+    static const char* name() { return "SysRequest"; };
+    typedef enum FieldId {
+        REQ_ID = 0,
+        SET_TIME = 1,
+        REBOOT = 2,
+        CONSOLE = 3,
+    } FieldId;
     /// For request/reply matching, 0 if not a request/reply
     std::optional<uint32_t> req_id;
     std::optional<uint64_t> set_time;
@@ -3662,124 +2498,166 @@ struct SysRequest {
     std::optional<std::string> console;
 
     /// Serialize this message into a CBOR map keyed by field id.
-    CborError toCbor(CborEncoder& parentEncoder) const {
-        size_t mapSize = 0;
+    Result<Void> encode(FrameEncoder& encoder) const {
+        encoder.begin_map().is_err()) {
+            return Result<Void>::Err("Failed to encode map size");
+        }
         if (req_id.has_value()) {
-            ++mapSize;
+            encoder.encode_uint32(0);
+            
+            encoder.encode_uint32(req_id);
         }
         if (set_time.has_value()) {
-            ++mapSize;
+            encoder.encode_uint32(1);
+            
+            encoder.encode_uint64(set_time);
         }
         if (reboot.has_value()) {
-            ++mapSize;
+            encoder.encode_uint32(2);
+            
+            encoder.encode_bool(reboot);
         }
         if (console.has_value()) {
-            ++mapSize;
+            encoder.encode_uint32(3);
+            
+            encoder.encode_str(console);
         }
 
-        CborEncoder mapEncoder;
-        CborError err = cbor_encoder_create_map(
-            &parentEncoder, &mapEncoder, mapSize);
-        if (err != CborNoError) return err;
-        if (req_id.has_value()) {
-            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(0));
-            if (err != CborNoError) return err;
-
-            err = msgs_detail::encodeOptionalUInt32(mapEncoder, req_id);
-        }
-        if (err != CborNoError) return err;
-        if (set_time.has_value()) {
-            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(1));
-            if (err != CborNoError) return err;
-
-            err = msgs_detail::encodeOptionalUInt64(mapEncoder, set_time);
-        }
-        if (err != CborNoError) return err;
-        if (reboot.has_value()) {
-            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(2));
-            if (err != CborNoError) return err;
-
-            err = msgs_detail::encodeOptionalBool(mapEncoder, reboot);
-        }
-        if (err != CborNoError) return err;
-        if (console.has_value()) {
-            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(3));
-            if (err != CborNoError) return err;
-
-            err = msgs_detail::encodeOptionalString(mapEncoder, console);
-        }
-        if (err != CborNoError) return err;
-        return cbor_encoder_close_container(&parentEncoder, &mapEncoder);
+        return encoder.end_map();
     }
 
     /// Deserialize a SysRequest from a CBOR map value.
-    static SysRequest fromCbor(CborValue& it) {
+    static Result<SysRequest> decode(FrameDecoder& decoder) {
         SysRequest msg;
-        CborValue map;
-        if (cbor_value_is_container(&it) &&
-            cbor_value_enter_container(&it, &map) == CborNoError)
-        {
-            while (!cbor_value_at_end(&map)) {
-                uint64_t key = 0;
-                if (cbor_value_is_unsigned_integer(&map)) {
-                    cbor_value_get_uint64(&map, &key);
-                } else if (cbor_value_is_integer(&map)) {
-                    int64_t signedKey = 0;
-                    cbor_value_get_int64(&map, &signedKey);
-                    if (signedKey < 0) {
-                        cbor_value_advance(&map);
-                        if (!cbor_value_at_end(&map)) {
-                            cbor_value_advance(&map);
-                        }
-                        continue;
-                    }
-                    key = static_cast<uint64_t>(signedKey);
-                } else {
-                    cbor_value_advance(&map);
-                    if (!cbor_value_at_end(&map)) {
-                        cbor_value_advance(&map);
-                    }
-                    continue;
-                }
-
-                cbor_value_advance(&map);
-                if (cbor_value_at_end(&map)) {
-                    break;
-                }
-
-                switch (key) {
-                    case 0:
-
-                    msgs_detail::decodeOptionalUInt32(map, msg.req_id);
-                        break;
-                    case 1:
-
-                    msgs_detail::decodeOptionalUInt64(map, msg.set_time);
-                        break;
-                    case 2:
-
-                    msgs_detail::decodeOptionalBool(map, msg.reboot);
-                        break;
-                    case 3:
-
-                    msgs_detail::decodeOptionalString(map, msg.console);
-                        break;
-                    default:
-                        break;
-                }
-
-                if (!cbor_value_at_end(&map)) {
-                    cbor_value_advance(&map);
-                }
-            }
-            cbor_value_leave_container(&it, &map);
+        auto map = decoder.begin_map();
+        if (map.is_err()) {
+            return Result<SysRequest>::Err("Failed to decode map size");
         }
-        return msg;
+
+        for (uint32_t i = 0; i < map.value(); ++i) {
+            auto key = decoder.decode_uint32();
+            if (key.is_err()) {
+                return Result<SysRequest>::Err("Failed to decode map key");
+            }
+
+            switch (key.value()) {
+                case 0:
+                    
+                    msgs_detail::decodeOptionalUInt32(map, msg.req_id);
+                    break;
+                case 1:
+                    
+                    msgs_detail::decodeOptionalUInt64(map, msg.set_time);
+                    break;
+                case 2:
+                    
+                    msgs_detail::decodeOptionalBool(map, msg.reboot);
+                    break;
+                case 3:
+                    
+                    msgs_detail::decodeOptionalString(map, msg.console);
+                    break;
+                default:
+                    // Unknown field id; skip the value.
+                    decoder.skip_value();
+                    break;          
+
     }
 };
 
 
-struct WifiEvent {
+
+class  UsEvent : public Serializeable {
+public:
+    static uint32_t id() { return FNV("UsEvent"); };
+    static const char* name() { return "UsEvent"; };
+    typedef enum FieldId {
+        DISTANCE = 0,
+        TEMPERATURE = 1,
+        STATUS = 2,
+    } FieldId;
+    /// Distance in meters
+    std::optional<float> distance;
+    /// Temperature in Celsius
+    std::optional<float> temperature;
+    /// Status code, 0 if no error
+    std::optional<int32_t> status;
+
+    /// Serialize this message into a CBOR map keyed by field id.
+    Result<Void> encode(FrameEncoder& encoder) const {
+        encoder.begin_map().is_err()) {
+            return Result<Void>::Err("Failed to encode map size");
+        }
+        if (distance.has_value()) {
+            encoder.encode_uint32(0);
+            
+            encoder.encode_float(distance);
+        }
+        if (temperature.has_value()) {
+            encoder.encode_uint32(1);
+            
+            encoder.encode_float(temperature);
+        }
+        if (status.has_value()) {
+            encoder.encode_uint32(2);
+            
+            encoder.encode_int32(status);
+        }
+
+        return encoder.end_map();
+    }
+
+    /// Deserialize a UsEvent from a CBOR map value.
+    static Result<UsEvent> decode(FrameDecoder& decoder) {
+        UsEvent msg;
+        auto map = decoder.begin_map();
+        if (map.is_err()) {
+            return Result<UsEvent>::Err("Failed to decode map size");
+        }
+
+        for (uint32_t i = 0; i < map.value(); ++i) {
+            auto key = decoder.decode_uint32();
+            if (key.is_err()) {
+                return Result<UsEvent>::Err("Failed to decode map key");
+            }
+
+            switch (key.value()) {
+                case 0:
+                    
+                    msgs_detail::decodeOptionalFloat(map, msg.distance);
+                    break;
+                case 1:
+                    
+                    msgs_detail::decodeOptionalFloat(map, msg.temperature);
+                    break;
+                case 2:
+                    
+                    msgs_detail::decodeOptionalInt32(map, msg.status);
+                    break;
+                default:
+                    // Unknown field id; skip the value.
+                    decoder.skip_value();
+                    break;          
+
+    }
+};
+
+
+
+class  WifiEvent : public Serializeable {
+public:
+    static uint32_t id() { return FNV("WifiEvent"); };
+    static const char* name() { return "WifiEvent"; };
+    typedef enum FieldId {
+        IP = 0,
+        GATEWAY = 1,
+        NETMASK = 2,
+        SSID = 3,
+        BSSID = 4,
+        CHANNEL = 5,
+        RSSI = 6,
+        MAC = 7,
+    } FieldId;
     std::optional<std::string> ip;
     std::optional<std::string> gateway;
     std::optional<std::string> netmask;
@@ -3790,175 +2668,106 @@ struct WifiEvent {
     std::optional<std::string> mac;
 
     /// Serialize this message into a CBOR map keyed by field id.
-    CborError toCbor(CborEncoder& parentEncoder) const {
-        size_t mapSize = 0;
+    Result<Void> encode(FrameEncoder& encoder) const {
+        encoder.begin_map().is_err()) {
+            return Result<Void>::Err("Failed to encode map size");
+        }
         if (ip.has_value()) {
-            ++mapSize;
+            encoder.encode_uint32(0);
+            
+            encoder.encode_str(ip);
         }
         if (gateway.has_value()) {
-            ++mapSize;
+            encoder.encode_uint32(1);
+            
+            encoder.encode_str(gateway);
         }
         if (netmask.has_value()) {
-            ++mapSize;
+            encoder.encode_uint32(2);
+            
+            encoder.encode_str(netmask);
         }
         if (ssid.has_value()) {
-            ++mapSize;
+            encoder.encode_uint32(3);
+            
+            encoder.encode_str(ssid);
         }
         if (bssid.has_value()) {
-            ++mapSize;
+            encoder.encode_uint32(4);
+            
+            encoder.encode_str(bssid);
         }
         if (channel.has_value()) {
-            ++mapSize;
+            encoder.encode_uint32(5);
+            
+            encoder.encode_int32(channel);
         }
         if (rssi.has_value()) {
-            ++mapSize;
+            encoder.encode_uint32(6);
+            
+            encoder.encode_int32(rssi);
         }
         if (mac.has_value()) {
-            ++mapSize;
+            encoder.encode_uint32(7);
+            
+            encoder.encode_str(mac);
         }
 
-        CborEncoder mapEncoder;
-        CborError err = cbor_encoder_create_map(
-            &parentEncoder, &mapEncoder, mapSize);
-        if (err != CborNoError) return err;
-        if (ip.has_value()) {
-            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(0));
-            if (err != CborNoError) return err;
-
-            err = msgs_detail::encodeOptionalString(mapEncoder, ip);
-        }
-        if (err != CborNoError) return err;
-        if (gateway.has_value()) {
-            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(1));
-            if (err != CborNoError) return err;
-
-            err = msgs_detail::encodeOptionalString(mapEncoder, gateway);
-        }
-        if (err != CborNoError) return err;
-        if (netmask.has_value()) {
-            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(2));
-            if (err != CborNoError) return err;
-
-            err = msgs_detail::encodeOptionalString(mapEncoder, netmask);
-        }
-        if (err != CborNoError) return err;
-        if (ssid.has_value()) {
-            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(3));
-            if (err != CborNoError) return err;
-
-            err = msgs_detail::encodeOptionalString(mapEncoder, ssid);
-        }
-        if (err != CborNoError) return err;
-        if (bssid.has_value()) {
-            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(4));
-            if (err != CborNoError) return err;
-
-            err = msgs_detail::encodeOptionalString(mapEncoder, bssid);
-        }
-        if (err != CborNoError) return err;
-        if (channel.has_value()) {
-            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(5));
-            if (err != CborNoError) return err;
-
-            err = msgs_detail::encodeOptionalInt32(mapEncoder, channel);
-        }
-        if (err != CborNoError) return err;
-        if (rssi.has_value()) {
-            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(6));
-            if (err != CborNoError) return err;
-
-            err = msgs_detail::encodeOptionalInt32(mapEncoder, rssi);
-        }
-        if (err != CborNoError) return err;
-        if (mac.has_value()) {
-            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>(7));
-            if (err != CborNoError) return err;
-
-            err = msgs_detail::encodeOptionalString(mapEncoder, mac);
-        }
-        if (err != CborNoError) return err;
-        return cbor_encoder_close_container(&parentEncoder, &mapEncoder);
+        return encoder.end_map();
     }
 
     /// Deserialize a WifiEvent from a CBOR map value.
-    static WifiEvent fromCbor(CborValue& it) {
+    static Result<WifiEvent> decode(FrameDecoder& decoder) {
         WifiEvent msg;
-        CborValue map;
-        if (cbor_value_is_container(&it) &&
-            cbor_value_enter_container(&it, &map) == CborNoError)
-        {
-            while (!cbor_value_at_end(&map)) {
-                uint64_t key = 0;
-                if (cbor_value_is_unsigned_integer(&map)) {
-                    cbor_value_get_uint64(&map, &key);
-                } else if (cbor_value_is_integer(&map)) {
-                    int64_t signedKey = 0;
-                    cbor_value_get_int64(&map, &signedKey);
-                    if (signedKey < 0) {
-                        cbor_value_advance(&map);
-                        if (!cbor_value_at_end(&map)) {
-                            cbor_value_advance(&map);
-                        }
-                        continue;
-                    }
-                    key = static_cast<uint64_t>(signedKey);
-                } else {
-                    cbor_value_advance(&map);
-                    if (!cbor_value_at_end(&map)) {
-                        cbor_value_advance(&map);
-                    }
-                    continue;
-                }
-
-                cbor_value_advance(&map);
-                if (cbor_value_at_end(&map)) {
-                    break;
-                }
-
-                switch (key) {
-                    case 0:
-
-                    msgs_detail::decodeOptionalString(map, msg.ip);
-                        break;
-                    case 1:
-
-                    msgs_detail::decodeOptionalString(map, msg.gateway);
-                        break;
-                    case 2:
-
-                    msgs_detail::decodeOptionalString(map, msg.netmask);
-                        break;
-                    case 3:
-
-                    msgs_detail::decodeOptionalString(map, msg.ssid);
-                        break;
-                    case 4:
-
-                    msgs_detail::decodeOptionalString(map, msg.bssid);
-                        break;
-                    case 5:
-
-                    msgs_detail::decodeOptionalInt32(map, msg.channel);
-                        break;
-                    case 6:
-
-                    msgs_detail::decodeOptionalInt32(map, msg.rssi);
-                        break;
-                    case 7:
-
-                    msgs_detail::decodeOptionalString(map, msg.mac);
-                        break;
-                    default:
-                        break;
-                }
-
-                if (!cbor_value_at_end(&map)) {
-                    cbor_value_advance(&map);
-                }
-            }
-            cbor_value_leave_container(&it, &map);
+        auto map = decoder.begin_map();
+        if (map.is_err()) {
+            return Result<WifiEvent>::Err("Failed to decode map size");
         }
-        return msg;
+
+        for (uint32_t i = 0; i < map.value(); ++i) {
+            auto key = decoder.decode_uint32();
+            if (key.is_err()) {
+                return Result<WifiEvent>::Err("Failed to decode map key");
+            }
+
+            switch (key.value()) {
+                case 0:
+                    
+                    msgs_detail::decodeOptionalString(map, msg.ip);
+                    break;
+                case 1:
+                    
+                    msgs_detail::decodeOptionalString(map, msg.gateway);
+                    break;
+                case 2:
+                    
+                    msgs_detail::decodeOptionalString(map, msg.netmask);
+                    break;
+                case 3:
+                    
+                    msgs_detail::decodeOptionalString(map, msg.ssid);
+                    break;
+                case 4:
+                    
+                    msgs_detail::decodeOptionalString(map, msg.bssid);
+                    break;
+                case 5:
+                    
+                    msgs_detail::decodeOptionalInt32(map, msg.channel);
+                    break;
+                case 6:
+                    
+                    msgs_detail::decodeOptionalInt32(map, msg.rssi);
+                    break;
+                case 7:
+                    
+                    msgs_detail::decodeOptionalString(map, msg.mac);
+                    break;
+                default:
+                    // Unknown field id; skip the value.
+                    decoder.skip_value();
+                    break;          
+
     }
 };
 
