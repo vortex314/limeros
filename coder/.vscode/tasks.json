@@ -70,7 +70,7 @@
             }
         },
                        {
-            "label": "Codegen c++",
+            "label": "Codegen c++ hoverboard",
             "type": "shell",
             "command": "~/.cargo/bin/cargo", // note: full path to the cargo
             "args": [
@@ -91,37 +91,29 @@
                 //               "isDefault": true   
             }
         },
-        {
-            "label": "ESP32 Eventbus",
+                       {
+            "label": "Codegen c++ ESP32 eventbus",
             "type": "shell",
-            "options": {
-                "cwd": "${workspaceFolder}",
-                "env": {
-                    "RUST_BACKTRACE": "full",
-                    "ZENOH_PLUGINS_PATH": "/home/lieven/workspace/zenoh/target/release/",
-                }
-            },
             "command": "~/.cargo/bin/cargo", // note: full path to the cargo
             "args": [
                 "run",
+                "--bin",
+                "codegen",
                 "--",
-                "--input",
-                "syntax/message.proto",
-                "--output",
-                "../esp32-eventbus/src",
-                "--lang",
-                "cpp",
-                "--format",
-                "cbor"
-            ],
+                "-i",
+                "hcl/robot.hcl",
+                "-d",
+                "hcl",
+                "-t",
+                "cpp.tera",
+                "-o",
+                "../esp32-eventbus/src/msgs.h"],
             "group": {
                 "kind": "build",
-                "isDefault": false
-            },
-            "presentation": {
-                "clear": true // <-- this line
+                //               "isDefault": true   
             }
         },
+          
 
         {
             "label": "Rust MC Limeros",

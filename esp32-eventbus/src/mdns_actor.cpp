@@ -47,7 +47,7 @@ void MdnsActor::init()
     INFO("mDNS started, hostname: %s.local", _hostname.c_str());
 }
 
-void MdnsActor::on_message(const Envelope &envelope)
+void MdnsActor::on_message(const ActorMessage &envelope)
 {
     const Msg &msg = *envelope.msg;
 

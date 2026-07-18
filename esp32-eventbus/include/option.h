@@ -14,6 +14,7 @@ void panic_here(const char *s); //{ printf(" ===> PANIC : %s\n", s); }
 #define LINE_STRING STRINGIZE(__LINE__)
 #define PANIC(S) panic_here(__FILE__ ":" LINE_STRING " " S)
 
+typedef bool Void;
 /*
  Trying the equivalent of Option in Rust
 */

@@ -206,7 +206,7 @@ HoverboardActor::~HoverboardActor()
     }
 }
 
-void HoverboardActor::on_message(const Envelope &env)
+void HoverboardActor::on_message(const ActorMessage &env)
 {
     const Msg &msg = *env.msg;
     msg.handle<HoverboardRequest>([&](auto hb_cmd)
@@ -227,63 +227,26 @@ void HoverboardActor::handle_uart_bytes(const Bytes &data)
         if (b == COBS_SEPARATOR)
         {
             DEBUG("COBS frame received (%d bytes)", uart_read_buffer.size());
-            (void)cobs_decode(uart_read_buffer)
-                .and_then(check_crc)
-                .and_then(HoverboardEventRaw::deserialize)
-                .and_then([&](HoverboardEventRaw *info)
-                          {
-                            HoverboardEvent* event = new HoverboardEvent();
-                            event->ctrl_mod = info->ctrl_mod;
-                            event->ctrl_typ = info->ctrl_typ;
-                            event->cur_mot_max = info->cur_mot_max;
-                            event->rpm_mot_max = info->rpm_mot_max;
-                            event->fi_weak_ena = info->fi_weak_ena;
-                            event->fi_weak_hi = info->fi_weak_hi;
-                            event->fi_weak_lo = info->fi_weak_lo;
-                            event->fi_weak_max = info->fi_weak_max;
-                            event->phase_adv_max_deg = info->phase_adv_max_deg;
-                            event->input1_raw = info->input1_raw;       
-                            event->input1_typ = info->input1_typ;       
-                            event->input1_min = info->input1_min;       
-                            event->input1_mid = info->input1_mid;       
-                            event->input1_max = info->input1_max;       
-                            event->input1_cmd = info->input1_cmd;       
-                            event->input2_raw = info->input2_raw;       
-                            event->input2_typ = info->input2_typ;       
-                            event->input2_min = info->input2_min;       
-                            event->input2_mid = info->input2_mid;       
-                            event->input2_max = info->input2_max;       
-                            event->input2_cmd = info->input2_cmd;       
-                            event->aux_input1_raw = info->aux_input1_raw; 
-                            event->aux_input1_typ = info->aux_input1_typ; 
-                            event->aux_input1_min = info->aux_input1_min; 
-                            event->aux_input1_mid = info->aux_input1_mid; 
-                            event->aux_input1_max = info->aux_input1_max; 
-                            event->aux_input1_cmd = info->aux_input1_cmd; 
-                            event->aux_input2_raw = info->aux_input2_raw; 
-                            event->aux_input2_typ = info->aux_input2_typ; 
-                            event->aux_input2_min = info->aux_input2_min; 
-                            event->aux_input2_mid = info->aux_input2_mid; 
-                            event->aux_input2_max = info->aux_input2_max; 
-                            event->aux_input2_cmd = info->aux_input2_cmd;       
-                            if (info->dc_curr) event->dc_curr = info->dc_curr.value() / 100.0;
-                            if (info->rdc_curr) event->rdc_curr = info->rdc_curr.value() / 100.0;
-                            if (info->ldc_curr) event->ldc_curr = info->ldc_curr.value() / 100.0;
-                            if (info->spdl) event->spdl = info->spdl.value();
-                            if (info->spdr) event->spdr = info->spdr.value();
-                            if (info->cmdl) event->cmdl = info->cmdl.value();
-                            if (info->cmdr) event->cmdr = info->cmdr.value();
-                            if (info->batv) event->batv = info->batv.value() / 100.0;
-                            if (info->temp) event->temp = info->temp.value() / 10.0;
-                            if (info->spd_avg) event->spd_avg = info->spd_avg.value();
+            HoverboardEvent event;
+            auto result = cobs_decode(uart_read_buffer)
+                .and_then(check_crc);
+            result.map([&](Bytes &decoded)
+                       {
+                        HoverboardEvent event;
+                        CborParser parser;
+                        CborValue cbor_value;
+                        cbor_parser_init(decoded.data(), decoded.size(), 0, &parser, &cbor_value);
+                        if (event.decode(cbor_value))
+                        {
                             emit(event);
-                            delete info;
-  //                          INFO("HoverboardEvent emitted");
-                            return Result<bool>::Ok(true); })
-                .or_else([&](Error e)
-                         {
-                        WARN("Failed to process UART data: %s", e.msg);
-                        return Result<bool>::Ok(false); });
+                        }
+                        else
+                        {
+                            WARN("Failed to decode HoverboardEvent");
+                        }
+                       });
+
+
             uart_read_buffer.clear();
         }
         else

@@ -52,7 +52,7 @@ private:
 public:
   McActor(const char *name, const char *hostname);
   ~McActor();
-  void on_message(const Envelope &);
+  void on_message(const ActorMessage &);
   void on_start();
   void init_event();
   void stop_event();
@@ -62,7 +62,7 @@ public:
   void send_unicast(uint32_t dst, uint32_t src, uint32_t msg_type, Bytes &value);
   void send_multicast(uint32_t dst, uint32_t src, uint32_t msg_type, const Bytes &value);
   void on_udp_raw(const Bytes &request, const sockaddr_in &sender_addr);
-  void on_udp_message(UdpMessage& udp_message,const sockaddr_in &sender_addr);
+  void on_udp_message(ActorMessage& udp_message,const sockaddr_in &sender_addr);
   void send_ping_req(const char* dst,uint32_t number);
   void send_ping_rep(const char* dst,uint32_t number);
   Result<Bytes> encode_message(uint32_t dst, uint32_t src, uint32_t type, const Bytes &value);

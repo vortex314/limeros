@@ -15,7 +15,7 @@ void OtaActor::on_start()
     INFO("OTA Actor started");
 }
 
-void OtaActor::on_message(const Envelope &envelope)
+void OtaActor::on_message(const ActorMessage &envelope)
 {
     const Msg &msg = *envelope.msg;
     msg.handle<WifiConnected>([&](const auto &msg){ start_task();});

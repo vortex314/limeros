@@ -54,7 +54,13 @@
 #define HEATER_SENSOR_TIMEOUT_MS 3000
 #endif
 
-DEFINE_MSG(Max31855Read);
+
+class Max31855Read : public Msg
+{
+public:
+    static uint32_t msg_id() { return FNV("Max31855Read"); }
+    static const char *msg_name() { return "Max31855Read"; }
+};
 
 
 class Max31855Actor : public Actor
@@ -88,7 +94,7 @@ public:
   Max31855Actor(const char *name, uint32_t poll_interval_ms = 500);
   ~Max31855Actor();
   void on_start() override;
-  void on_message(const Envelope &env) override;
+  void on_message(const ActorMessage &env) override;
 
 private:
   bool init_spi();

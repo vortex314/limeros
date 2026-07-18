@@ -18,7 +18,7 @@
 #include <stdint.h>
 #include <serdes.h>
 #include <ArduinoJson.h>
-#include <msg.h>
+#include <msgs.h>
 #pragma once
 
 uint64_t current_time();
@@ -43,31 +43,27 @@ public:
 
 extern ActorRef NULL_ACTOR;
 
-class Envelope
+class ActorMessage
 {
 public:
     std::optional<ActorRef> src = std::nullopt;
     std::optional<ActorRef> dst = std::nullopt;
     const Msg *msg;
-    Envelope(Msg *msg) : msg(msg) {}
-    Envelope(ActorRef src, const Msg *msg) : src(src), msg(msg) {}
-    Envelope(ActorRef src, ActorRef dst, const Msg *msg) : src(src), dst(dst), msg(msg) {}
-    ~Envelope() { delete msg; }
+    ActorMessage(Msg *msg) : msg(msg) {}
+    ActorMessage(ActorRef src, const Msg *msg) : src(src), msg(msg) {}
+    ActorMessage(ActorRef src, ActorRef dst, const Msg *msg) : src(src), dst(dst), msg(msg) {}
+    ~ActorMessage() { delete msg; }
 };
 
-DEFINE_MSG(TimerMsg,
-           int timer_id;
-           TimerMsg(int id) : timer_id(id){});
-
-/*template <typename T>
-void handle(const Msg &message, std::function<void(const T &)> f)
+class TimerMsg : public Msg
 {
-    if (message.type_id() == T::id)
-    {
-        T &msg = (T &)message;
-        f(msg);
-    }
-}*/
+public:
+    static uint32_t msg_id() { return FNV("TimerMsg"); }
+    static const char *msg_name() { return "TimerMsg"; }
+    int timer_id;
+    TimerMsg(int id) : timer_id(id) {}
+};
+
 
 template <class T>
 class Queue
@@ -192,18 +188,18 @@ public:
 
 class Actor;
 
-class EventBus : public Queue<const Envelope *>
+class EventBus : public Queue<const ActorMessage *>
 {
     std::vector<Actor *> _actors;
-    std::vector<std::function<void(const Envelope &)>> _message_handlers;
+    std::vector<std::function<void(const ActorMessage &)>> _message_handlers;
     size_t _stack_size = 1024;
     TaskHandle_t _task_handle;
 
 public:
     EventBus(size_t size);
-    void push(const Envelope *env);
+    void push(const ActorMessage *env);
     void register_actor(Actor *);
-    void register_handler(std::function<void(const Envelope &)> handler)
+    void register_handler(std::function<void(const ActorMessage &)> handler)
     {
         _message_handlers.push_back(handler);
     }
@@ -227,7 +223,7 @@ public:
 
     virtual void on_start() { INFO("actor %s default started.", _self.name()); }
     virtual void on_stop() { INFO("actor %s default stopped.", _self.name()); }
-    virtual void on_message(const Envelope &env)
+    virtual void on_message(const ActorMessage &env)
     {
         WARN(" No message handler for actor %s ", _self.name());
     }
@@ -258,14 +254,14 @@ public:
     EventBus *eventbus() const { return _eventbus; }
 
     void emit(const Msg *msg);
-    void emit(const Envelope *env);
+    void emit(const ActorMessage *env);
     void set_eventbus(EventBus *eventbus);
 
     void handle_expired_timers()
     {
         for (int id : _timers.get_expired_timers())
         {
-            Envelope *env = new Envelope(ref(), new TimerMsg(id));
+            ActorMessage *env = new ActorMessage(ref(), new TimerMsg(id));
             on_message(*env);
             _timers.refresh(id);
         }
@@ -338,12 +334,22 @@ typedef struct PropInfo
     Option<float> max;
 } PropInfo;
 
-DEFINE_MSG(PublishTxd,
-           JsonDocument doc;
-           PublishTxd(const JsonDocument &doc) : doc(doc){});
-DEFINE_MSG(PublishRxd,
-           JsonDocument doc;
-           PublishRxd(const JsonDocument &doc) : doc(doc){});
+class PublishTxd : public Msg {
+public:
+    static uint32_t msg_id() { return FNV("PublishTxd"); };
+    static const char* msg_name() { return "PublishTxd"; };
+
+    JsonDocument doc;
+    PublishTxd(const JsonDocument &doc) : doc(doc) {}
+};
+
+class PublishRxd : public Msg {
+public:
+    static uint32_t msg_id() { return FNV("PublishRxd"); };
+    static const char* msg_name() { return "PublishRxd"; };
+    JsonDocument doc;
+    PublishRxd(const JsonDocument &doc) : doc(doc) {}
+};
 
 template <typename T>
 void handle(JsonDocument &doc, const char *key, std::function<void(const T &)> f)

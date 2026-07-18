@@ -5,15 +5,74 @@
 
 #pragma once
 
-#include <limero/codec.h>
+#include <result.h>
+#include <option.h>
 #include <cbor.h>
+#include <errno.h>
+
+
+// FNV-1a hash function for 32-bit hash value
+constexpr uint32_t fnv1a_32_1(const char* str, uint32_t hash = 2166136261U)
+{
+    return *str == '\0' ? hash : fnv1a_32_1(str + 1, (hash ^ static_cast<uint32_t>(*str)) * 16777619U);
+}
+
+// Helper to compute the hash at compile time for a string literal
+template <std::size_t N>
+constexpr uint32_t FNV(const char(&str)[N])
+{
+    return fnv1a_32_1(str);
+}
+
+class Bytes {
+    private:
+        uint8_t* _buffer;
+        size_t _capacity;
+        size_t _index;
+    public :
+        Bytes(uint8_t* buffer,size_t capacity ) : _buffer(buffer),_capacity(capacity),_index(0);
+        Bytes(size_t capacity) {
+            _buffer = (uint8_t*)malloc(capacity);
+            _capacity=capacity;
+            _index=0;
+        }
+        uint8_t* data() { return _buffer;};
+        size_t size() { return _index; }
+        int push(uint8_t b) { if ( _index < _capacity ) {
+                _buffer[_index++] = b;
+                return 0;
+                }
+                return ENOSPC;
+        }
+};
+
+// ---------------------- abstract class Msg ------------------
+class Msg {
+    public:
+    static uint32_t msg_id() { return FNV("Msg"); };
+    static const char* msg_name() { return "Msg"; };
+    errno encode(Bytes& buffer) 
+    {
+        WARN(¨encode not implemeneted for %s¨,msg_name());
+        return ENOTSUP;
+    }
+    errno decode(Bytes& buffer) 
+    {
+        WARN(¨decode not implemeneted for %s¨,msg_name());
+        return ENOTSUP;    }
+};
+
 
 // ── TinyCBOR helper ────────────────────────────────────────────────────────
 
-static inline Result<Void> cbor_check(CborError err) {
-    if (err == CborNoError) return Result<Void>::Ok(Void());
-    return Result<Void>::Err(err, cbor_error_string(err));
-}
+#define cbor_check(X) { \
+    CborError err = X; \
+    if (err != CborNoError) { \
+        WARN(¨failed cbor : %s¨,#X); \
+         return EINVAL; \
+    }   \
+    }
+
 
 // ── Encode macro ───────────────────────────────────────────────────────────
 {%- macro encode_value(field) %}
@@ -105,7 +164,7 @@ static inline Result<Void> cbor_check(CborError err) {
                 if ({{ cbor_type_check }}) {
                     {{ val_var }};
                     {{ tinycbor_getter }};
-                    {{ field.name }}.some({{ cpp_cast }});
+                    {{ field.name }} = ({{ cpp_cast }});
                 }
 {%- endmacro -%}
 
@@ -114,55 +173,55 @@ static inline Result<Void> cbor_check(CborError err) {
                 if (cbor_value_is_unsigned_integer(&mapValue)) {
                     uint64_t val;
                     cbor_value_get_uint64(&mapValue, &val);
-                    {{ field.name }}.some((uint32_t)val);
+                    {{ field.name }} = ((uint32_t)val);
                 } else if (cbor_value_is_negative_integer(&mapValue)) {
                     int64_t val;
                     cbor_value_get_int64(&mapValue, &val);
-                    {{ field.name }}.some((uint32_t)val);
+                    {{ field.name }} = ((uint32_t)val);
                 }
 {%- elif field.cpp_type == "int32_t" -%}
                 if (cbor_value_is_unsigned_integer(&mapValue)) {
                     uint64_t val;
                     cbor_value_get_uint64(&mapValue, &val);
-                    {{ field.name }}.some((int32_t)val);
+                    {{ field.name }} = ((int32_t)val);
                 } else if (cbor_value_is_negative_integer(&mapValue)) {
                     int64_t val;
                     cbor_value_get_int64(&mapValue, &val);
-                    {{ field.name }}.some((int32_t)val);
+                    {{ field.name }} = ((int32_t)val);
                 }
 {%- elif field.cpp_type == "uint64_t" -%}
                 if (cbor_value_is_unsigned_integer(&mapValue)) {
                     uint64_t val;
                     cbor_value_get_uint64(&mapValue, &val);
-                    {{ field.name }}.some(val);
+                    {{ field.name }} = (val);
                 } else if (cbor_value_is_negative_integer(&mapValue)) {
                     int64_t val;
                     cbor_value_get_int64(&mapValue, &val);
-                    {{ field.name }}.some((uint64_t)val);
+                    {{ field.name }} = ((uint64_t)val);
                 }
 {%- elif field.cpp_type == "int64_t" -%}
                 if (cbor_value_is_unsigned_integer(&mapValue)) {
                     uint64_t val;
                     cbor_value_get_uint64(&mapValue, &val);
-                    {{ field.name }}.some((int64_t)val);
+                    {{ field.name }} = ((int64_t)val);
                 } else if (cbor_value_is_negative_integer(&mapValue)) {
                     int64_t val;
                     cbor_value_get_int64(&mapValue, &val);
-                    {{ field.name }}.some(val);
+                    {{ field.name }} = (val);
                 }
 {%- elif field.cpp_type == "float" -%}
                 if (cbor_value_is_float(&mapValue) || cbor_value_is_double(&mapValue)) {
                     float val;
                     cbor_value_get_float(&mapValue, &val);
-                    {{ field.name }}.some(val);
+                    {{ field.name }} = (val);
                 } else if (cbor_value_is_unsigned_integer(&mapValue)) {
                     uint64_t val;
                     cbor_value_get_uint64(&mapValue, &val);
-                    {{ field.name }}.some((float)val);
+                    {{ field.name }} = ((float)val);
                 } else if (cbor_value_is_negative_integer(&mapValue)) {
                     int64_t val;
                     cbor_value_get_int64(&mapValue, &val);
-                    {{ field.name }}.some((float)val);
+                    {{ field.name }} = ((float)val);
                 }
 {%- elif field.cpp_type == "std::string" -%}
                 if (cbor_value_is_text_string(&mapValue)) {
@@ -171,13 +230,13 @@ static inline Result<Void> cbor_check(CborError err) {
                     std::string val(len, '\0');
                     cbor_value_copy_text_string(&mapValue, &val[0], &len, NULL);
                     val.resize(len);
-                    {{ field.name }}.some(val);
+                    {{ field.name }} = (val);
                 }
 {%- elif field.cpp_type == "bool" -%}
                 if (cbor_value_is_boolean(&mapValue)) {
                     bool val;
                     cbor_value_get_boolean(&mapValue, &val);
-                    {{ field.name }}.some(val);
+                    {{ field.name }} = (val);
                 }
 {%- elif field.cpp_type == "std::vector<uint8_t>" -%}
                 if (cbor_value_is_byte_string(&mapValue)) {
@@ -185,7 +244,7 @@ static inline Result<Void> cbor_check(CborError err) {
                     cbor_value_get_string_length(&mapValue, &len);
                     std::vector<uint8_t> val(len);
                     cbor_value_copy_byte_string(&mapValue, val.data(), &len, NULL);
-                    {{ field.name }}.some(val);
+                    {{ field.name }} = (val);
                 }
 {%- elif field.cpp_type == "std::vector<uint32_t>" -%}
                 if (cbor_value_is_array(&mapValue)) {
@@ -205,7 +264,7 @@ static inline Result<Void> cbor_check(CborError err) {
                         cbor_value_advance(&arrValue);
                     }
                     cbor_value_leave_container(&mapValue, &arrValue);
-                    {{ field.name }}.some(val);
+                    {{ field.name }} = (val);
                 }
 {%- elif field.cpp_type == "std::vector<int32_t>" -%}
                 if (cbor_value_is_array(&mapValue)) {
@@ -225,7 +284,7 @@ static inline Result<Void> cbor_check(CborError err) {
                         cbor_value_advance(&arrValue);
                     }
                     cbor_value_leave_container(&mapValue, &arrValue);
-                    {{ field.name }}.some(val);
+                    {{ field.name }} = (val);
                 }
 {%- elif field.cpp_type == "std::vector<uint64_t>" -%}
                 if (cbor_value_is_array(&mapValue)) {
@@ -245,7 +304,7 @@ static inline Result<Void> cbor_check(CborError err) {
                         cbor_value_advance(&arrValue);
                     }
                     cbor_value_leave_container(&mapValue, &arrValue);
-                    {{ field.name }}.some(val);
+                    {{ field.name }} = (val);
                 }
 {%- elif field.cpp_type == "std::vector<int64_t>" -%}
                 if (cbor_value_is_array(&mapValue)) {
@@ -265,7 +324,7 @@ static inline Result<Void> cbor_check(CborError err) {
                         cbor_value_advance(&arrValue);
                     }
                     cbor_value_leave_container(&mapValue, &arrValue);
-                    {{ field.name }}.some(val);
+                    {{ field.name }} = (val);
                 }
 {%- elif field.cpp_type == "std::vector<float>" -%}
                 if (cbor_value_is_array(&mapValue)) {
@@ -289,7 +348,7 @@ static inline Result<Void> cbor_check(CborError err) {
                         cbor_value_advance(&arrValue);
                     }
                     cbor_value_leave_container(&mapValue, &arrValue);
-                    {{ field.name }}.some(val);
+                    {{ field.name }} = (val);
                 }
 {%- elif field.cpp_type == "std::vector<bool>" -%}
                 if (cbor_value_is_array(&mapValue)) {
@@ -305,7 +364,7 @@ static inline Result<Void> cbor_check(CborError err) {
                         cbor_value_advance(&arrValue);
                     }
                     cbor_value_leave_container(&mapValue, &arrValue);
-                    {{ field.name }}.some(val);
+                    {{ field.name }} = (val);
                 }
 {%- elif field.cpp_type == "std::vector<std::string>" -%}
                 if (cbor_value_is_array(&mapValue)) {
@@ -324,7 +383,7 @@ static inline Result<Void> cbor_check(CborError err) {
                         cbor_value_advance(&arrValue);
                     }
                     cbor_value_leave_container(&mapValue, &arrValue);
-                    {{ field.name }}.some(val);
+                    {{ field.name }} = (val);
                 }
 {%- endif -%}
 {%- endmacro decode_field -%}
@@ -352,18 +411,20 @@ public:
 
     /// Serialize this message into a CBOR map keyed by field id.
     /// Writes into the parent encoder as a single map item.
-    Result<Void> encode(CborEncoder& encoder)  {
+    int encode(Bytes& buffer)  {
+        CborEncoder encoder;
+        cbor_encoder_init(&encoder,buffer.data(),buffer.size(),0);
         // Count how many optional fields are set.
         uint32_t fieldCount = 0;
 {%- for field in msg.fields %}
-        {{ field.name }}.inspect([&](const auto&) { fieldCount++; });
+        {{ field.name }}.for_each([&](const auto&) { fieldCount++; });
 {%- endfor %}
 
         CborEncoder mapEncoder;
-        RET_ERR(cbor_check(cbor_encoder_create_map(&encoder, &mapEncoder, fieldCount)));
+        cbor_check(cbor_encoder_create_map(&encoder, &mapEncoder, fieldCount));
 
 {%- for field in msg.fields %}
-        {{ field.name }}.inspect([&](const auto& value) {
+        {{ field.name }}.for_each([&](const auto& value) {
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::{{ field.name | upper }}));
             {{ self::encode_value(field=field) }}
         });

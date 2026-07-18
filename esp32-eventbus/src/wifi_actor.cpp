@@ -79,7 +79,7 @@ void WifiActor::on_start()
   }
 }
 
-void WifiActor::on_message(const Envelope &env)
+void WifiActor::on_message(const ActorMessage &env)
 {
   env.msg->handle<TimerMsg>([&](const TimerMsg &msg)
                             { handle_timer(msg.timer_id); });

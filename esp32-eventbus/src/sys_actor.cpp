@@ -56,7 +56,7 @@ void SysActor::reboot(bool b)
         esp_restart();
 }
 
-void SysActor::on_message(const Envelope &env)
+void SysActor::on_message(const ActorMessage &env)
 {
     const Msg &msg = *env.msg;
     msg.handle<SysRequest>([&](auto sys_cmd)

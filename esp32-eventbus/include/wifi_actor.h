@@ -29,7 +29,7 @@ private:
 public:
   WifiActor(const char *name);
   ~WifiActor();
-  void on_message(const Envelope &);
+  void on_message(const ActorMessage &);
   void on_start();
   void handle_timer(int id);
   Res net_init();

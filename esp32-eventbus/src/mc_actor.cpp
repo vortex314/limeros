@@ -116,12 +116,14 @@ void McActor::stop_event()
 
 Result<Bytes> McActor::encode_message(uint32_t dst, uint32_t src, uint32_t type, const Bytes &payload)
 {
-    UdpMessage msg;
+    Envelope msg;
     msg.dst = dst;
     msg.src = src;
-    msg.typ = type;
-    msg.msg = payload;
-    return UdpMessage::serialize(msg);
+    msg.msg_type = type;
+    msg.payload = payload;
+    CborEncoder encoder;
+    cbor_encoder_init(&encoder, nullptr, 0, 0);
+    return msg.encode(&encoder);
 }
 
 void McActor::send_unicast(uint32_t dst, uint32_t src, uint32_t type, const Bytes &payload)
@@ -198,7 +200,7 @@ void McActor::stop_listener()
     _running = false;
 }
 
-void McActor::on_message(const Envelope &envelope)
+void McActor::on_message(const ActorMessage &envelope)
 {
     const Msg &msg = *envelope.msg;
     msg.handle<DeviceAliveEvent>([&](const auto &msg) // accept actor capabilities
@@ -351,7 +353,7 @@ bool put_on_actor_bus(Actor *actor, UdpMessage &udp_msg)
     if (strcmp(udp_msg.typ->c_str(), M::name_value) == 0)
     {
         M::from_poly(*(udp_msg.msg)).just([&](const M *msg)
-                                          { actor->emit(new Envelope(
+                                          { actor->emit(new ActorMessage(
                                                 udp_msg.src.has_value() ? ActorRef(udp_msg.src->c_str()) : NULL_ACTOR,
                                                 udp_msg.dst.has_value() ? ActorRef(udp_msg.dst->c_str()) : NULL_ACTOR,
                                                 msg)); });

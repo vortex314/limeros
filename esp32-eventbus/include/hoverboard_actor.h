@@ -7,14 +7,18 @@
 #include <vector>
 #include <option.h>
 #include <ArduinoJson.h>
-#include <msg.h>
+#include <msgs.h>
 #include <zenoh_actor.h>
-#include <hoverboard_event_raw.h>
 
-DEFINE_MSG(UartRxd,
+class UartRxd : public Msg
+{
+public:
+    static uint32_t msg_id() { return FNV("UartRxd"); }
+    static const char *msg_name() { return "UartRxd"; }
     Bytes payload;
-    UartRxd(const Bytes &payload) : payload(payload){};
-);
+    UartRxd(const Bytes &payload) : payload(payload) {};
+
+};
 
 
 class HoverboardActor : public Actor
@@ -23,8 +27,8 @@ private:
     int _timer_publish = -1;
     int _timer_hb_alive = -1;
     int _prop_counter = 0;
-    uint16_t _speed=0;
-    uint16_t _steer=0;
+    uint16_t _speed = 0;
+    uint16_t _steer = 0;
 
 public:
     QueueHandle_t uart_queue = NULL;
@@ -36,7 +40,7 @@ public:
 public:
     HoverboardActor(const char *name);
     ~HoverboardActor();
-    void on_message(const Envelope &msg);
+    void on_message(const ActorMessage &msg);
     void on_timer(int timer_id);
     void on_start();
     Result<bool> init_uart();
@@ -44,7 +48,7 @@ public:
     void handle_uart_bytes(const Bytes &);
     static Result<Bytes> cobs_decode(const Bytes &input);
     static Result<Bytes> check_crc(const Bytes &input);
-    static Result<HoverboardEventRaw*> parse_info_msg(const Bytes &input);
+    static Result<HoverboardEventRaw *> parse_info_msg(const Bytes &input);
 };
 
 #endif

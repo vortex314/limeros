@@ -47,7 +47,7 @@ class LedActor : public Actor
 public:
     LedActor(const char *name);
     ~LedActor();
-    void on_message(const Envelope &msg);
+    void on_message(const ActorMessage &msg);
     void on_timer(int timer_id);
     void on_start();
 };

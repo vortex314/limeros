@@ -57,7 +57,7 @@ public:
   ZenohActor(const char *name,const char * device_name);
   ~ZenohActor();
   void run();
-  void on_message(const Envelope &env);
+  void on_message(const ActorMessage &env);
   void on_start();
   void on_stop();
   void handle_timer(int id);

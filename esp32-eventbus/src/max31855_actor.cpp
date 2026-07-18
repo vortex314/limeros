@@ -72,7 +72,7 @@ void Max31855Actor::on_start()
          MAX31855_SPI_MODE);
 }
 
-void Max31855Actor::on_message(const Envelope &env)
+void Max31855Actor::on_message(const ActorMessage &env)
 {
     const Msg &msg = *env.msg;
 

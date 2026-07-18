@@ -9,7 +9,7 @@ LedActor::~LedActor()
 {
 }
 
-void LedActor::on_message(const Envelope &env)
+void LedActor::on_message(const ActorMessage &env)
 {
     const Msg &msg = *env.msg;
     msg.handle<LedOn>([&](auto _)
