@@ -49,12 +49,10 @@ void Max31855Actor::on_start()
         timer_stop(_timer_poll);
         return;
     }
-    DeviceAliveEvent *alive_event = new DeviceAliveEvent();
-    alive_event->publishes.push_back(Max31855Event::name_value);
-    alive_event->publishes.push_back(HeatingEvent::name_value);
-    alive_event->subscribes.push_back(Max31855Read::name_value);
-    alive_event->subscribes.push_back(HeatingRequest::name_value);
-    emit(alive_event);
+    EndpointAnnounce *announce = new EndpointAnnounce;
+    announce->events = {Max31855Event::msg_id(), HeatingEvent::msg_id()};
+    announce->services = {Max31855Read::msg_id(), HeatingRequest::msg_id()};
+    emit(announce);
 
     gpio_set_direction(_pin_ssr, GPIO_MODE_OUTPUT);
     set_heater(false);
@@ -72,12 +70,10 @@ void Max31855Actor::on_start()
          MAX31855_SPI_MODE);
 }
 
-void Max31855Actor::on_message(const ActorMessage &env)
+void Max31855Actor::on_message(const ActorMessage &msg)
 {
-    const Msg &msg = *env.msg;
-
-    msg.handle<TimerMsg>([&](const TimerMsg &timer_msg)
-                         {
+    msg.handle_if<TimerMsg>([&](const TimerMsg &timer_msg)
+                            {
     if (timer_msg.timer_id == _timer_poll)
     {
             control();
@@ -88,11 +84,11 @@ void Max31855Actor::on_message(const ActorMessage &env)
             publish_heating_event(esp_timer_get_time() / 1000);
     } });
 
-    msg.handle<Max31855Read>([&](auto _)
-                                                         { control(); });
+    msg.handle_if<Max31855Read>([&](auto _)
+                                { control(); });
 
-        msg.handle<HeatingRequest>([&](const HeatingRequest &req)
-                                                             {
+    msg.handle_if<HeatingRequest>([&](const HeatingRequest &req)
+                                  {
             if (req.setpoint_c)
             {
                 const float clamped = clampf(*req.setpoint_c, HEATER_SETPOINT_MIN_C, HEATER_SETPOINT_MAX_C);
@@ -127,8 +123,7 @@ void Max31855Actor::on_message(const ActorMessage &env)
                          _enabled,
                          _kp,
                          _ki,
-                         _kd);
-        });
+                         _kd); });
 }
 
 bool Max31855Actor::init_spi()
@@ -281,20 +276,20 @@ void Max31855Actor::control()
     auto event = new Max31855Event();
 
     event->thermocouple_temp = thermocouple_c;
-    event->internal_temp     = internal_c;
+    event->internal_temp = internal_c;
     event->fault = fault;
     event->fault_open_tc = open_circuit;
     event->fault_short_gnd = short_to_gnd;
     event->fault_short_vcc = short_to_vcc;
- //   event->timestamp_ms = esp_timer_get_time() / 1000;
+    //   event->timestamp_ms = esp_timer_get_time() / 1000;
 
     DEBUG("MAX31855 tc=%.2fC cj=%.2fC fault=%d oc=%d scg=%d scv=%d",
-         thermocouple_c,
-         internal_c,
-         fault,
-         open_circuit,
-         short_to_gnd,
-         short_to_vcc);
+          thermocouple_c,
+          internal_c,
+          fault,
+          open_circuit,
+          short_to_gnd,
+          short_to_vcc);
 
     emit(event);
 
@@ -391,7 +386,7 @@ void Max31855Actor::publish_heating_event(uint64_t now_ms)
 void Max31855Actor::set_heater(bool on)
 {
     _heater_on = on;
-    gpio_set_level(_pin_ssr, _heater_on ? 1 : 0); // SSR driven via 
+    gpio_set_level(_pin_ssr, _heater_on ? 1 : 0); // SSR driven via
 }
 
 bool Max31855Actor::is_setpoint_valid(float setpoint_c) const

@@ -5,62 +5,10 @@
 
 #pragma once
 
-#include <result.h>
-#include <option.h>
 #include <cbor.h>
 #include <errno.h>
+#include <msg.h>
 
-
-// FNV-1a hash function for 32-bit hash value
-constexpr uint32_t fnv1a_32_1(const char* str, uint32_t hash = 2166136261U)
-{
-    return *str == '\0' ? hash : fnv1a_32_1(str + 1, (hash ^ static_cast<uint32_t>(*str)) * 16777619U);
-}
-
-// Helper to compute the hash at compile time for a string literal
-template <std::size_t N>
-constexpr uint32_t FNV(const char(&str)[N])
-{
-    return fnv1a_32_1(str);
-}
-
-class Bytes {
-    private:
-        uint8_t* _buffer;
-        size_t _capacity;
-        size_t _index;
-    public :
-        Bytes(uint8_t* buffer,size_t capacity ) : _buffer(buffer),_capacity(capacity),_index(0);
-        Bytes(size_t capacity) {
-            _buffer = (uint8_t*)malloc(capacity);
-            _capacity=capacity;
-            _index=0;
-        }
-        uint8_t* data() { return _buffer;};
-        size_t size() { return _index; }
-        int push(uint8_t b) { if ( _index < _capacity ) {
-                _buffer[_index++] = b;
-                return 0;
-                }
-                return ENOSPC;
-        }
-};
-
-// ---------------------- abstract class Msg ------------------
-class Msg {
-    public:
-    static uint32_t msg_id() { return FNV("Msg"); };
-    static const char* msg_name() { return "Msg"; };
-    errno encode(Bytes& buffer) 
-    {
-        WARN(¨encode not implemeneted for %s¨,msg_name());
-        return ENOTSUP;
-    }
-    errno decode(Bytes& buffer) 
-    {
-        WARN(¨decode not implemeneted for %s¨,msg_name());
-        return ENOTSUP;    }
-};
 
 
 // ── TinyCBOR helper ────────────────────────────────────────────────────────
@@ -68,7 +16,7 @@ class Msg {
 #define cbor_check(X) { \
     CborError err = X; \
     if (err != CborNoError) { \
-        WARN(¨failed cbor : %s¨,#X); \
+        WARN("failed cbor : %s",#X); \
          return EINVAL; \
     }   \
     }
@@ -94,7 +42,7 @@ public:
     /// Writes into the parent encoder as a single map item.
     int encode(Bytes& buffer)  {
         CborEncoder encoder;
-        cbor_encoder_init(&encoder,buffer.data(),buffer.size(),0);
+        cbor_encoder_init(&encoder,buffer.data(),buffer.capacity(),0);
         // Count how many optional fields are set.
         uint32_t fieldCount = 0;
         src.for_each([&](const auto&) { fieldCount++; });
@@ -111,14 +59,19 @@ public:
             cbor_check(cbor_encode_uint(&mapEncoder, value));
         });
 
-        return cbor_check(cbor_encoder_close_container(&encoder, &mapEncoder));
+         cbor_check(cbor_encoder_close_container(&encoder, &mapEncoder));
+         return 0;
     }
 
     /// Deserialize a BrokerSubscribeRequest from a CBOR map value.
     /// `it` must point to the map; after decoding it is advanced past the map.
-     Result<Void> decode(CborValue& it) {
+     int decode(const Bytes& buffer) {
+        CborParser parser;
+        CborValue it;
+        cbor_check(cbor_parser_init(buffer.data(), buffer.size(), 0, &parser, &it));
         if (!cbor_value_is_map(&it)) {
-            return Result<Void>::Err(-1, "Expected CBOR map for BrokerSubscribeRequest");
+            WARN("Expected CBOR map ");
+            return EINVAL;
         }
 
         CborValue mapValue;
@@ -171,7 +124,7 @@ public:
         }
 
         cbor_value_leave_container(&it, &mapValue);
-        return Result<Void>::Ok(Void());
+        return 0;
     }
 };
 
@@ -207,7 +160,7 @@ public:
     /// Writes into the parent encoder as a single map item.
     int encode(Bytes& buffer)  {
         CborEncoder encoder;
-        cbor_encoder_init(&encoder,buffer.data(),buffer.size(),0);
+        cbor_encoder_init(&encoder,buffer.data(),buffer.capacity(),0);
         // Count how many optional fields are set.
         uint32_t fieldCount = 0;
         heading.for_each([&](const auto&) { fieldCount++; });
@@ -259,14 +212,19 @@ public:
             cbor_check(cbor_encode_float(&mapEncoder, value));
         });
 
-        return cbor_check(cbor_encoder_close_container(&encoder, &mapEncoder));
+         cbor_check(cbor_encoder_close_container(&encoder, &mapEncoder));
+         return 0;
     }
 
     /// Deserialize a CompassEvent from a CBOR map value.
     /// `it` must point to the map; after decoding it is advanced past the map.
-     Result<Void> decode(CborValue& it) {
+     int decode(const Bytes& buffer) {
+        CborParser parser;
+        CborValue it;
+        cbor_check(cbor_parser_init(buffer.data(), buffer.size(), 0, &parser, &it));
         if (!cbor_value_is_map(&it)) {
-            return Result<Void>::Err(-1, "Expected CBOR map for CompassEvent");
+            WARN("Expected CBOR map ");
+            return EINVAL;
         }
 
         CborValue mapValue;
@@ -432,7 +390,7 @@ public:
         }
 
         cbor_value_leave_container(&it, &mapValue);
-        return Result<Void>::Ok(Void());
+        return 0;
     }
 };
 
@@ -456,7 +414,7 @@ public:
     /// Writes into the parent encoder as a single map item.
     int encode(Bytes& buffer)  {
         CborEncoder encoder;
-        cbor_encoder_init(&encoder,buffer.data(),buffer.size(),0);
+        cbor_encoder_init(&encoder,buffer.data(),buffer.capacity(),0);
         // Count how many optional fields are set.
         uint32_t fieldCount = 0;
         device.for_each([&](const auto&) { fieldCount++; });
@@ -478,14 +436,19 @@ public:
             cbor_check(cbor_encode_uint(&mapEncoder, value));
         });
 
-        return cbor_check(cbor_encoder_close_container(&encoder, &mapEncoder));
+         cbor_check(cbor_encoder_close_container(&encoder, &mapEncoder));
+         return 0;
     }
 
     /// Deserialize a DeviceAliveEvent from a CBOR map value.
     /// `it` must point to the map; after decoding it is advanced past the map.
-     Result<Void> decode(CborValue& it) {
+     int decode(const Bytes& buffer) {
+        CborParser parser;
+        CborValue it;
+        cbor_check(cbor_parser_init(buffer.data(), buffer.size(), 0, &parser, &it));
         if (!cbor_value_is_map(&it)) {
-            return Result<Void>::Err(-1, "Expected CBOR map for DeviceAliveEvent");
+            WARN("Expected CBOR map ");
+            return EINVAL;
         }
 
         CborValue mapValue;
@@ -547,7 +510,7 @@ public:
         }
 
         cbor_value_leave_container(&it, &mapValue);
-        return Result<Void>::Ok(Void());
+        return 0;
     }
 };
 
@@ -579,7 +542,7 @@ public:
     /// Writes into the parent encoder as a single map item.
     int encode(Bytes& buffer)  {
         CborEncoder encoder;
-        cbor_encoder_init(&encoder,buffer.data(),buffer.size(),0);
+        cbor_encoder_init(&encoder,buffer.data(),buffer.capacity(),0);
         // Count how many optional fields are set.
         uint32_t fieldCount = 0;
         id.for_each([&](const auto&) { fieldCount++; });
@@ -649,14 +612,19 @@ public:
         }
         });
 
-        return cbor_check(cbor_encoder_close_container(&encoder, &mapEncoder));
+         cbor_check(cbor_encoder_close_container(&encoder, &mapEncoder));
+         return 0;
     }
 
     /// Deserialize a EndpointAnnounce from a CBOR map value.
     /// `it` must point to the map; after decoding it is advanced past the map.
-     Result<Void> decode(CborValue& it) {
+     int decode(const Bytes& buffer) {
+        CborParser parser;
+        CborValue it;
+        cbor_check(cbor_parser_init(buffer.data(), buffer.size(), 0, &parser, &it));
         if (!cbor_value_is_map(&it)) {
-            return Result<Void>::Err(-1, "Expected CBOR map for EndpointAnnounce");
+            WARN("Expected CBOR map ");
+            return EINVAL;
         }
 
         CborValue mapValue;
@@ -802,7 +770,7 @@ public:
         }
 
         cbor_value_leave_container(&it, &mapValue);
-        return Result<Void>::Ok(Void());
+        return 0;
     }
 };
 
@@ -822,7 +790,7 @@ public:
     /// Writes into the parent encoder as a single map item.
     int encode(Bytes& buffer)  {
         CborEncoder encoder;
-        cbor_encoder_init(&encoder,buffer.data(),buffer.size(),0);
+        cbor_encoder_init(&encoder,buffer.data(),buffer.capacity(),0);
         // Count how many optional fields are set.
         uint32_t fieldCount = 0;
         utc.for_each([&](const auto&) { fieldCount++; });
@@ -834,14 +802,19 @@ public:
             cbor_check(cbor_encode_uint(&mapEncoder, value));
         });
 
-        return cbor_check(cbor_encoder_close_container(&encoder, &mapEncoder));
+         cbor_check(cbor_encoder_close_container(&encoder, &mapEncoder));
+         return 0;
     }
 
     /// Deserialize a EndpointAnnounceReply from a CBOR map value.
     /// `it` must point to the map; after decoding it is advanced past the map.
-     Result<Void> decode(CborValue& it) {
+     int decode(const Bytes& buffer) {
+        CborParser parser;
+        CborValue it;
+        cbor_check(cbor_parser_init(buffer.data(), buffer.size(), 0, &parser, &it));
         if (!cbor_value_is_map(&it)) {
-            return Result<Void>::Err(-1, "Expected CBOR map for EndpointAnnounceReply");
+            WARN("Expected CBOR map ");
+            return EINVAL;
         }
 
         CborValue mapValue;
@@ -883,7 +856,7 @@ public:
         }
 
         cbor_value_leave_container(&it, &mapValue);
-        return Result<Void>::Ok(Void());
+        return 0;
     }
 };
 
@@ -913,7 +886,7 @@ public:
     /// Writes into the parent encoder as a single map item.
     int encode(Bytes& buffer)  {
         CborEncoder encoder;
-        cbor_encoder_init(&encoder,buffer.data(),buffer.size(),0);
+        cbor_encoder_init(&encoder,buffer.data(),buffer.capacity(),0);
         // Count how many optional fields are set.
         uint32_t fieldCount = 0;
         src.for_each([&](const auto&) { fieldCount++; });
@@ -950,14 +923,19 @@ public:
             cbor_check(cbor_encode_byte_string(&mapEncoder, value.data(), value.size()));
         });
 
-        return cbor_check(cbor_encoder_close_container(&encoder, &mapEncoder));
+         cbor_check(cbor_encoder_close_container(&encoder, &mapEncoder));
+         return 0;
     }
 
     /// Deserialize a Envelope from a CBOR map value.
     /// `it` must point to the map; after decoding it is advanced past the map.
-     Result<Void> decode(CborValue& it) {
+     int decode(const Bytes& buffer) {
+        CborParser parser;
+        CborValue it;
+        cbor_check(cbor_parser_init(buffer.data(), buffer.size(), 0, &parser, &it));
         if (!cbor_value_is_map(&it)) {
-            return Result<Void>::Err(-1, "Expected CBOR map for Envelope");
+            WARN("Expected CBOR map ");
+            return EINVAL;
         }
 
         CborValue mapValue;
@@ -1052,7 +1030,7 @@ public:
         }
 
         cbor_value_leave_container(&it, &mapValue);
-        return Result<Void>::Ok(Void());
+        return 0;
     }
 };
 
@@ -1078,7 +1056,7 @@ public:
     /// Writes into the parent encoder as a single map item.
     int encode(Bytes& buffer)  {
         CborEncoder encoder;
-        cbor_encoder_init(&encoder,buffer.data(),buffer.size(),0);
+        cbor_encoder_init(&encoder,buffer.data(),buffer.capacity(),0);
         // Count how many optional fields are set.
         uint32_t fieldCount = 0;
         req_id.for_each([&](const auto&) { fieldCount++; });
@@ -1105,14 +1083,19 @@ public:
             cbor_check(cbor_encode_uint(&mapEncoder, value));
         });
 
-        return cbor_check(cbor_encoder_close_container(&encoder, &mapEncoder));
+         cbor_check(cbor_encoder_close_container(&encoder, &mapEncoder));
+         return 0;
     }
 
     /// Deserialize a GenericReply from a CBOR map value.
     /// `it` must point to the map; after decoding it is advanced past the map.
-     Result<Void> decode(CborValue& it) {
+     int decode(const Bytes& buffer) {
+        CborParser parser;
+        CborValue it;
+        cbor_check(cbor_parser_init(buffer.data(), buffer.size(), 0, &parser, &it));
         if (!cbor_value_is_map(&it)) {
-            return Result<Void>::Err(-1, "Expected CBOR map for GenericReply");
+            WARN("Expected CBOR map ");
+            return EINVAL;
         }
 
         CborValue mapValue;
@@ -1186,7 +1169,7 @@ public:
         }
 
         cbor_value_leave_container(&it, &mapValue);
-        return Result<Void>::Ok(Void());
+        return 0;
     }
 };
 
@@ -1198,48 +1181,81 @@ public:
     static const char* msg_name() { return "HeatingEvent"; }
 
     typedef enum FieldId {
-        TEMPERATURE = 0,
-        SETPOINT = 1,
-        HEATING = 2,
+        TEMPERATURE_C = 0,
+        SETPOINT_C = 1,
+        ENABLED = 2,
+        OUTPUT_PCT = 3,
+        HEATER_ON = 4,
+        FAULT = 5,
+        TIMESTAMP_MS = 6,
     } FieldId;
-    Option<float> temperature;// Current temperature in Celsius
-    Option<float> setpoint;// Setpoint temperature in Celsius
-    Option<bool> heating;// Heating status
+    Option<float> temperature_c;// Current temperature in Celsius
+    Option<float> setpoint_c;// Setpoint temperature in Celsius
+    Option<bool> enabled;// Heating enabled or disabled
+    Option<float> output_pct;// Output percentage of the heating element
+    Option<bool> heater_on;// Heater is currently on or off
+    Option<bool> fault;// Fault detected in the heating system
+    Option<uint64_t> timestamp_ms;// Timestamp in milliseconds since epoch
 
     /// Serialize this message into a CBOR map keyed by field id.
     /// Writes into the parent encoder as a single map item.
     int encode(Bytes& buffer)  {
         CborEncoder encoder;
-        cbor_encoder_init(&encoder,buffer.data(),buffer.size(),0);
+        cbor_encoder_init(&encoder,buffer.data(),buffer.capacity(),0);
         // Count how many optional fields are set.
         uint32_t fieldCount = 0;
-        temperature.for_each([&](const auto&) { fieldCount++; });
-        setpoint.for_each([&](const auto&) { fieldCount++; });
-        heating.for_each([&](const auto&) { fieldCount++; });
+        temperature_c.for_each([&](const auto&) { fieldCount++; });
+        setpoint_c.for_each([&](const auto&) { fieldCount++; });
+        enabled.for_each([&](const auto&) { fieldCount++; });
+        output_pct.for_each([&](const auto&) { fieldCount++; });
+        heater_on.for_each([&](const auto&) { fieldCount++; });
+        fault.for_each([&](const auto&) { fieldCount++; });
+        timestamp_ms.for_each([&](const auto&) { fieldCount++; });
 
         CborEncoder mapEncoder;
         cbor_check(cbor_encoder_create_map(&encoder, &mapEncoder, fieldCount));
-        temperature.for_each([&](const auto& value) {
-            cbor_check(cbor_encode_uint(&mapEncoder, FieldId::TEMPERATURE));
+        temperature_c.for_each([&](const auto& value) {
+            cbor_check(cbor_encode_uint(&mapEncoder, FieldId::TEMPERATURE_C));
             cbor_check(cbor_encode_float(&mapEncoder, value));
         });
-        setpoint.for_each([&](const auto& value) {
-            cbor_check(cbor_encode_uint(&mapEncoder, FieldId::SETPOINT));
+        setpoint_c.for_each([&](const auto& value) {
+            cbor_check(cbor_encode_uint(&mapEncoder, FieldId::SETPOINT_C));
             cbor_check(cbor_encode_float(&mapEncoder, value));
         });
-        heating.for_each([&](const auto& value) {
-            cbor_check(cbor_encode_uint(&mapEncoder, FieldId::HEATING));
+        enabled.for_each([&](const auto& value) {
+            cbor_check(cbor_encode_uint(&mapEncoder, FieldId::ENABLED));
             cbor_check(cbor_encode_boolean(&mapEncoder, value));
         });
+        output_pct.for_each([&](const auto& value) {
+            cbor_check(cbor_encode_uint(&mapEncoder, FieldId::OUTPUT_PCT));
+            cbor_check(cbor_encode_float(&mapEncoder, value));
+        });
+        heater_on.for_each([&](const auto& value) {
+            cbor_check(cbor_encode_uint(&mapEncoder, FieldId::HEATER_ON));
+            cbor_check(cbor_encode_boolean(&mapEncoder, value));
+        });
+        fault.for_each([&](const auto& value) {
+            cbor_check(cbor_encode_uint(&mapEncoder, FieldId::FAULT));
+            cbor_check(cbor_encode_boolean(&mapEncoder, value));
+        });
+        timestamp_ms.for_each([&](const auto& value) {
+            cbor_check(cbor_encode_uint(&mapEncoder, FieldId::TIMESTAMP_MS));
+            cbor_check(cbor_encode_uint(&mapEncoder, value));
+        });
 
-        return cbor_check(cbor_encoder_close_container(&encoder, &mapEncoder));
+         cbor_check(cbor_encoder_close_container(&encoder, &mapEncoder));
+         return 0;
     }
 
     /// Deserialize a HeatingEvent from a CBOR map value.
     /// `it` must point to the map; after decoding it is advanced past the map.
-     Result<Void> decode(CborValue& it) {
+     int decode(const Bytes& buffer) {
+        CborParser parser;
+        CborValue it;
+        cbor_check(cbor_parser_init(buffer.data(), buffer.size(), 0, &parser, &it));
         if (!cbor_value_is_map(&it)) {
-            return Result<Void>::Err(-1, "Expected CBOR map for HeatingEvent");
+            WARN("Expected CBOR map ");
+            return EINVAL;
         }
 
         CborValue mapValue;
@@ -1261,41 +1277,81 @@ public:
             cbor_value_advance(&mapValue);  // advance to value
 
             switch ((uint32_t)keyVal) {
-                case HeatingEvent::FieldId::TEMPERATURE:
+                case HeatingEvent::FieldId::TEMPERATURE_C:
                     if (cbor_value_is_float(&mapValue) || cbor_value_is_double(&mapValue)) {
                     float val;
                     cbor_value_get_float(&mapValue, &val);
-                    temperature = (val);
+                    temperature_c = (val);
                 } else if (cbor_value_is_unsigned_integer(&mapValue)) {
                     uint64_t val;
                     cbor_value_get_uint64(&mapValue, &val);
-                    temperature = ((float)val);
+                    temperature_c = ((float)val);
                 } else if (cbor_value_is_negative_integer(&mapValue)) {
                     int64_t val;
                     cbor_value_get_int64(&mapValue, &val);
-                    temperature = ((float)val);
+                    temperature_c = ((float)val);
                 }
                     break;
-                case HeatingEvent::FieldId::SETPOINT:
+                case HeatingEvent::FieldId::SETPOINT_C:
                     if (cbor_value_is_float(&mapValue) || cbor_value_is_double(&mapValue)) {
                     float val;
                     cbor_value_get_float(&mapValue, &val);
-                    setpoint = (val);
+                    setpoint_c = (val);
                 } else if (cbor_value_is_unsigned_integer(&mapValue)) {
                     uint64_t val;
                     cbor_value_get_uint64(&mapValue, &val);
-                    setpoint = ((float)val);
+                    setpoint_c = ((float)val);
                 } else if (cbor_value_is_negative_integer(&mapValue)) {
                     int64_t val;
                     cbor_value_get_int64(&mapValue, &val);
-                    setpoint = ((float)val);
+                    setpoint_c = ((float)val);
                 }
                     break;
-                case HeatingEvent::FieldId::HEATING:
+                case HeatingEvent::FieldId::ENABLED:
                     if (cbor_value_is_boolean(&mapValue)) {
                     bool val;
                     cbor_value_get_boolean(&mapValue, &val);
-                    heating = (val);
+                    enabled = (val);
+                }
+                    break;
+                case HeatingEvent::FieldId::OUTPUT_PCT:
+                    if (cbor_value_is_float(&mapValue) || cbor_value_is_double(&mapValue)) {
+                    float val;
+                    cbor_value_get_float(&mapValue, &val);
+                    output_pct = (val);
+                } else if (cbor_value_is_unsigned_integer(&mapValue)) {
+                    uint64_t val;
+                    cbor_value_get_uint64(&mapValue, &val);
+                    output_pct = ((float)val);
+                } else if (cbor_value_is_negative_integer(&mapValue)) {
+                    int64_t val;
+                    cbor_value_get_int64(&mapValue, &val);
+                    output_pct = ((float)val);
+                }
+                    break;
+                case HeatingEvent::FieldId::HEATER_ON:
+                    if (cbor_value_is_boolean(&mapValue)) {
+                    bool val;
+                    cbor_value_get_boolean(&mapValue, &val);
+                    heater_on = (val);
+                }
+                    break;
+                case HeatingEvent::FieldId::FAULT:
+                    if (cbor_value_is_boolean(&mapValue)) {
+                    bool val;
+                    cbor_value_get_boolean(&mapValue, &val);
+                    fault = (val);
+                }
+                    break;
+                case HeatingEvent::FieldId::TIMESTAMP_MS:
+                    if (cbor_value_is_unsigned_integer(&mapValue)) {
+                    uint64_t val;
+                    cbor_value_get_uint64(&mapValue, &val);
+                    timestamp_ms = (val);
+                } else if (cbor_value_is_negative_integer(&mapValue)) {
+                    int64_t val;
+                    cbor_value_get_int64(&mapValue, &val);
+                    timestamp_ms = ((uint64_t)val);
                 }
                     break;
                 default:
@@ -1307,7 +1363,191 @@ public:
         }
 
         cbor_value_leave_container(&it, &mapValue);
-        return Result<Void>::Ok(Void());
+        return 0;
+    }
+};
+
+
+
+class HeatingRequest : public Msg {
+public:
+    static uint32_t msg_id() { return FNV("HeatingRequest"); }
+    static const char* msg_name() { return "HeatingRequest"; }
+
+    typedef enum FieldId {
+        SETPOINT_C = 0,
+        ENABLED = 1,
+        KP = 2,
+        KI = 3,
+        KD = 4,
+        RESET_INTEGRAL = 5,
+    } FieldId;
+    Option<float> setpoint_c;// Setpoint temperature in Celsius
+    Option<bool> enabled;// Enable or disable heating
+    Option<float> kp;// Proportional gain for PID controller
+    Option<float> ki;// Integral gain for PID controller
+    Option<float> kd;// Derivative gain for PID controller
+    Option<bool> reset_integral;// Reset the integral term of the PID controller
+
+    /// Serialize this message into a CBOR map keyed by field id.
+    /// Writes into the parent encoder as a single map item.
+    int encode(Bytes& buffer)  {
+        CborEncoder encoder;
+        cbor_encoder_init(&encoder,buffer.data(),buffer.capacity(),0);
+        // Count how many optional fields are set.
+        uint32_t fieldCount = 0;
+        setpoint_c.for_each([&](const auto&) { fieldCount++; });
+        enabled.for_each([&](const auto&) { fieldCount++; });
+        kp.for_each([&](const auto&) { fieldCount++; });
+        ki.for_each([&](const auto&) { fieldCount++; });
+        kd.for_each([&](const auto&) { fieldCount++; });
+        reset_integral.for_each([&](const auto&) { fieldCount++; });
+
+        CborEncoder mapEncoder;
+        cbor_check(cbor_encoder_create_map(&encoder, &mapEncoder, fieldCount));
+        setpoint_c.for_each([&](const auto& value) {
+            cbor_check(cbor_encode_uint(&mapEncoder, FieldId::SETPOINT_C));
+            cbor_check(cbor_encode_float(&mapEncoder, value));
+        });
+        enabled.for_each([&](const auto& value) {
+            cbor_check(cbor_encode_uint(&mapEncoder, FieldId::ENABLED));
+            cbor_check(cbor_encode_boolean(&mapEncoder, value));
+        });
+        kp.for_each([&](const auto& value) {
+            cbor_check(cbor_encode_uint(&mapEncoder, FieldId::KP));
+            cbor_check(cbor_encode_float(&mapEncoder, value));
+        });
+        ki.for_each([&](const auto& value) {
+            cbor_check(cbor_encode_uint(&mapEncoder, FieldId::KI));
+            cbor_check(cbor_encode_float(&mapEncoder, value));
+        });
+        kd.for_each([&](const auto& value) {
+            cbor_check(cbor_encode_uint(&mapEncoder, FieldId::KD));
+            cbor_check(cbor_encode_float(&mapEncoder, value));
+        });
+        reset_integral.for_each([&](const auto& value) {
+            cbor_check(cbor_encode_uint(&mapEncoder, FieldId::RESET_INTEGRAL));
+            cbor_check(cbor_encode_boolean(&mapEncoder, value));
+        });
+
+         cbor_check(cbor_encoder_close_container(&encoder, &mapEncoder));
+         return 0;
+    }
+
+    /// Deserialize a HeatingRequest from a CBOR map value.
+    /// `it` must point to the map; after decoding it is advanced past the map.
+     int decode(const Bytes& buffer) {
+        CborParser parser;
+        CborValue it;
+        cbor_check(cbor_parser_init(buffer.data(), buffer.size(), 0, &parser, &it));
+        if (!cbor_value_is_map(&it)) {
+            WARN("Expected CBOR map ");
+            return EINVAL;
+        }
+
+        CborValue mapValue;
+        cbor_value_enter_container(&it, &mapValue);
+
+        while (!cbor_value_at_end(&mapValue)) {
+            // Read the map key (must be an unsigned integer — field id).
+            if (!cbor_value_is_unsigned_integer(&mapValue)) {
+                // Skip unknown key type and its value.
+                cbor_value_advance(&mapValue);  // skip key
+                if (!cbor_value_at_end(&mapValue)) {
+                    cbor_value_advance(&mapValue);  // skip value
+                }
+                continue;
+            }
+
+            uint64_t keyVal;
+            cbor_value_get_uint64(&mapValue, &keyVal);
+            cbor_value_advance(&mapValue);  // advance to value
+
+            switch ((uint32_t)keyVal) {
+                case HeatingRequest::FieldId::SETPOINT_C:
+                    if (cbor_value_is_float(&mapValue) || cbor_value_is_double(&mapValue)) {
+                    float val;
+                    cbor_value_get_float(&mapValue, &val);
+                    setpoint_c = (val);
+                } else if (cbor_value_is_unsigned_integer(&mapValue)) {
+                    uint64_t val;
+                    cbor_value_get_uint64(&mapValue, &val);
+                    setpoint_c = ((float)val);
+                } else if (cbor_value_is_negative_integer(&mapValue)) {
+                    int64_t val;
+                    cbor_value_get_int64(&mapValue, &val);
+                    setpoint_c = ((float)val);
+                }
+                    break;
+                case HeatingRequest::FieldId::ENABLED:
+                    if (cbor_value_is_boolean(&mapValue)) {
+                    bool val;
+                    cbor_value_get_boolean(&mapValue, &val);
+                    enabled = (val);
+                }
+                    break;
+                case HeatingRequest::FieldId::KP:
+                    if (cbor_value_is_float(&mapValue) || cbor_value_is_double(&mapValue)) {
+                    float val;
+                    cbor_value_get_float(&mapValue, &val);
+                    kp = (val);
+                } else if (cbor_value_is_unsigned_integer(&mapValue)) {
+                    uint64_t val;
+                    cbor_value_get_uint64(&mapValue, &val);
+                    kp = ((float)val);
+                } else if (cbor_value_is_negative_integer(&mapValue)) {
+                    int64_t val;
+                    cbor_value_get_int64(&mapValue, &val);
+                    kp = ((float)val);
+                }
+                    break;
+                case HeatingRequest::FieldId::KI:
+                    if (cbor_value_is_float(&mapValue) || cbor_value_is_double(&mapValue)) {
+                    float val;
+                    cbor_value_get_float(&mapValue, &val);
+                    ki = (val);
+                } else if (cbor_value_is_unsigned_integer(&mapValue)) {
+                    uint64_t val;
+                    cbor_value_get_uint64(&mapValue, &val);
+                    ki = ((float)val);
+                } else if (cbor_value_is_negative_integer(&mapValue)) {
+                    int64_t val;
+                    cbor_value_get_int64(&mapValue, &val);
+                    ki = ((float)val);
+                }
+                    break;
+                case HeatingRequest::FieldId::KD:
+                    if (cbor_value_is_float(&mapValue) || cbor_value_is_double(&mapValue)) {
+                    float val;
+                    cbor_value_get_float(&mapValue, &val);
+                    kd = (val);
+                } else if (cbor_value_is_unsigned_integer(&mapValue)) {
+                    uint64_t val;
+                    cbor_value_get_uint64(&mapValue, &val);
+                    kd = ((float)val);
+                } else if (cbor_value_is_negative_integer(&mapValue)) {
+                    int64_t val;
+                    cbor_value_get_int64(&mapValue, &val);
+                    kd = ((float)val);
+                }
+                    break;
+                case HeatingRequest::FieldId::RESET_INTEGRAL:
+                    if (cbor_value_is_boolean(&mapValue)) {
+                    bool val;
+                    cbor_value_get_boolean(&mapValue, &val);
+                    reset_integral = (val);
+                }
+                    break;
+                default:
+                    // Unknown field id — skip value.
+                    break;
+            }
+
+            cbor_value_advance(&mapValue);  // advance past value to next key (or end)
+        }
+
+        cbor_value_leave_container(&it, &mapValue);
+        return 0;
     }
 };
 
@@ -1417,7 +1657,7 @@ public:
     /// Writes into the parent encoder as a single map item.
     int encode(Bytes& buffer)  {
         CborEncoder encoder;
-        cbor_encoder_init(&encoder,buffer.data(),buffer.size(),0);
+        cbor_encoder_init(&encoder,buffer.data(),buffer.capacity(),0);
         // Count how many optional fields are set.
         uint32_t fieldCount = 0;
         ctrl_mod.for_each([&](const auto&) { fieldCount++; });
@@ -1654,14 +1894,19 @@ public:
             cbor_check(cbor_encode_int(&mapEncoder, value));
         });
 
-        return cbor_check(cbor_encoder_close_container(&encoder, &mapEncoder));
+         cbor_check(cbor_encoder_close_container(&encoder, &mapEncoder));
+         return 0;
     }
 
     /// Deserialize a HoverboardEvent from a CBOR map value.
     /// `it` must point to the map; after decoding it is advanced past the map.
-     Result<Void> decode(CborValue& it) {
+     int decode(const Bytes& buffer) {
+        CborParser parser;
+        CborValue it;
+        cbor_check(cbor_parser_init(buffer.data(), buffer.size(), 0, &parser, &it));
         if (!cbor_value_is_map(&it)) {
-            return Result<Void>::Err(-1, "Expected CBOR map for HoverboardEvent");
+            WARN("Expected CBOR map ");
+            return EINVAL;
         }
 
         CborValue mapValue;
@@ -2198,7 +2443,7 @@ public:
         }
 
         cbor_value_leave_container(&it, &mapValue);
-        return Result<Void>::Ok(Void());
+        return 0;
     }
 };
 
@@ -2222,7 +2467,7 @@ public:
     /// Writes into the parent encoder as a single map item.
     int encode(Bytes& buffer)  {
         CborEncoder encoder;
-        cbor_encoder_init(&encoder,buffer.data(),buffer.size(),0);
+        cbor_encoder_init(&encoder,buffer.data(),buffer.capacity(),0);
         // Count how many optional fields are set.
         uint32_t fieldCount = 0;
         req_id.for_each([&](const auto&) { fieldCount++; });
@@ -2244,14 +2489,19 @@ public:
             cbor_check(cbor_encode_int(&mapEncoder, value));
         });
 
-        return cbor_check(cbor_encoder_close_container(&encoder, &mapEncoder));
+         cbor_check(cbor_encoder_close_container(&encoder, &mapEncoder));
+         return 0;
     }
 
     /// Deserialize a HoverboardRequest from a CBOR map value.
     /// `it` must point to the map; after decoding it is advanced past the map.
-     Result<Void> decode(CborValue& it) {
+     int decode(const Bytes& buffer) {
+        CborParser parser;
+        CborValue it;
+        cbor_check(cbor_parser_init(buffer.data(), buffer.size(), 0, &parser, &it));
         if (!cbor_value_is_map(&it)) {
-            return Result<Void>::Err(-1, "Expected CBOR map for HoverboardRequest");
+            WARN("Expected CBOR map ");
+            return EINVAL;
         }
 
         CborValue mapValue;
@@ -2315,7 +2565,7 @@ public:
         }
 
         cbor_value_leave_container(&it, &mapValue);
-        return Result<Void>::Ok(Void());
+        return 0;
     }
 };
 
@@ -2345,7 +2595,7 @@ public:
     /// Writes into the parent encoder as a single map item.
     int encode(Bytes& buffer)  {
         CborEncoder encoder;
-        cbor_encoder_init(&encoder,buffer.data(),buffer.size(),0);
+        cbor_encoder_init(&encoder,buffer.data(),buffer.capacity(),0);
         // Count how many optional fields are set.
         uint32_t fieldCount = 0;
         gyro_x.for_each([&](const auto&) { fieldCount++; });
@@ -2382,14 +2632,19 @@ public:
             cbor_check(cbor_encode_float(&mapEncoder, value));
         });
 
-        return cbor_check(cbor_encoder_close_container(&encoder, &mapEncoder));
+         cbor_check(cbor_encoder_close_container(&encoder, &mapEncoder));
+         return 0;
     }
 
     /// Deserialize a ImuEvent from a CBOR map value.
     /// `it` must point to the map; after decoding it is advanced past the map.
-     Result<Void> decode(CborValue& it) {
+     int decode(const Bytes& buffer) {
+        CborParser parser;
+        CborValue it;
+        cbor_check(cbor_parser_init(buffer.data(), buffer.size(), 0, &parser, &it));
         if (!cbor_value_is_map(&it)) {
-            return Result<Void>::Err(-1, "Expected CBOR map for ImuEvent");
+            WARN("Expected CBOR map ");
+            return EINVAL;
         }
 
         CborValue mapValue;
@@ -2510,7 +2765,7 @@ public:
         }
 
         cbor_value_leave_container(&it, &mapValue);
-        return Result<Void>::Ok(Void());
+        return 0;
     }
 };
 
@@ -2540,7 +2795,7 @@ public:
     /// Writes into the parent encoder as a single map item.
     int encode(Bytes& buffer)  {
         CborEncoder encoder;
-        cbor_encoder_init(&encoder,buffer.data(),buffer.size(),0);
+        cbor_encoder_init(&encoder,buffer.data(),buffer.capacity(),0);
         // Count how many optional fields are set.
         uint32_t fieldCount = 0;
         thermocouple_temp.for_each([&](const auto&) { fieldCount++; });
@@ -2577,14 +2832,19 @@ public:
             cbor_check(cbor_encode_boolean(&mapEncoder, value));
         });
 
-        return cbor_check(cbor_encoder_close_container(&encoder, &mapEncoder));
+         cbor_check(cbor_encoder_close_container(&encoder, &mapEncoder));
+         return 0;
     }
 
     /// Deserialize a Max31855Event from a CBOR map value.
     /// `it` must point to the map; after decoding it is advanced past the map.
-     Result<Void> decode(CborValue& it) {
+     int decode(const Bytes& buffer) {
+        CborParser parser;
+        CborValue it;
+        cbor_check(cbor_parser_init(buffer.data(), buffer.size(), 0, &parser, &it));
         if (!cbor_value_is_map(&it)) {
-            return Result<Void>::Err(-1, "Expected CBOR map for Max31855Event");
+            WARN("Expected CBOR map ");
+            return EINVAL;
         }
 
         CborValue mapValue;
@@ -2673,7 +2933,7 @@ public:
         }
 
         cbor_value_leave_container(&it, &mapValue);
-        return Result<Void>::Ok(Void());
+        return 0;
     }
 };
 
@@ -2695,7 +2955,7 @@ public:
     /// Writes into the parent encoder as a single map item.
     int encode(Bytes& buffer)  {
         CborEncoder encoder;
-        cbor_encoder_init(&encoder,buffer.data(),buffer.size(),0);
+        cbor_encoder_init(&encoder,buffer.data(),buffer.capacity(),0);
         // Count how many optional fields are set.
         uint32_t fieldCount = 0;
         req_id.for_each([&](const auto&) { fieldCount++; });
@@ -2712,14 +2972,19 @@ public:
             cbor_check(cbor_encode_uint(&mapEncoder, value));
         });
 
-        return cbor_check(cbor_encoder_close_container(&encoder, &mapEncoder));
+         cbor_check(cbor_encoder_close_container(&encoder, &mapEncoder));
+         return 0;
     }
 
     /// Deserialize a PingReply from a CBOR map value.
     /// `it` must point to the map; after decoding it is advanced past the map.
-     Result<Void> decode(CborValue& it) {
+     int decode(const Bytes& buffer) {
+        CborParser parser;
+        CborValue it;
+        cbor_check(cbor_parser_init(buffer.data(), buffer.size(), 0, &parser, &it));
         if (!cbor_value_is_map(&it)) {
-            return Result<Void>::Err(-1, "Expected CBOR map for PingReply");
+            WARN("Expected CBOR map ");
+            return EINVAL;
         }
 
         CborValue mapValue;
@@ -2772,7 +3037,7 @@ public:
         }
 
         cbor_value_leave_container(&it, &mapValue);
-        return Result<Void>::Ok(Void());
+        return 0;
     }
 };
 
@@ -2794,7 +3059,7 @@ public:
     /// Writes into the parent encoder as a single map item.
     int encode(Bytes& buffer)  {
         CborEncoder encoder;
-        cbor_encoder_init(&encoder,buffer.data(),buffer.size(),0);
+        cbor_encoder_init(&encoder,buffer.data(),buffer.capacity(),0);
         // Count how many optional fields are set.
         uint32_t fieldCount = 0;
         req_id.for_each([&](const auto&) { fieldCount++; });
@@ -2811,14 +3076,19 @@ public:
             cbor_check(cbor_encode_uint(&mapEncoder, value));
         });
 
-        return cbor_check(cbor_encoder_close_container(&encoder, &mapEncoder));
+         cbor_check(cbor_encoder_close_container(&encoder, &mapEncoder));
+         return 0;
     }
 
     /// Deserialize a PingRequest from a CBOR map value.
     /// `it` must point to the map; after decoding it is advanced past the map.
-     Result<Void> decode(CborValue& it) {
+     int decode(const Bytes& buffer) {
+        CborParser parser;
+        CborValue it;
+        cbor_check(cbor_parser_init(buffer.data(), buffer.size(), 0, &parser, &it));
         if (!cbor_value_is_map(&it)) {
-            return Result<Void>::Err(-1, "Expected CBOR map for PingRequest");
+            WARN("Expected CBOR map ");
+            return EINVAL;
         }
 
         CborValue mapValue;
@@ -2871,7 +3141,7 @@ public:
         }
 
         cbor_value_leave_container(&it, &mapValue);
-        return Result<Void>::Ok(Void());
+        return 0;
     }
 };
 
@@ -2955,7 +3225,7 @@ public:
     /// Writes into the parent encoder as a single map item.
     int encode(Bytes& buffer)  {
         CborEncoder encoder;
-        cbor_encoder_init(&encoder,buffer.data(),buffer.size(),0);
+        cbor_encoder_init(&encoder,buffer.data(),buffer.capacity(),0);
         // Count how many optional fields are set.
         uint32_t fieldCount = 0;
         button_left.for_each([&](const auto&) { fieldCount++; });
@@ -3127,14 +3397,19 @@ public:
             cbor_check(cbor_encode_int(&mapEncoder, value));
         });
 
-        return cbor_check(cbor_encoder_close_container(&encoder, &mapEncoder));
+         cbor_check(cbor_encoder_close_container(&encoder, &mapEncoder));
+         return 0;
     }
 
     /// Deserialize a Ps4Event from a CBOR map value.
     /// `it` must point to the map; after decoding it is advanced past the map.
-     Result<Void> decode(CborValue& it) {
+     int decode(const Bytes& buffer) {
+        CborParser parser;
+        CborValue it;
+        cbor_check(cbor_parser_init(buffer.data(), buffer.size(), 0, &parser, &it));
         if (!cbor_value_is_map(&it)) {
-            return Result<Void>::Err(-1, "Expected CBOR map for Ps4Event");
+            WARN("Expected CBOR map ");
+            return EINVAL;
         }
 
         CborValue mapValue;
@@ -3447,7 +3722,7 @@ public:
         }
 
         cbor_value_leave_container(&it, &mapValue);
-        return Result<Void>::Ok(Void());
+        return 0;
     }
 };
 
@@ -3481,7 +3756,7 @@ public:
     /// Writes into the parent encoder as a single map item.
     int encode(Bytes& buffer)  {
         CborEncoder encoder;
-        cbor_encoder_init(&encoder,buffer.data(),buffer.size(),0);
+        cbor_encoder_init(&encoder,buffer.data(),buffer.capacity(),0);
         // Count how many optional fields are set.
         uint32_t fieldCount = 0;
         req_id.for_each([&](const auto&) { fieldCount++; });
@@ -3528,14 +3803,19 @@ public:
             cbor_check(cbor_encode_int(&mapEncoder, value));
         });
 
-        return cbor_check(cbor_encoder_close_container(&encoder, &mapEncoder));
+         cbor_check(cbor_encoder_close_container(&encoder, &mapEncoder));
+         return 0;
     }
 
     /// Deserialize a Ps4Request from a CBOR map value.
     /// `it` must point to the map; after decoding it is advanced past the map.
-     Result<Void> decode(CborValue& it) {
+     int decode(const Bytes& buffer) {
+        CborParser parser;
+        CborValue it;
+        cbor_check(cbor_parser_init(buffer.data(), buffer.size(), 0, &parser, &it));
         if (!cbor_value_is_map(&it)) {
-            return Result<Void>::Err(-1, "Expected CBOR map for Ps4Request");
+            WARN("Expected CBOR map ");
+            return EINVAL;
         }
 
         CborValue mapValue;
@@ -3654,7 +3934,7 @@ public:
         }
 
         cbor_value_leave_container(&it, &mapValue);
-        return Result<Void>::Ok(Void());
+        return 0;
     }
 };
 
@@ -3684,7 +3964,7 @@ public:
     /// Writes into the parent encoder as a single map item.
     int encode(Bytes& buffer)  {
         CborEncoder encoder;
-        cbor_encoder_init(&encoder,buffer.data(),buffer.size(),0);
+        cbor_encoder_init(&encoder,buffer.data(),buffer.capacity(),0);
         // Count how many optional fields are set.
         uint32_t fieldCount = 0;
         utc.for_each([&](const auto&) { fieldCount++; });
@@ -3721,14 +4001,19 @@ public:
             cbor_check(cbor_encode_text_string(&mapEncoder, value.c_str(), value.length()));
         });
 
-        return cbor_check(cbor_encoder_close_container(&encoder, &mapEncoder));
+         cbor_check(cbor_encoder_close_container(&encoder, &mapEncoder));
+         return 0;
     }
 
     /// Deserialize a SysEvent from a CBOR map value.
     /// `it` must point to the map; after decoding it is advanced past the map.
-     Result<Void> decode(CborValue& it) {
+     int decode(const Bytes& buffer) {
+        CborParser parser;
+        CborValue it;
+        cbor_check(cbor_parser_init(buffer.data(), buffer.size(), 0, &parser, &it));
         if (!cbor_value_is_map(&it)) {
-            return Result<Void>::Err(-1, "Expected CBOR map for SysEvent");
+            WARN("Expected CBOR map ");
+            return EINVAL;
         }
 
         CborValue mapValue;
@@ -3823,7 +4108,7 @@ public:
         }
 
         cbor_value_leave_container(&it, &mapValue);
-        return Result<Void>::Ok(Void());
+        return 0;
     }
 };
 
@@ -3847,7 +4132,7 @@ public:
     /// Writes into the parent encoder as a single map item.
     int encode(Bytes& buffer)  {
         CborEncoder encoder;
-        cbor_encoder_init(&encoder,buffer.data(),buffer.size(),0);
+        cbor_encoder_init(&encoder,buffer.data(),buffer.capacity(),0);
         // Count how many optional fields are set.
         uint32_t fieldCount = 0;
         req_id.for_each([&](const auto&) { fieldCount++; });
@@ -3869,14 +4154,19 @@ public:
             cbor_check(cbor_encode_text_string(&mapEncoder, value.c_str(), value.length()));
         });
 
-        return cbor_check(cbor_encoder_close_container(&encoder, &mapEncoder));
+         cbor_check(cbor_encoder_close_container(&encoder, &mapEncoder));
+         return 0;
     }
 
     /// Deserialize a SysReply from a CBOR map value.
     /// `it` must point to the map; after decoding it is advanced past the map.
-     Result<Void> decode(CborValue& it) {
+     int decode(const Bytes& buffer) {
+        CborParser parser;
+        CborValue it;
+        cbor_check(cbor_parser_init(buffer.data(), buffer.size(), 0, &parser, &it));
         if (!cbor_value_is_map(&it)) {
-            return Result<Void>::Err(-1, "Expected CBOR map for SysReply");
+            WARN("Expected CBOR map ");
+            return EINVAL;
         }
 
         CborValue mapValue;
@@ -3939,7 +4229,7 @@ public:
         }
 
         cbor_value_leave_container(&it, &mapValue);
-        return Result<Void>::Ok(Void());
+        return 0;
     }
 };
 
@@ -3965,7 +4255,7 @@ public:
     /// Writes into the parent encoder as a single map item.
     int encode(Bytes& buffer)  {
         CborEncoder encoder;
-        cbor_encoder_init(&encoder,buffer.data(),buffer.size(),0);
+        cbor_encoder_init(&encoder,buffer.data(),buffer.capacity(),0);
         // Count how many optional fields are set.
         uint32_t fieldCount = 0;
         req_id.for_each([&](const auto&) { fieldCount++; });
@@ -3992,14 +4282,19 @@ public:
             cbor_check(cbor_encode_text_string(&mapEncoder, value.c_str(), value.length()));
         });
 
-        return cbor_check(cbor_encoder_close_container(&encoder, &mapEncoder));
+         cbor_check(cbor_encoder_close_container(&encoder, &mapEncoder));
+         return 0;
     }
 
     /// Deserialize a SysRequest from a CBOR map value.
     /// `it` must point to the map; after decoding it is advanced past the map.
-     Result<Void> decode(CborValue& it) {
+     int decode(const Bytes& buffer) {
+        CborParser parser;
+        CborValue it;
+        cbor_check(cbor_parser_init(buffer.data(), buffer.size(), 0, &parser, &it));
         if (!cbor_value_is_map(&it)) {
-            return Result<Void>::Err(-1, "Expected CBOR map for SysRequest");
+            WARN("Expected CBOR map ");
+            return EINVAL;
         }
 
         CborValue mapValue;
@@ -4069,7 +4364,7 @@ public:
         }
 
         cbor_value_leave_container(&it, &mapValue);
-        return Result<Void>::Ok(Void());
+        return 0;
     }
 };
 
@@ -4093,7 +4388,7 @@ public:
     /// Writes into the parent encoder as a single map item.
     int encode(Bytes& buffer)  {
         CborEncoder encoder;
-        cbor_encoder_init(&encoder,buffer.data(),buffer.size(),0);
+        cbor_encoder_init(&encoder,buffer.data(),buffer.capacity(),0);
         // Count how many optional fields are set.
         uint32_t fieldCount = 0;
         distance.for_each([&](const auto&) { fieldCount++; });
@@ -4115,14 +4410,19 @@ public:
             cbor_check(cbor_encode_int(&mapEncoder, value));
         });
 
-        return cbor_check(cbor_encoder_close_container(&encoder, &mapEncoder));
+         cbor_check(cbor_encoder_close_container(&encoder, &mapEncoder));
+         return 0;
     }
 
     /// Deserialize a UsEvent from a CBOR map value.
     /// `it` must point to the map; after decoding it is advanced past the map.
-     Result<Void> decode(CborValue& it) {
+     int decode(const Bytes& buffer) {
+        CborParser parser;
+        CborValue it;
+        cbor_check(cbor_parser_init(buffer.data(), buffer.size(), 0, &parser, &it));
         if (!cbor_value_is_map(&it)) {
-            return Result<Void>::Err(-1, "Expected CBOR map for UsEvent");
+            WARN("Expected CBOR map ");
+            return EINVAL;
         }
 
         CborValue mapValue;
@@ -4194,7 +4494,7 @@ public:
         }
 
         cbor_value_leave_container(&it, &mapValue);
-        return Result<Void>::Ok(Void());
+        return 0;
     }
 };
 
@@ -4228,7 +4528,7 @@ public:
     /// Writes into the parent encoder as a single map item.
     int encode(Bytes& buffer)  {
         CborEncoder encoder;
-        cbor_encoder_init(&encoder,buffer.data(),buffer.size(),0);
+        cbor_encoder_init(&encoder,buffer.data(),buffer.capacity(),0);
         // Count how many optional fields are set.
         uint32_t fieldCount = 0;
         ip.for_each([&](const auto&) { fieldCount++; });
@@ -4275,14 +4575,19 @@ public:
             cbor_check(cbor_encode_text_string(&mapEncoder, value.c_str(), value.length()));
         });
 
-        return cbor_check(cbor_encoder_close_container(&encoder, &mapEncoder));
+         cbor_check(cbor_encoder_close_container(&encoder, &mapEncoder));
+         return 0;
     }
 
     /// Deserialize a WifiEvent from a CBOR map value.
     /// `it` must point to the map; after decoding it is advanced past the map.
-     Result<Void> decode(CborValue& it) {
+     int decode(const Bytes& buffer) {
+        CborParser parser;
+        CborValue it;
+        cbor_check(cbor_parser_init(buffer.data(), buffer.size(), 0, &parser, &it));
         if (!cbor_value_is_map(&it)) {
-            return Result<Void>::Err(-1, "Expected CBOR map for WifiEvent");
+            WARN("Expected CBOR map ");
+            return EINVAL;
         }
 
         CborValue mapValue;
@@ -4395,7 +4700,7 @@ public:
         }
 
         cbor_value_leave_container(&it, &mapValue);
-        return Result<Void>::Ok(Void());
+        return 0;
     }
 };
 

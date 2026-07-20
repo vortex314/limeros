@@ -15,7 +15,6 @@
 #include <wifi_actor.h>
 #include <sys_actor.h>
 #include <led_actor.h>
-#include <zenoh_actor.h>
 #include <mc_actor.h>
 #include <ota_actor.h>
 #include <mdns_actor.h>

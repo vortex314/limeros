@@ -6,18 +6,16 @@
 #include <freertos/queue.h>
 #include <freertos/timers.h>
 #include <stddef.h>
+#include <stdint.h>
 #include <vector>
 #include <functional>
 #include <esp_timer.h>
 #include <log.h>
 #include <util.h>
-#include <serdes.h>
 #include <option.h>
 #include <result.h>
 #include <memory>
 #include <stdint.h>
-#include <serdes.h>
-#include <ArduinoJson.h>
 #include <msgs.h>
 #pragma once
 
@@ -43,6 +41,8 @@ public:
 
 extern ActorRef NULL_ACTOR;
 
+typedef Msg ActorMessage;
+/*
 class ActorMessage
 {
 public:
@@ -54,6 +54,7 @@ public:
     ActorMessage(ActorRef src, ActorRef dst, const Msg *msg) : src(src), dst(dst), msg(msg) {}
     ~ActorMessage() { delete msg; }
 };
+*/
 
 class TimerMsg : public Msg
 {
@@ -215,7 +216,6 @@ private:
     ActorRef _self;
     Timers _timers;
     EventBus *_eventbus = nullptr;
-    std::vector<const char *> _interests; // message type names this actor handles
 
 public:
     Actor(const char *name) : _self(name) { _self.set_local(true); };
@@ -231,21 +231,10 @@ public:
     /// Declare that this actor handles messages of the given type name.
     /// Call in the constructor. If no interests are registered, the actor
     /// receives all messages (backward-compatible default).
-    void add_interest(const char *type_name) { _interests.push_back(type_name); }
 
     /// Returns true if this actor should receive messages of the given type.
     /// An empty interest list means "accept all".
-    bool accepts(const char *type_name) const
-    {
-        if (_interests.empty())
-            return true;
-        for (auto &interest : _interests)
-        {
-            if (strcmp(interest, type_name) == 0)
-                return true;
-        }
-        return false;
-    }
+
     std::vector<int> get_expired_timers() { return _timers.get_expired_timers(); }
     Timers &timers() { return _timers; }
     uint64_t sleep_time() { return _timers.sleep_time(); }
@@ -253,7 +242,6 @@ public:
     const char *name() { return _self.name(); }
     EventBus *eventbus() const { return _eventbus; }
 
-    void emit(const Msg *msg);
     void emit(const ActorMessage *env);
     void set_eventbus(EventBus *eventbus);
 
@@ -261,7 +249,7 @@ public:
     {
         for (int id : _timers.get_expired_timers())
         {
-            ActorMessage *env = new ActorMessage(ref(), new TimerMsg(id));
+            ActorMessage *env =  new TimerMsg(id);
             on_message(*env);
             _timers.refresh(id);
         }
@@ -334,32 +322,23 @@ typedef struct PropInfo
     Option<float> max;
 } PropInfo;
 
-class PublishTxd : public Msg {
+class Unicast : public Msg {
 public:
     static uint32_t msg_id() { return FNV("PublishTxd"); };
     static const char* msg_name() { return "PublishTxd"; };
 
-    JsonDocument doc;
-    PublishTxd(const JsonDocument &doc) : doc(doc) {}
+    Envelope env;
+    Unicast(const Envelope &env) : env(env) {}
 };
 
 class PublishRxd : public Msg {
 public:
     static uint32_t msg_id() { return FNV("PublishRxd"); };
     static const char* msg_name() { return "PublishRxd"; };
-    JsonDocument doc;
-    PublishRxd(const JsonDocument &doc) : doc(doc) {}
+    Envelope env;
+    PublishRxd(const Envelope &env) : env(env) {}
 };
 
-template <typename T>
-void handle(JsonDocument &doc, const char *key, std::function<void(const T &)> f)
-{
-    if (doc.containsKey(key) && doc[key].is<T>())
-    {
-        T value = doc[key].as<T>();
-        f(value);
-    }
-}
 
 template <typename T>
 void handle(std::optional<T> &v, std::function<void(const T &)> f)

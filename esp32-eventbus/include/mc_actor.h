@@ -1,3 +1,5 @@
+#ifndef MC_ACTOR_H
+#define MC_ACTOR_H
 #include <string.h>
 #include <stdio.h>
 #include <errno.h>
@@ -26,12 +28,28 @@
 #include <lwip/def.h>
 #include <lwip/inet.h>
 #include <msgs.h>
-#include <fnv.h>
 
+class Unicast : public Msg {
+public:
+  static uint32_t msg_id() { return FNV("Unicast"); }
+  static const char *msg_name() { return "Unicast"; }
+  Unicast(Envelope env) : env(env) {}
+    Envelope env;
+};
+
+class Multicast : public Msg {
+public:
+  static uint32_t msg_id() { return FNV("Multicast"); }
+  static const char *msg_name() { return "Multicast"; }
+  Multicast(Envelope env) : env(env) {}
+    Envelope env;
+};
 
 class McActor : public Actor
 {
 private:
+  std::string endpoint_name;
+  uint32_t endpoint_id;
   std::string _hostname;
   int _unicast_socket;
   int _multicast_socket;
@@ -41,13 +59,13 @@ private:
   int _timer_publish;
   uint32_t _ping_counter = 0;
   bool _connected = false;
-  std::unordered_map<uint32_t, std::pair<sockaddr_in,uint64_t>> _source_map;
+  std::unordered_map<uint32_t, std::pair<sockaddr_in, uint64_t>> _source_map;
   std::optional<sockaddr_in> _broker_addr = std::nullopt;
   std::optional<std::string> _broker_name = std::nullopt;
   uint32_t _last_ping_number = 1;
-  std::vector<std::string> _publishes;
-  std::vector<std::string> _subscribes;
-  std::vector<std::string> _services;
+  std::vector<std::uint32_t> _events;
+  std::vector<std::uint32_t> _subscribes;
+  std::vector<std::uint32_t> _services;
 
 public:
   McActor(const char *name, const char *hostname);
@@ -59,13 +77,15 @@ public:
   void start_unicast_listener();
   void start_multicast_listener();
   void stop_listener();
-  void send_unicast(uint32_t dst, uint32_t src, uint32_t msg_type, Bytes &value);
-  void send_multicast(uint32_t dst, uint32_t src, uint32_t msg_type, const Bytes &value);
+  void send_unicast(Envelope &envelope);
+  void send_multicast(Envelope &envelope);
   void on_udp_raw(const Bytes &request, const sockaddr_in &sender_addr);
-  void on_udp_message(ActorMessage& udp_message,const sockaddr_in &sender_addr);
-  void send_ping_req(const char* dst,uint32_t number);
-  void send_ping_rep(const char* dst,uint32_t number);
+  void on_udp_message(Envelope &udp_message, const sockaddr_in &sender_addr);
+  void send_ping_req(uint32_t dst, uint32_t number);
+  void send_ping_rep(uint32_t dst, uint32_t number);
   Result<Bytes> encode_message(uint32_t dst, uint32_t src, uint32_t type, const Bytes &value);
   static void unicast_listener_task(void *param);
   static void multicast_listener_task(void *param);
 };
+
+#endif // MC_ACTOR_H

@@ -21,17 +21,6 @@ void Actor::emit(const ActorMessage *env)
     }
 }
 
-void Actor::emit(const Msg *msg)
-{
-    if (_eventbus)
-    {
-        _eventbus->push(new ActorMessage(ref(),msg));
-    }
-    else
-    {
-        ERROR("EventBus not set for actor %s", name());
-    }
-}
 
 void panic_here(const char *s)
 {
@@ -353,10 +342,7 @@ void EventBus::loop()
             }
             for (Actor *actor : _actors)
             {
-                if (actor->accepts(pmsg->msg->msg_name()))
-                {
                     actor->on_message(*pmsg);
-                }
             }
             delete pmsg;
         }
@@ -366,7 +352,8 @@ void EventBus::loop()
         {
             for (int id : actor->timers().get_expired_timers())
             {
-                actor->on_message(ActorMessage(new TimerMsg(id)));
+                TimerMsg tm(id);
+                actor->on_message(tm);
                 actor->timers().refresh(id);
             }
             uint64_t sleep_duration = actor->sleep_time();

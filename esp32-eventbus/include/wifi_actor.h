@@ -7,9 +7,18 @@
 #include <vector>
 #include <msgs.h>
 
+struct WifiConnected : public Msg
+{
+    static uint32_t msg_id() { return FNV("WifiConnected"); };
+    static const char *msg_name() { return "WifiConnected"; };
+};
 
-DEFINE_MSG(WifiConnected);
-DEFINE_MSG(WifiDisconnected);
+struct WifiDisconnected : public Msg
+{
+    static uint32_t msg_id() { return FNV("WifiDisconnected"); };
+    static const char *msg_name() { return "WifiDisconnected"; };
+};
+
 
 class WifiActor : public Actor
 {

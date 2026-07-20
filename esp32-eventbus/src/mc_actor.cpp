@@ -1,5 +1,4 @@
 #include "mc_actor.h"
-#include <poly_json.h>
 
 constexpr int MULTICAST_PORT = 50000;
 constexpr const char *MULTICAST_GROUP = "239.0.0.1";
@@ -117,153 +116,105 @@ void McActor::stop_event()
 Result<Bytes> McActor::encode_message(uint32_t dst, uint32_t src, uint32_t type, const Bytes &payload)
 {
     Envelope msg;
+    Bytes buffer;
     msg.dst = dst;
     msg.src = src;
     msg.msg_type = type;
     msg.payload = payload;
     CborEncoder encoder;
     cbor_encoder_init(&encoder, nullptr, 0, 0);
-    return msg.encode(&encoder);
+    return msg.encode(buffer);
 }
 
-void McActor::send_unicast(uint32_t dst, uint32_t src, uint32_t type, const Bytes &payload)
+void McActor::send_unicast(Envelope &envelope)
 {
     if (!_connected)
     {
         ERROR("Cannot send unicast message, not connected to WiFi");
         return;
     }
-
-    const char *requested_dst = dst;
-    dst = dst ? dst : (_broker_name.has_value() ? _broker_name->c_str() : NULL);
-    const std::string payload_json = poly::json::serialize_or_empty(payload);
-    DEBUG("send_unicast dst: %s , src: %s : %s = %s", dst ? dst : "broker", src ? src : "unknown", type, payload_json.c_str());
+    if (!_broker_addr.has_value())
+    {
+        ERROR("Cannot send unicast message, broker address not discovered yet");
+        return;
+    }
 
     sockaddr_in dst_addr{};
-    bool have_destination = false;
-
-    if (dst && _source_map.find(dst) != _source_map.end())
+    dst_addr = *_broker_addr;
+    Bytes buffer(1000);
+    if (envelope.encode(buffer) == 0)
     {
-        dst_addr = _source_map[dst].first;
-        have_destination = true;
-    }
-    else if (_broker_addr.has_value())
-    {
-        dst_addr = *_broker_addr;
-        have_destination = true;
-    }
+        DEBUG("Send message_type '%s' to %s @ %s", envelope.msg_type.has_value() ? std::to_string(*(envelope.msg_type)).c_str() : "-", socketAddrToString(&dst_addr).c_str(), socketAddrToString(&dst_addr).c_str());
 
-    if (!have_destination || dst_addr.sin_family == 0)
-    {
-        DEBUG("Skipping unicast '%s' from '%s': broker/destination not discovered yet", type, src ? src : "unknown");
-        return;
-    }
-
-    auto r = encode_message(dst, src, type, payload);
-    if (r.is_err())
-    {
-        ERROR("Failed to encode unicast message: [%d] %s", r.unwrap_err().rc, r.unwrap_err().msg);
-        return;
-    }
-    r.just([&](const Bytes &buffer)
-           {
-    DEBUG("Send message_type '%s' to %s @ %s", type, dst ? dst : "-", socketAddrToString(&dst_addr).c_str());
-
-    int sent = sendto(_unicast_socket, buffer.data(), buffer.size(), 0, (sockaddr *)&dst_addr, sizeof(dst_addr));
-    if (sent < 0)
-    {
-        ERROR("Failed to send unicast message to %s @ %s: %s (errno=%d, %u bytes)",
-              dst ? dst : "broker",
-              socketAddrToString(&dst_addr).c_str(),
-              strerror(errno),
-              errno,
-              static_cast<unsigned>(buffer.size()));
-
-        if (requested_dst == NULL)
+        int sent = sendto(_unicast_socket, buffer.data(), buffer.size(), 0, (sockaddr *)&dst_addr, sizeof(dst_addr));
+        if (sent < 0)
         {
-            _broker_addr.reset();
-            _broker_name.reset();
+            ERROR("Failed to send unicast message to %s @ %s: %s (errno=%d, %u bytes)",
+                  "broker",
+                  socketAddrToString(&dst_addr).c_str(),
+                  strerror(errno),
+                  errno,
+                  static_cast<unsigned>(buffer.size()));
+        }
+        else
+        {
+            DEBUG("Sent message to %s (%d bytes)", socketAddrToString(&dst_addr).c_str(), sent);
         }
     }
-    else
-    {
-        DEBUG("Sent message to %s (%d bytes)", socketAddrToString(&dst_addr).c_str(), sent);
-    } });
-
-    // send bytes
 }
-
-
 
 void McActor::stop_listener()
 {
     _running = false;
 }
 
-void McActor::on_message(const ActorMessage &envelope)
+static Bytes mc_buffer(1000);
+
+void McActor::on_message(const ActorMessage &msg)
 {
-    const Msg &msg = *envelope.msg;
-    msg.handle<DeviceAliveEvent>([&](const auto &msg) // accept actor capabilities
-                           { for ( auto& pub : msg.publishes) {
-                            _publishes.push_back(pub);
-                         };
-                         for ( auto& sub : msg.subscribes) {
-                            _subscribes.push_back(sub);
-                         };
-                         for ( auto& serv : msg.services) {
-                            _services.push_back(serv);
-                         } });
-    msg.handle<TimerMsg>([&](const TimerMsg &msg)
-                         { DeviceAliveEvent alive;
-                         for (const auto& pub : _publishes) {
-                            alive.publishes.push_back(pub);
-                         }
-                         for (const auto& serv : _services) {
-                            alive.services.push_back(serv);
-                         }
-                         for (const auto& sub : _subscribes) {
-                            alive.subscribes.push_back(sub);
-                         }
-                            auto bytes = DeviceAliveEvent::to_poly(alive).unwrap();
-                            send_multicast(NULL,_hostname.c_str(),DeviceAliveEvent::name_value,bytes);
-                            send_ping_req(NULL,0); });
+    msg.handle_if<EndpointAnnounce>([&](const EndpointAnnounce &msg)
+                                    {
+        msg.services.for_each([&](const std::vector<uint32_t> &services)
+        {
+             for (auto v : services) 
+                _services.push_back(v);
+        });
+        msg.events.for_each([&](const std::vector<uint32_t> &events)
+        {
+            for (auto v : events)
+                _events.push_back(v);
+        });
+        msg.subscribes.for_each([&](const std::vector<uint32_t> &subscribes)
+        {
+            for (auto v : subscribes)
+                _subscribes.push_back(v);
+        }); });
+    msg.handle_if<TimerMsg>([&](const TimerMsg &msg)
+                            {
+        EndpointAnnounce announce;
+        announce.id = endpoint_id;
+        announce.name = endpoint_name;
+        if (announce.encode(mc_buffer) == 0)
+        {
+            Envelope env;
+            env.src = endpoint_id;
+            env.msg_type = EndpointAnnounce::msg_id();
+            env.payload = mc_buffer;
+            send_multicast(env);
+        } });
 
-    msg.handle<PingRequest>([&](const auto &m) { /*INFO("Received PingReq from '%s' number %d",
-                                               envelope.src.has_value() ? envelope.src->name() : "-",
-                                               m.number.has_value() ? *(m.number) : -1 );*/
-                                                 if (m.number.has_value())
-                                                 {
-                                                     send_ping_rep(envelope.src->name(), *(m.number));
-                                                 }
-    });
-
-    msg.handle<WifiConnected>([&](const auto &msg)
-                              { _connected = true; 
+    msg.handle_if<WifiConnected>([&](const WifiConnected &msg)
+                                 { _connected = true; 
                                 init_event();
                                 start_unicast_listener();
                                 start_multicast_listener(); });
 
-    msg.handle<WifiDisconnected>([&](const auto &msg) { /*stop_listener(); */ });
+    msg.handle_if<WifiDisconnected>([&](const auto &msg) { /*stop_listener(); */ });
 
     if (!_connected) // ignore other messages if not connected
         return;
-    msg.handle<Max31855Event>([&](const auto &msg)
-                              { Max31855Event::to_poly(msg).just([&](const Bytes &serialized_msg)
-                                            { 
-                                                DEBUG("Max31855Event as poly: %s", serialized_msg.to_string().c_str());
-                                                send_unicast(NULL, _hostname.c_str(), msg.type_name(), serialized_msg); }); });
-    msg.handle<HeatingEvent>([&](const auto &msg)
-                             { HeatingEvent::to_poly(msg).just([&](const auto &serialized_msg)
-                                                               { send_unicast(NULL, _hostname.c_str(), msg.type_name(), serialized_msg); }); });
-    msg.handle<SysEvent>([&](const auto &msg)
-                         { SysEvent::to_poly(msg).just([&](const auto &serialized_msg)
-                                                       { send_unicast(NULL, _hostname.c_str(), msg.type_name(), serialized_msg); }); });
-    msg.handle<WifiEvent>([&](const auto &msg)
-                          { WifiEvent::to_poly(msg).just([&](const auto &serialized_msg)
-                                                         { send_unicast(NULL, _hostname.c_str(), msg.type_name(), serialized_msg); }); });
-    msg.handle<HoverboardEvent>([&](const auto &msg)
-                                { HoverboardEvent::to_poly(msg).just([&](const auto &serialized_msg)
-                                                                     { send_unicast(NULL, _hostname.c_str(), msg.type_name(), serialized_msg); }); });
+    msg.handle_if<Unicast>([&](const Unicast &pub)
+                           { send_unicast(pub.env); });
 }
 
 void McActor::start_unicast_listener()
@@ -335,85 +286,33 @@ void McActor::multicast_listener_task(void *pvParameters)
 
 void McActor::on_udp_raw(const Bytes &request, const sockaddr_in &sender_addr)
 {
-    auto r = UdpMessage::json_deserialize(request);
-    if (r.is_err())
+    Envelope *envelope = new Envelope();
+    if (envelope->decode(request) == 0)
     {
-        ERROR("Failed to deserialize UdpMessage");
-        return;
+        on_udp_message(envelope, sender_addr);
     }
-    UdpMessage *udp_msg = r.unwrap();
-    DEBUG("Received UDP message  %s", std::string(request.begin(), request.end()).c_str());
-    on_udp_message(*udp_msg, sender_addr);
-    delete udp_msg;
+    else
+    {
+        ERROR("Failed to decode Envelope from UDP message");
+    }
+    delete envelope;
 }
 
-template <typename M>
-bool put_on_actor_bus(Actor *actor, UdpMessage &udp_msg)
+void McActor::on_udp_message(Envelope *env, const sockaddr_in &sender_addr)
 {
-    if (strcmp(udp_msg.typ->c_str(), M::name_value) == 0)
-    {
-        M::from_poly(*(udp_msg.msg)).just([&](const M *msg)
-                                          { actor->emit(new ActorMessage(
-                                                udp_msg.src.has_value() ? ActorRef(udp_msg.src->c_str()) : NULL_ACTOR,
-                                                udp_msg.dst.has_value() ? ActorRef(udp_msg.dst->c_str()) : NULL_ACTOR,
-                                                msg)); });
-        INFO("Message '%s' to bus '%s' : %s",
-             M::name_value, udp_msg.src.has_value() ? udp_msg.src->c_str() : "-",
-             udp_msg.msg.has_value() ? udp_msg.msg->as_string().c_str() : "-");
-        return true;
-    }
-    return false;
-}
-
-void McActor::on_udp_message(UdpMessage &udp_msg, const sockaddr_in &sender_addr)
-{
-    if (!udp_msg.typ.has_value() || !udp_msg.msg.has_value())
+    if (!env->msg_type || !env->payload)
     {
         ERROR("UdpMessage missing fields: typ=%s msg=%s",
-              udp_msg.typ.has_value() ? "yes" : "no",
-              udp_msg.msg.has_value() ? "yes" : "no");
+              env->msg_type ? "yes" : "no",
+              env->payload ? "yes" : "no");
         return;
     }
-
-    Bytes &payload = *(udp_msg.msg);
-    const char *typ = udp_msg.typ->c_str();
-
-    put_on_actor_bus<PingRequest>(this, udp_msg);
-    put_on_actor_bus<HoverboardRequest>(this, udp_msg);
-    put_on_actor_bus<HeatingRequest>(this, udp_msg);
-    put_on_actor_bus<SysRequest>(this, udp_msg);
-    //  put_on_actor_bus<DeviceAliveEvent>(this, udp_msg);
-
-    if (strcmp(typ, PingReply::name_value) == 0)
+    if (env->msg_type == PingReply::msg_id())
     {
-        send_ping_req(udp_msg.src->c_str(), ++_last_ping_number);
+        send_ping_req(env->src.value(), ++_last_ping_number);
     }
-    else if (strcmp(typ, DeviceAliveEvent::name_value) == 0)
-    {
-        DEBUG("MC Actor received DeviceAliveEvent message");
-        DeviceAliveEvent::from_poly(payload).just([&](const DeviceAliveEvent *alive)
-                                            {
-                if (!udp_msg.src.has_value()) {
-                    ERROR("DeviceAliveEvent message missing src");
-                    return;
-                }
-                std::string source = *(udp_msg.src);
-
-//                INFO("  Endpoint: %s @ %s ", etp.c_str(), socketAddrToString((sockaddr_in*)&sender_addr).c_str());
-                _source_map[source] = std::pair<sockaddr_in,uint64_t>(sender_addr,esp_timer_get_time());
-                const bool is_broker_source = (source == "broker") || (source.find("broker") != std::string::npos);
-                if (is_broker_source)
-                {
-                    DEBUG("Received DeviceAliveEvent from broker-like source '%s' at %s", source.c_str(), socketAddrToString((sockaddr_in*)&sender_addr).c_str());
-                    if (_broker_addr.has_value() && memcmp(&_broker_addr.value(), &sender_addr, sizeof(sender_addr)) != 0)
-                    {
-                        INFO("Broker address changed from %s to %s", socketAddrToString(&_broker_addr.value()).c_str(), socketAddrToString((sockaddr_in*)&sender_addr).c_str());
-                    }
-                    _broker_addr = sender_addr;
-                    _broker_name = source;
-                };
-                            delete alive; });
-    }
+    else
+        emit(env);
 }
 
 void McActor::send_multicast(const char *dst, const char *src, const char *type, const Bytes &payload)

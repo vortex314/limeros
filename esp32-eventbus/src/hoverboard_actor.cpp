@@ -4,6 +4,8 @@
 #include <time.h>
 #include <string.h>
 #include <esp_flash.h>
+#include <driver/uart.h>
+#include <driver/gpio.h>
 
 #define UART_PORT UART_NUM_2
 #define UART_TX_PIN GPIO_NUM_17
@@ -31,7 +33,7 @@ public:
         return crc;
     }
 
-    void add_crc(std::vector<uint8_t> &vec)
+    void add_crc(Bytes &vec)
     {
         uint16_t crc_value = crc();
         vec.push_back(static_cast<uint8_t>(crc_value & 0xFF));
@@ -40,7 +42,7 @@ public:
 
     Bytes encode()
     {
-        std::vector<uint8_t> v;
+        Bytes v;
         v.push_back(static_cast<uint8_t>(START_FRAME & 0xFF));
         v.push_back(static_cast<uint8_t>((START_FRAME >> 8) & 0xFF));
         v.push_back(static_cast<uint8_t>(steer & 0xFF));
@@ -48,11 +50,11 @@ public:
         v.push_back(static_cast<uint8_t>(speed & 0xFF));
         v.push_back(static_cast<uint8_t>((speed >> 8) & 0xFF));
         add_crc(v);
-        return Bytes(v.begin(), v.end());
+        return v;
     }
 };
 
-HoverboardActor::HoverboardActor(const char *name) : Actor(name)
+HoverboardActor::HoverboardActor(const char *name) : Actor(name),uart_read_buffer(UART_BUF_SIZE)
 {
     _timer_publish = timer_repetitive(5000);
     _timer_hb_alive = timer_repetitive(100);
@@ -82,6 +84,9 @@ Result<bool> HoverboardActor::init_uart()
         .flow_ctrl = UART_HW_FLOWCTRL_DISABLE,
         .rx_flow_ctrl_thresh = 0,
         .source_clk = UART_SCLK_DEFAULT,
+        .flags = {
+            .backup_before_sleep = 0,
+        },
     };
     ESP_ERROR_RET(uart_param_config(UART_PORT, &uart_config));
     ESP_ERROR_RET(uart_set_pin(UART_PORT, UART_TX_PIN, UART_RX_PIN, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE));
@@ -100,10 +105,7 @@ Result<bool> HoverboardActor::init_uart()
 void HoverboardActor::on_start()
 {
     INFO("Starting HoverboardActor");
-    AliveEvent *alive_event = new AliveEvent();
-    alive_event->publishes.push_back(HoverboardEvent::name_value);
-    alive_event->services.push_back(HoverboardRequest::name_value);
-    emit(alive_event);
+
 }
 
 /**
@@ -115,8 +117,8 @@ void HoverboardActor::on_start()
 
 Result<Bytes> HoverboardActor::cobs_decode(const Bytes &input)
 {
-    std::vector<uint8_t> output(input.size());
-    size_t read_index = 0, write_index = 0;
+    Bytes output(input.size());
+    size_t read_index = 0;
     uint8_t code = 0, i = 0;
 
     while (read_index < input.size())
@@ -130,14 +132,14 @@ Result<Bytes> HoverboardActor::cobs_decode(const Bytes &input)
         read_index++;
         for (i = 1; i < code; i++)
         {
-            output[write_index++] = input[read_index++];
+            output.push_back(input[read_index++]);
         }
         if (code != 0xFF && read_index < input.size())
         {
-            output[write_index++] = 0;
+            output.push_back(0);
         }
     }
-    output.resize(write_index);
+    // output.resize(write_index);
     return Result<Bytes>::Ok(output);
 }
 
@@ -180,19 +182,18 @@ Result<Bytes> HoverboardActor::check_crc(const Bytes &input)
     {
         return Result<Bytes>::Err(-2, "CRC mismatch");
     }
-    return Result<Bytes>::Ok(Bytes(input.begin(), input.end() - 2));
+    return Result<Bytes>::Ok(Bytes(input.begin(), input.begin() + input.size() - 2));
 }
 
-Result<HoverboardEventRaw *> HoverboardActor::parse_info_msg(const Bytes &input)
+Result<HoverboardEvent *> HoverboardActor::parse_info_msg(const Bytes &input)
 {
-    // print hex buffer for debugging
-    /* INFO("Parsing HoverboardEvent message (%d bytes):", input.size());
-     for (size_t i = 0; i < input.size(); i++)
-     {
-         printf("%02X ", input[i]);
-     }
-     printf("\n");*/
-    return HoverboardEventRaw::deserialize(input);
+    HoverboardEvent* hb_event = new HoverboardEvent();
+    if ( hb_event->decode(input) != 0)
+    {
+        delete hb_event;
+        return Result<HoverboardEvent *>::Err(-1, "Failed to decode HoverboardEvent");
+    }
+    return Result<HoverboardEvent *>::Ok(hb_event);
 }
 
 HoverboardActor::~HoverboardActor()
@@ -206,23 +207,22 @@ HoverboardActor::~HoverboardActor()
     }
 }
 
-void HoverboardActor::on_message(const ActorMessage &env)
+void HoverboardActor::on_message(const ActorMessage &msg)
 {
-    const Msg &msg = *env.msg;
-    msg.handle<HoverboardRequest>([&](auto hb_cmd)
+    msg.handle_if<HoverboardRequest>([&](const auto hb_cmd)
                                   { INFO("Received HoverboardRequest: speed=%d, steer=%d", hb_cmd.speed.value_or(-1), hb_cmd.steer.value_or(-1));
-                                if (hb_cmd.speed) _speed = hb_cmd.speed.value(); 
-                                if (hb_cmd.steer) _steer = hb_cmd.steer.value() ; });
-    msg.handle<TimerMsg>([&](const TimerMsg &msg)
+                                hb_cmd.speed.for_each([&](const auto& value) { _speed = value; });
+                                hb_cmd.steer.for_each([&](const auto& value) { _steer = value; }); });
+    msg.handle_if<TimerMsg>([&](const TimerMsg &msg)
                          { on_timer(msg.timer_id); });
-    msg.handle<UartRxd>([&](const UartRxd &uart_rxd)
+    msg.handle_if<UartRxd>([&](const UartRxd &uart_rxd)
                         { handle_uart_bytes(uart_rxd.payload); });
 }
 
 void HoverboardActor::handle_uart_bytes(const Bytes &data)
 {
     DEBUG("Processing UART RX data (%d bytes)", data.size());
-    for (auto b : data)
+    for (auto b : data.to_vector())
     {
         if (b == COBS_SEPARATOR)
         {
@@ -230,19 +230,17 @@ void HoverboardActor::handle_uart_bytes(const Bytes &data)
             HoverboardEvent event;
             auto result = cobs_decode(uart_read_buffer)
                 .and_then(check_crc);
-            result.map([&](Bytes &decoded)
+            result.just([&](Bytes &decoded)
                        {
-                        HoverboardEvent event;
-                        CborParser parser;
-                        CborValue cbor_value;
-                        cbor_parser_init(decoded.data(), decoded.size(), 0, &parser, &cbor_value);
-                        if (event.decode(cbor_value))
+                        HoverboardEvent* event = new HoverboardEvent();
+                        if (event->decode(decoded) == 0)
                         {
                             emit(event);
                         }
                         else
                         {
                             WARN("Failed to decode HoverboardEvent");
+                            delete event;
                         }
                        });
 
@@ -251,7 +249,7 @@ void HoverboardActor::handle_uart_bytes(const Bytes &data)
         }
         else
         {
-            uart_read_buffer.push_back(b);
+            uart_read_buffer.push(b);
         }
     }
 }
@@ -296,7 +294,7 @@ void uart_event_task(void *pvParameters)
                 if (len > 0)
                 {
                     data[len] = '\0'; // Null-terminate
-                    Bytes payload(data, data + len);
+                    Bytes payload(data, data+len);
                     actor->emit(new UartRxd(payload));
                 }
                 break;

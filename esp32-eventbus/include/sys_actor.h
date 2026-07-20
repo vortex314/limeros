@@ -2,13 +2,9 @@
 #define _SYS_ACTOR_H_
 #include <actor.h>
 #include <functional>
-#include <msg_info.h>
-#include <serdes.h>
 #include <vector>
 #include <option.h>
-#include <ArduinoJson.h>
 #include <msgs.h>
-#include <zenoh_actor.h>
 
 class SysActor : public Actor
 {

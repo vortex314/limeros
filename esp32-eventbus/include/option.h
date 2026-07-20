@@ -241,6 +241,10 @@ public:
             PANIC("");
         return *_pv;
     }
+    const T &value_or(const T &default_value) const
+    {
+        return _pv ? *_pv : default_value;
+    }
 };
 /*
 int main() {

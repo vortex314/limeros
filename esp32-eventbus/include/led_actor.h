@@ -4,30 +4,44 @@
 #include <actor.h>
 #include <driver/gpio.h>
 #include <soc/gpio_num.h>
+#include <msgs.h>
 
 #ifndef GPIO_LED
 #define GPIO_LED GPIO_NUM_2
 #endif
 
-DEFINE_MSG(LedBlink, uint32_t interval_msec;LedBlink(uint32_t interval_msec) : interval_msec(interval_msec) {};);
-DEFINE_MSG(LedOff);
-DEFINE_MSG(LedOn);
-/*
+
+struct LedBlink : public Msg
+{
+public:
+    static uint32_t msg_id() { return FNV("LedBlink"); };
+    static const char* msg_name() { return "LedBlink"; };
+    uint32_t interval_msec;
+    LedBlink(uint32_t interval_msec) : interval_msec(interval_msec) {};
+};
+
+struct LedOff : public Msg
+{
+public:
+    static uint32_t msg_id() { return FNV("LedOff"); };
+    static const char* msg_name() { return "LedOff"; };
+};
+
+struct LedOn : public Msg
+{
+public:
+    static uint32_t msg_id() { return FNV("LedOn"); };
+    static const char* msg_name() { return "LedOn"; };
+};
 struct LedPulse : public Msg
 {
 public:
-    static constexpr MsgId id_value = fnv32(2166136261, "LedPulse");
-    inline MsgId type_id() const noexcept override { return id_value; };
-    inline const char *type_name() const noexcept override { return "LedPulse"; };
-    ~LedPulse() override = default;
+    static uint32_t msg_id() { return FNV("LedPulse"); };
+    static const char* msg_name() { return "LedPulse"; };
     uint32_t duration_msec;
     LedPulse(uint32_t duration_msec) : duration_msec(duration_msec) {};
-    ;
-    LedPulse() = default;
-};*/
-DEFINE_MSG(LedPulse,
-           uint32_t duration_msec;
-           LedPulse(uint32_t duration_msec) : duration_msec(duration_msec) {});
+};
+
 
 class LedActor : public Actor
 {

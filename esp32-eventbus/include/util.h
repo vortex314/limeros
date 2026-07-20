@@ -26,7 +26,6 @@
 
 // #include <ArduinoJson.h>
 
-typedef std::vector<uint8_t> Bytes;
 
 #define TEST_RC(TYPE, VAL, MSG)                  \
   {                                              \

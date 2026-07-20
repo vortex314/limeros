@@ -9,44 +9,44 @@ LedActor::~LedActor()
 {
 }
 
-void LedActor::on_message(const ActorMessage &env)
+void LedActor::on_message(const ActorMessage &msg)
 {
-    const Msg &msg = *env.msg;
-    msg.handle<LedOn>([&](auto _)
+    
+   msg.handle_if<LedOn>([&](auto _)
                       { 
                         _state = LED_STATE_ON;
             gpio_set_level(GPIO_LED, LED_ON_VALUE); });
 
-    msg.handle<LedOff>([&](auto _)
+    msg.handle_if<LedOff>([&](auto _)
                        {             
                         _state = LED_STATE_OFF;
             gpio_set_level(GPIO_LED, LED_OFF_VALUE); });
 
-    msg.handle<LedPulse>([&](auto led_pulse)
+    msg.handle_if<LedPulse>([&](auto led_pulse)
                          {
                             _duration = led_pulse.duration_msec;
         _state = LED_STATE_PULSE;
         _led_is_on = true;
         gpio_set_level(GPIO_LED, LED_ON_VALUE);
-        timer_fire(_timer_led, _duration); });
+        timer_fire(_timer_led, _duration); }));
 
-    msg.handle<LedBlink>([&](auto led_blink)
+    msg.handle_if<LedBlink>([&](auto led_blink)
                          {
         _duration = led_blink.interval_msec;
         _state = LED_STATE_BLINK;
         _led_is_on = true;
         gpio_set_level(GPIO_LED, LED_ON_VALUE);
-        timer_fire(_timer_led, _duration); });
-    msg.handle<TimerMsg>([&](const TimerMsg &msg)
-                         { on_timer(msg.timer_id); });
+        timer_fire(_timer_led, _duration); }))  ;
+    msg.handle_if<TimerMsg>([&](const TimerMsg &msg)
+                         { on_timer(msg.timer_id); }));
 
-    msg.handle<PublishTxd>([&](const PublishTxd &msg)
+    msg.handle_if<Unicast>([&](const Unicast &msg)
                            {
                              _duration = 10;
         _state = LED_STATE_PULSE;
         _led_is_on = true;
         gpio_set_level(GPIO_LED, LED_ON_VALUE);
-        timer_fire(_timer_led, _duration); });
+        timer_fire(_timer_led, _duration); }));
 }
 
 void LedActor::on_timer(int timer_id)
