@@ -1,0 +1,135 @@
+// Auto-generated from robot.hcl — do not edit by hand.
+// Every field is `std::optional<T>`; missing fields serialize as CBOR null.
+// Messages are encoded as CBOR maps keyed by field id.
+// Uses tinycbor for CBOR encoding/decoding.
+
+
+{%- macro encode_field(field) %}
+{%- if field.cpp_type == "uint32_t" -%}
+            encoder.encode_uint32({{ field.name }}.unwrap());
+{%- elif field.cpp_type == "int32_t" -%}
+            encoder.encode_int32({{ field.name }}.unwrap());
+{%- elif field.cpp_type == "uint64_t" -%}
+            encoder.encode_uint64({{ field.name }}.unwrap());
+{%- elif field.cpp_type == "int64_t" -%}
+            encoder.encode_int64({{ field.name }}.unwrap());
+{%- elif field.cpp_type == "float" -%}
+            encoder.encode_float({{ field.name }}.unwrap());
+{%- elif field.cpp_type == "std::string" -%}
+            encoder.encode_str({{ field.name }}.unwrap());
+{%- elif field.cpp_type == "bool" -%}
+            encoder.encode_bool({{ field.name }}.unwrap());
+{%- elif field.cpp_type == "std::vector<uint8_t>" -%}
+            encoder.encode_bstr(&{{ field.name }}.unwrap());
+{%- elif field.cpp_type == "std::vector<int32_t>" -%}
+            encoder.encode_int32_array({{ field.name }}.unwrap());
+{%- elif field.cpp_type == "std::vector<uint64_t>" -%}
+            encoder.encode_uint64_array({{ field.name }}.unwrap());
+{%- elif field.cpp_type == "std::vector<int64_t>" -%}
+            encoder.encode_int64_array({{ field.name }}.unwrap());
+{%- elif field.cpp_type == "std::vector<float>" -%}
+            encoder.encode_float_array({{ field.name }}.unwrap());
+{%- elif field.cpp_type == "std::vector<bool>" -%}
+            encoder.encode_bool_array({{ field.name }}.unwrap());
+{%- elif field.cpp_type == "std::vector<std::string>" -%}
+            encoder.encode_string_array({{ field.name }}.unwrap());
+{%- endif -%}
+{%- endmacro encode_field -%}
+
+{% macro decode_field(field) %}
+{%- if field.cpp_type == "uint32_t" %}
+                    decoder.decode_uint32().inspect([&](auto value) { {{ field.name }}.some(value) ;});
+{%- elif field.cpp_type == "int32_t" %}
+                    msgs_detail::decodeOptionalInt32(map, msg.{{ field.name }});
+{%- elif field.cpp_type == "uint64_t" %}
+                    msgs_detail::decodeOptionalUInt64(map, msg.{{ field.name }});
+{%- elif field.cpp_type == "int64_t" %}
+                    msgs_detail::decodeOptionalInt64(map, msg.{{ field.name }});
+{%- elif field.cpp_type == "float" %}
+                    msgs_detail::decodeOptionalFloat(map, msg.{{ field.name }});
+{%- elif field.cpp_type == "std::string" %}
+                    msgs_detail::decodeOptionalString(map, msg.{{ field.name }});
+{%- elif field.cpp_type == "bool" %}
+                    msgs_detail::decodeOptionalBool(map, msg.{{ field.name }});
+{%- elif field.cpp_type == "std::vector<uint32_t>" %}
+                    msgs_detail::decodeOptionalUInt32Array(map, msg.{{ field.name }});
+{%- elif field.cpp_type == "std::vector<int32_t>" %}
+                    msgs_detail::decodeOptionalInt32Array(map, msg.{{ field.name }});
+{%- elif field.cpp_type == "std::vector<uint64_t>" %}
+                    msgs_detail::decodeOptionalUInt64Array(map, msg.{{ field.name }});
+{%- elif field.cpp_type == "std::vector<int64_t>" %}
+                    msgs_detail::decodeOptionalInt64Array(map, msg.{{ field.name }});
+{%- elif field.cpp_type == "std::vector<float>" %}
+                    msgs_detail::decodeOptionalFloatArray(map, msg.{{ field.name }});
+{%- elif field.cpp_type == "std::vector<bool>" %}
+                    msgs_detail::decodeOptionalBoolArray(map, msg.{{ field.name }});
+{%- elif field.cpp_type == "std::vector<std::string>" %}
+                    msgs_detail::decodeOptionalStringArray(map, msg.{{ field.name }});
+{%- endif %}
+{%- endmacro decode_field %}
+
+#pragma once
+
+#include <limero/codec.h>
+
+{% for msg in messages %}
+
+class  {{ msg.name }} : public Msg {
+public:
+    static uint32_t id() { return FNV("{{ msg.name }}"); };
+    static const char* name() { return "{{ msg.name }}"; };
+    typedef enum FieldId {
+        {%- for field in msg.fields %}
+        {{ field.name | upper }} = {{ field.id }},
+        {%- endfor %}
+    } FieldId;
+
+
+{%- for field in msg.fields %}
+{%- if field.description %}
+    /// {{ field.description }}
+{%- endif %}
+    Option<{{ field.cpp_type }}> {{ field.name }};
+{%- endfor %}
+
+    /// Serialize this message into a CBOR map keyed by field id.
+    Result<Void> encode(FrameEncoder& encoder)  {
+        RET_ERR(encoder.begin_map());
+{%- for field in msg.fields %}
+        {{ field.name }}.inspect([&](const auto& value) {
+            encoder.encode_uint32(FieldId::{{ field.name | upper }});
+            {{ self::encode_field(field=field) }}
+        });
+
+{%- endfor %}
+        return encoder.end_map();
+    }
+
+    /// Deserialize a {{ msg.name }} from a CBOR map value.
+    Result<Void> decode(FrameDecoder& decoder) {
+        {{ msg.name }} msg;
+        RET_ERR(decoder.begin_map());
+
+        for (uint32_t i = 0; i < decoder.begin_map().unwrap(); ++i) {
+            auto key = decoder.decode_uint32();
+            if (key.is_err()) {
+                return Result<{{ msg.name }}>::Err("Failed to decode map key");
+            }
+
+            switch (key.value()) {
+{%- for field in msg.fields %}
+                case FieldId::{{ field.name | upper }}:
+                    {{ self::decode_field(field=field) }}
+                    break;
+{%- endfor %}
+                default:
+                    // Unknown field id; skip the value.
+                    decoder.skip_value();
+                    break;          
+            }
+        }
+        return decoder.end_map();
+    }
+};
+
+{% endfor %}

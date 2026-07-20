@@ -292,10 +292,25 @@ robot "ronald" {
 
   message HeatingEvent {
     description = "Heating event message"
-    field "temperature" { id = 0 type = "float"  description = "Current temperature in Celsius"}
-    field "setpoint" { id = 1 type = "float"  description = "Setpoint temperature in Celsius"}
-    field "heating" { id = 2 type = "bool"  description = "Heating status"}
+    field "temperature_c" { id = 0 type = "float"  description = "Current temperature in Celsius"}
+    field "setpoint_c" { id = 1 type = "float"  description = "Setpoint temperature in Celsius"}
+    field "enabled" { id = 2 type = "bool"  description = "Heating enabled or disabled"}
+    field "output_pct" { id = 3 type = "float"  description = "Output percentage of the heating element"}
+    field "heater_on" { id = 4 type = "bool"  description = "Heater is currently on or off"}
+    field  "fault" { id = 5 type = "bool"  description = "Fault detected in the heating system"}
+    field  "timestamp_ms" { id = 6 type = "uint64"  description = "Timestamp in milliseconds since epoch"}
   }
+
+  message HeatingRequest {
+    description = "Heating request message"
+    field "setpoint_c" { id = 0 type = "float"  description = "Setpoint temperature in Celsius"}
+    field "enabled" { id = 1 type = "bool"  description = "Enable or disable heating"}
+    field "kp" { id = 2 type = "float"  description = "Proportional gain for PID controller"}
+    field "ki" { id = 3 type = "float"  description = "Integral gain for PID controller"}
+    field "kd" { id = 4 type = "float"  description = "Derivative gain for PID controller"}
+    field "reset_integral" { id = 5 type = "bool"  description = "Reset the integral term of the PID controller"}
+  }
+        
 
   message Envelope {
     description = "Envelope message for encapsulating other messages"

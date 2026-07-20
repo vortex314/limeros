@@ -1,0 +1,500 @@
+// Auto-generated from robot.hcl — do not edit by hand.
+// Every field is `std::optional<T>`; missing fields serialize as CBOR null.
+// Messages are encoded as CBOR maps keyed by field id.
+// Uses tinycbor for CBOR encoding/decoding.
+
+#pragma once
+
+#include <cbor.h>
+#include <cstdlib>
+#include <cstdint>
+#include <optional>
+#include <string>
+#include <type_traits>
+#include <vector>
+
+ namespace msgs_detail {
+
+template <typename>
+inline constexpr bool always_false_v = false;
+
+template <typename T>
+struct is_vector : std::false_type {};
+
+template <typename T, typename A>
+struct is_vector<std::vector<T, A>> : std::true_type {};
+
+inline CborError encodeValue(CborEncoder& encoder, uint32_t value) {
+    return cbor_encode_uint(&encoder, static_cast<uint64_t>(value));
+}
+
+inline CborError encodeValue(CborEncoder& encoder, int32_t value) {
+    return cbor_encode_int(&encoder, static_cast<int64_t>(value));
+}
+
+inline CborError encodeValue(CborEncoder& encoder, uint64_t value) {
+    return cbor_encode_uint(&encoder, value);
+}
+
+inline CborError encodeValue(CborEncoder& encoder, int64_t value) {
+    return cbor_encode_int(&encoder, value);
+}
+
+inline CborError encodeValue(CborEncoder& encoder, bool value) {
+    return cbor_encode_boolean(&encoder, value);
+}
+
+inline CborError encodeValue(CborEncoder& encoder, float value) {
+    return cbor_encode_float(&encoder, value);
+}
+
+inline CborError encodeValue(CborEncoder& encoder, const std::string& value) {
+    return cbor_encode_text_string(&encoder, value.c_str(), value.size());
+}
+
+template <typename T>
+inline CborError encodeValue(CborEncoder& encoder, const std::vector<T>& value) {
+    CborEncoder arrayEncoder;
+    CborError err = cbor_encoder_create_array(
+        &encoder, &arrayEncoder, static_cast<size_t>(value.size()));
+    if (err != CborNoError) {
+        return err;
+    }
+
+    for (const auto& element : value) {
+        if constexpr (std::is_same_v<T, bool>) {
+            err = encodeValue(arrayEncoder, static_cast<bool>(element));
+        } else {
+            err = encodeValue(arrayEncoder, element);
+        }
+        if (err != CborNoError) {
+            return err;
+        }
+    }
+
+    return cbor_encoder_close_container(&encoder, &arrayEncoder);
+}
+
+template <typename T>
+inline CborError encodeOptional(CborEncoder& encoder,
+                                const std::optional<T>& value) {
+    if (!value.has_value()) {
+        return cbor_encode_null(&encoder);
+    }
+
+    if constexpr (std::is_same_v<T, uint32_t> ||
+                  std::is_same_v<T, int32_t> ||
+                  std::is_same_v<T, uint64_t> ||
+                  std::is_same_v<T, int64_t> ||
+                  std::is_same_v<T, bool> ||
+                  std::is_same_v<T, float> ||
+                  std::is_same_v<T, std::string> ||
+                  is_vector<T>::value) {
+        return encodeValue(encoder, value.value());
+    } else {
+        static_assert(always_false_v<T>, "Unsupported encodeOptional<T> type");
+    }
+}
+
+inline CborError encodeOptionalUInt32(CborEncoder& encoder,
+                                      const std::optional<uint32_t>& value) {
+    return encodeOptional(encoder, value);
+}
+
+inline void decodeOptionalUInt32(CborValue& value,
+                                 std::optional<uint32_t>& out) {
+    if (!cbor_value_is_null(&value)) {
+        uint64_t v;
+        cbor_value_get_uint64(&value, &v);
+        out = static_cast<uint32_t>(v);
+    }
+}
+
+inline CborError encodeOptionalInt32(CborEncoder& encoder,
+                                     const std::optional<int32_t>& value) {
+    return encodeOptional(encoder, value);
+}
+
+inline void decodeOptionalInt32(CborValue& value,
+                                std::optional<int32_t>& out) {
+    if (!cbor_value_is_null(&value)) {
+        int64_t v;
+        cbor_value_get_int64(&value, &v);
+        out = static_cast<int32_t>(v);
+    }
+}
+
+inline CborError encodeOptionalUInt64(CborEncoder& encoder,
+                                      const std::optional<uint64_t>& value) {
+    return encodeOptional(encoder, value);
+}
+
+inline void decodeOptionalUInt64(CborValue& value,
+                                 std::optional<uint64_t>& out) {
+    if (!cbor_value_is_null(&value)) {
+        cbor_value_get_uint64(&value, &out.emplace());
+    }
+}
+
+inline CborError encodeOptionalInt64(CborEncoder& encoder,
+                                     const std::optional<int64_t>& value) {
+    return encodeOptional(encoder, value);
+}
+
+inline void decodeOptionalInt64(CborValue& value,
+                                std::optional<int64_t>& out) {
+    if (!cbor_value_is_null(&value)) {
+        cbor_value_get_int64(&value, &out.emplace());
+    }
+}
+
+inline CborError encodeOptionalBool(CborEncoder& encoder,
+                                    const std::optional<bool>& value) {
+    return encodeOptional(encoder, value);
+}
+
+inline void decodeOptionalBool(CborValue& value,
+                               std::optional<bool>& out) {
+    if (!cbor_value_is_null(&value)) {
+        bool v;
+        cbor_value_get_boolean(&value, &v);
+        out = v;
+    }
+}
+
+inline CborError encodeOptionalFloat(CborEncoder& encoder,
+                                     const std::optional<float>& value) {
+    return encodeOptional(encoder, value);
+}
+
+inline void decodeOptionalFloat(CborValue& value,
+                                std::optional<float>& out) {
+    if (!cbor_value_is_null(&value)) {
+        cbor_value_get_float(&value, &out.emplace());
+    }
+}
+
+inline CborError encodeOptionalString(CborEncoder& encoder,
+                                      const std::optional<std::string>& value) {
+    return encodeOptional(encoder, value);
+}
+
+inline void decodeOptionalString(CborValue& value,
+                                 std::optional<std::string>& out) {
+    if (!cbor_value_is_null(&value)) {
+        char* buf = nullptr;
+        size_t len = 0;
+        cbor_value_dup_text_string(&value, &buf, &len, nullptr);
+        out = std::string(buf, len);
+        free(buf);
+    }
+}
+
+template <typename T>
+inline bool decodeScalar(CborValue& value, T& out) {
+    if constexpr (std::is_same_v<T, uint32_t>) {
+        if (!cbor_value_is_integer(&value)) return false;
+        uint64_t v;
+        if (cbor_value_get_uint64(&value, &v) != CborNoError) return false;
+        out = static_cast<uint32_t>(v);
+        return true;
+    } else if constexpr (std::is_same_v<T, int32_t>) {
+        if (!cbor_value_is_integer(&value)) return false;
+        int64_t v;
+        if (cbor_value_get_int64(&value, &v) != CborNoError) return false;
+        out = static_cast<int32_t>(v);
+        return true;
+    } else if constexpr (std::is_same_v<T, uint64_t>) {
+        if (!cbor_value_is_integer(&value)) return false;
+        return cbor_value_get_uint64(&value, &out) == CborNoError;
+    } else if constexpr (std::is_same_v<T, int64_t>) {
+        if (!cbor_value_is_integer(&value)) return false;
+        return cbor_value_get_int64(&value, &out) == CborNoError;
+    } else if constexpr (std::is_same_v<T, bool>) {
+        if (!cbor_value_is_boolean(&value)) return false;
+        return cbor_value_get_boolean(&value, &out) == CborNoError;
+    } else if constexpr (std::is_same_v<T, float>) {
+        if (!cbor_value_is_float(&value)) return false;
+        return cbor_value_get_float(&value, &out) == CborNoError;
+    } else if constexpr (std::is_same_v<T, std::string>) {
+        if (!cbor_value_is_text_string(&value)) return false;
+        char* buf = nullptr;
+        size_t len = 0;
+        if (cbor_value_dup_text_string(&value, &buf, &len, nullptr) != CborNoError) {
+            return false;
+        }
+        out = std::string(buf, len);
+        free(buf);
+        return true;
+    } else {
+        static_assert(always_false_v<T>, "Unsupported decodeScalar<T> type");
+    }
+}
+
+template <typename T>
+inline void decodeOptionalVector(CborValue& value,
+                                 std::optional<std::vector<T>>& out) {
+    if (cbor_value_is_null(&value) || !cbor_value_is_array(&value)) {
+        return;
+    }
+
+    CborValue array;
+    if (cbor_value_enter_container(&value, &array) != CborNoError) {
+        return;
+    }
+
+    std::vector<T> decoded;
+    while (!cbor_value_at_end(&array)) {
+        T item{};
+        if (decodeScalar(array, item)) {
+            decoded.push_back(std::move(item));
+        }
+
+        if (!cbor_value_at_end(&array)) {
+            cbor_value_advance(&array);
+        }
+    }
+
+    cbor_value_leave_container(&value, &array);
+    out = std::move(decoded);
+}
+
+inline CborError encodeOptionalUInt32Array(
+    CborEncoder& encoder,
+    const std::optional<std::vector<uint32_t>>& value) {
+    return encodeOptional(encoder, value);
+}
+
+inline void decodeOptionalUInt32Array(
+    CborValue& value,
+    std::optional<std::vector<uint32_t>>& out) {
+    decodeOptionalVector(value, out);
+}
+
+inline CborError encodeOptionalInt32Array(
+    CborEncoder& encoder,
+    const std::optional<std::vector<int32_t>>& value) {
+    return encodeOptional(encoder, value);
+}
+
+inline void decodeOptionalInt32Array(
+    CborValue& value,
+    std::optional<std::vector<int32_t>>& out) {
+    decodeOptionalVector(value, out);
+}
+
+inline CborError encodeOptionalUInt64Array(
+    CborEncoder& encoder,
+    const std::optional<std::vector<uint64_t>>& value) {
+    return encodeOptional(encoder, value);
+}
+
+inline void decodeOptionalUInt64Array(
+    CborValue& value,
+    std::optional<std::vector<uint64_t>>& out) {
+    decodeOptionalVector(value, out);
+}
+
+inline CborError encodeOptionalInt64Array(
+    CborEncoder& encoder,
+    const std::optional<std::vector<int64_t>>& value) {
+    return encodeOptional(encoder, value);
+}
+
+inline void decodeOptionalInt64Array(
+    CborValue& value,
+    std::optional<std::vector<int64_t>>& out) {
+    decodeOptionalVector(value, out);
+}
+
+inline CborError encodeOptionalFloatArray(
+    CborEncoder& encoder,
+    const std::optional<std::vector<float>>& value) {
+    return encodeOptional(encoder, value);
+}
+
+inline void decodeOptionalFloatArray(
+    CborValue& value,
+    std::optional<std::vector<float>>& out) {
+    decodeOptionalVector(value, out);
+}
+
+inline CborError encodeOptionalBoolArray(
+    CborEncoder& encoder,
+    const std::optional<std::vector<bool>>& value) {
+    return encodeOptional(encoder, value);
+}
+
+inline void decodeOptionalBoolArray(
+    CborValue& value,
+    std::optional<std::vector<bool>>& out) {
+    decodeOptionalVector(value, out);
+}
+
+inline CborError encodeOptionalStringArray(
+    CborEncoder& encoder,
+    const std::optional<std::vector<std::string>>& value) {
+    return encodeOptional(encoder, value);
+}
+
+inline void decodeOptionalStringArray(
+    CborValue& value,
+    std::optional<std::vector<std::string>>& out) {
+    decodeOptionalVector(value, out);
+}
+
+} // namespace msgs_detail
+
+{% macro encode_field(field) %}
+{%- if field.cpp_type == "uint32_t" %}
+            err = msgs_detail::encodeOptionalUInt32(mapEncoder, {{ field.name }});
+{%- elif field.cpp_type == "int32_t" %}
+            err = msgs_detail::encodeOptionalInt32(mapEncoder, {{ field.name }});
+{%- elif field.cpp_type == "uint64_t" %}
+            err = msgs_detail::encodeOptionalUInt64(mapEncoder, {{ field.name }});
+{%- elif field.cpp_type == "int64_t" %}
+            err = msgs_detail::encodeOptionalInt64(mapEncoder, {{ field.name }});
+{%- elif field.cpp_type == "float" %}
+            err = msgs_detail::encodeOptionalFloat(mapEncoder, {{ field.name }});
+{%- elif field.cpp_type == "std::string" %}
+            err = msgs_detail::encodeOptionalString(mapEncoder, {{ field.name }});
+{%- elif field.cpp_type == "bool" %}
+            err = msgs_detail::encodeOptionalBool(mapEncoder, {{ field.name }});
+{%- elif field.cpp_type == "std::vector<uint32_t>" %}
+            err = msgs_detail::encodeOptionalUInt32Array(mapEncoder, {{ field.name }});
+{%- elif field.cpp_type == "std::vector<int32_t>" %}
+            err = msgs_detail::encodeOptionalInt32Array(mapEncoder, {{ field.name }});
+{%- elif field.cpp_type == "std::vector<uint64_t>" %}
+            err = msgs_detail::encodeOptionalUInt64Array(mapEncoder, {{ field.name }});
+{%- elif field.cpp_type == "std::vector<int64_t>" %}
+            err = msgs_detail::encodeOptionalInt64Array(mapEncoder, {{ field.name }});
+{%- elif field.cpp_type == "std::vector<float>" %}
+            err = msgs_detail::encodeOptionalFloatArray(mapEncoder, {{ field.name }});
+{%- elif field.cpp_type == "std::vector<bool>" %}
+            err = msgs_detail::encodeOptionalBoolArray(mapEncoder, {{ field.name }});
+{%- elif field.cpp_type == "std::vector<std::string>" %}
+            err = msgs_detail::encodeOptionalStringArray(mapEncoder, {{ field.name }});
+{%- endif %}
+{%- endmacro encode_field %}
+
+{% macro decode_field(field) %}
+{%- if field.cpp_type == "uint32_t" %}
+                    msgs_detail::decodeOptionalUInt32(map, msg.{{ field.name }});
+{%- elif field.cpp_type == "int32_t" %}
+                    msgs_detail::decodeOptionalInt32(map, msg.{{ field.name }});
+{%- elif field.cpp_type == "uint64_t" %}
+                    msgs_detail::decodeOptionalUInt64(map, msg.{{ field.name }});
+{%- elif field.cpp_type == "int64_t" %}
+                    msgs_detail::decodeOptionalInt64(map, msg.{{ field.name }});
+{%- elif field.cpp_type == "float" %}
+                    msgs_detail::decodeOptionalFloat(map, msg.{{ field.name }});
+{%- elif field.cpp_type == "std::string" %}
+                    msgs_detail::decodeOptionalString(map, msg.{{ field.name }});
+{%- elif field.cpp_type == "bool" %}
+                    msgs_detail::decodeOptionalBool(map, msg.{{ field.name }});
+{%- elif field.cpp_type == "std::vector<uint32_t>" %}
+                    msgs_detail::decodeOptionalUInt32Array(map, msg.{{ field.name }});
+{%- elif field.cpp_type == "std::vector<int32_t>" %}
+                    msgs_detail::decodeOptionalInt32Array(map, msg.{{ field.name }});
+{%- elif field.cpp_type == "std::vector<uint64_t>" %}
+                    msgs_detail::decodeOptionalUInt64Array(map, msg.{{ field.name }});
+{%- elif field.cpp_type == "std::vector<int64_t>" %}
+                    msgs_detail::decodeOptionalInt64Array(map, msg.{{ field.name }});
+{%- elif field.cpp_type == "std::vector<float>" %}
+                    msgs_detail::decodeOptionalFloatArray(map, msg.{{ field.name }});
+{%- elif field.cpp_type == "std::vector<bool>" %}
+                    msgs_detail::decodeOptionalBoolArray(map, msg.{{ field.name }});
+{%- elif field.cpp_type == "std::vector<std::string>" %}
+                    msgs_detail::decodeOptionalStringArray(map, msg.{{ field.name }});
+{%- endif %}
+{%- endmacro decode_field %}
+
+{% for msg in messages %}
+struct {{ msg.name }} {
+{%- for field in msg.fields %}
+{%- if field.description %}
+    /// {{ field.description }}
+{%- endif %}
+    std::optional<{{ field.cpp_type }}> {{ field.name }};
+{%- endfor %}
+
+    /// Serialize this message into a CBOR map keyed by field id.
+    CborError toCbor(CborEncoder& parentEncoder) const {
+        size_t mapSize = 0;
+{%- for field in msg.fields %}
+        if ({{ field.name }}.has_value()) {
+            ++mapSize;
+        }
+{%- endfor %}
+
+        CborEncoder mapEncoder;
+        CborError err = cbor_encoder_create_map(
+            &parentEncoder, &mapEncoder, mapSize);
+        if (err != CborNoError) return err;
+{%- for field in msg.fields %}
+        if ({{ field.name }}.has_value()) {
+            err = cbor_encode_uint(&mapEncoder, static_cast<uint64_t>({{ field.id }}));
+            if (err != CborNoError) return err;
+{{ self::encode_field(field=field) }}
+        }
+        if (err != CborNoError) return err;
+{%- endfor %}
+        return cbor_encoder_close_container(&parentEncoder, &mapEncoder);
+    }
+
+    /// Deserialize a {{ msg.name }} from a CBOR map value.
+    static {{ msg.name }} fromCbor(CborValue& it) {
+        {{ msg.name }} msg;
+        CborValue map;
+        if (cbor_value_is_container(&it) &&
+            cbor_value_enter_container(&it, &map) == CborNoError)
+        {
+            while (!cbor_value_at_end(&map)) {
+                uint64_t key = 0;
+                if (cbor_value_is_unsigned_integer(&map)) {
+                    cbor_value_get_uint64(&map, &key);
+                } else if (cbor_value_is_integer(&map)) {
+                    int64_t signedKey = 0;
+                    cbor_value_get_int64(&map, &signedKey);
+                    if (signedKey < 0) {
+                        cbor_value_advance(&map);
+                        if (!cbor_value_at_end(&map)) {
+                            cbor_value_advance(&map);
+                        }
+                        continue;
+                    }
+                    key = static_cast<uint64_t>(signedKey);
+                } else {
+                    cbor_value_advance(&map);
+                    if (!cbor_value_at_end(&map)) {
+                        cbor_value_advance(&map);
+                    }
+                    continue;
+                }
+
+                cbor_value_advance(&map);
+                if (cbor_value_at_end(&map)) {
+                    break;
+                }
+
+                switch (key) {
+{%- for field in msg.fields %}
+                    case {{ field.id }}:
+{{ self::decode_field(field=field) }}
+                        break;
+{%- endfor %}
+                    default:
+                        break;
+                }
+
+                if (!cbor_value_at_end(&map)) {
+                    cbor_value_advance(&map);
+                }
+            }
+            cbor_value_leave_container(&it, &map);
+        }
+        return msg;
+    }
+};
+
+{% endfor %}

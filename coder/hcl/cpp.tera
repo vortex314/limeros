@@ -5,62 +5,10 @@
 
 #pragma once
 
-#include <result.h>
-#include <option.h>
 #include <cbor.h>
 #include <errno.h>
+#include <msg.h>
 
-
-// FNV-1a hash function for 32-bit hash value
-constexpr uint32_t fnv1a_32_1(const char* str, uint32_t hash = 2166136261U)
-{
-    return *str == '\0' ? hash : fnv1a_32_1(str + 1, (hash ^ static_cast<uint32_t>(*str)) * 16777619U);
-}
-
-// Helper to compute the hash at compile time for a string literal
-template <std::size_t N>
-constexpr uint32_t FNV(const char(&str)[N])
-{
-    return fnv1a_32_1(str);
-}
-
-class Bytes {
-    private:
-        uint8_t* _buffer;
-        size_t _capacity;
-        size_t _index;
-    public :
-        Bytes(uint8_t* buffer,size_t capacity ) : _buffer(buffer),_capacity(capacity),_index(0);
-        Bytes(size_t capacity) {
-            _buffer = (uint8_t*)malloc(capacity);
-            _capacity=capacity;
-            _index=0;
-        }
-        uint8_t* data() { return _buffer;};
-        size_t size() { return _index; }
-        int push(uint8_t b) { if ( _index < _capacity ) {
-                _buffer[_index++] = b;
-                return 0;
-                }
-                return ENOSPC;
-        }
-};
-
-// ---------------------- abstract class Msg ------------------
-class Msg {
-    public:
-    static uint32_t msg_id() { return FNV("Msg"); };
-    static const char* msg_name() { return "Msg"; };
-    errno encode(Bytes& buffer) 
-    {
-        WARN(¨encode not implemeneted for %s¨,msg_name());
-        return ENOTSUP;
-    }
-    errno decode(Bytes& buffer) 
-    {
-        WARN(¨decode not implemeneted for %s¨,msg_name());
-        return ENOTSUP;    }
-};
 
 
 // ── TinyCBOR helper ────────────────────────────────────────────────────────
@@ -68,7 +16,7 @@ class Msg {
 #define cbor_check(X) { \
     CborError err = X; \
     if (err != CborNoError) { \
-        WARN(¨failed cbor : %s¨,#X); \
+        WARN("failed cbor : %s",#X); \
          return EINVAL; \
     }   \
     }
@@ -413,7 +361,7 @@ public:
     /// Writes into the parent encoder as a single map item.
     int encode(Bytes& buffer)  {
         CborEncoder encoder;
-        cbor_encoder_init(&encoder,buffer.data(),buffer.size(),0);
+        cbor_encoder_init(&encoder,buffer.data(),buffer.capacity(),0);
         // Count how many optional fields are set.
         uint32_t fieldCount = 0;
 {%- for field in msg.fields %}
@@ -430,14 +378,19 @@ public:
         });
 {%- endfor %}
 
-        return cbor_check(cbor_encoder_close_container(&encoder, &mapEncoder));
+         cbor_check(cbor_encoder_close_container(&encoder, &mapEncoder));
+         return 0;
     }
 
     /// Deserialize a {{ msg.name }} from a CBOR map value.
     /// `it` must point to the map; after decoding it is advanced past the map.
-     Result<Void> decode(CborValue& it) {
+     int decode(const Bytes& buffer) {
+        CborParser parser;
+        CborValue it;
+        cbor_check(cbor_parser_init(buffer.data(), buffer.size(), 0, &parser, &it));
         if (!cbor_value_is_map(&it)) {
-            return Result<Void>::Err(-1, "Expected CBOR map for {{ msg.name }}");
+            WARN("Expected CBOR map ");
+            return EINVAL;
         }
 
         CborValue mapValue;
@@ -473,7 +426,7 @@ public:
         }
 
         cbor_value_leave_container(&it, &mapValue);
-        return Result<Void>::Ok(Void());
+        return 0;
     }
 };
 
