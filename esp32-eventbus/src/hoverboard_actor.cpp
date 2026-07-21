@@ -115,9 +115,9 @@ void HoverboardActor::on_start()
  * @return The decoded bytes or an error.
  */
 
-Result<Bytes> HoverboardActor::cobs_decode(const Bytes &input)
+Result<Buffer> HoverboardActor::cobs_decode(const Buffer &input)
 {
-    Bytes output(input.size());
+    Buffer output(input.size());
     size_t read_index = 0;
     uint8_t code = 0, i = 0;
 
@@ -127,7 +127,7 @@ Result<Bytes> HoverboardActor::cobs_decode(const Bytes &input)
         if (read_index + code > input.size() && code != 1)
         {
             output.clear();
-            return Result<Bytes>::Err(-1, "COBS decode error");
+            return Result<Buffer>::Err(-1, "COBS decode error");
         }
         read_index++;
         for (i = 1; i < code; i++)
@@ -140,7 +140,7 @@ Result<Bytes> HoverboardActor::cobs_decode(const Bytes &input)
         }
     }
     // output.resize(write_index);
-    return Result<Bytes>::Ok(output);
+    return Result<Buffer>::Ok(output);
 }
 
 uint16_t crc16(const uint8_t *data, size_t length)
@@ -169,23 +169,24 @@ uint16_t crc16(const uint8_t *data, size_t length)
  * @param input The input bytes with CRC at the end.
  * @return The data without CRC if valid, or an error.
  */
-Result<Bytes> HoverboardActor::check_crc(const Bytes &input)
+Result<Buffer> HoverboardActor::check_crc(const Buffer &input)
 {
     if (input.size() < 4)
     {
-        return Result<Bytes>::Err(-1, "Data too short for CRC check");
+        return Result<Buffer>::Err(-1, "Data too short for CRC check");
     }
     uint16_t received_crc = static_cast<uint16_t>(input[input.size() - 1]) |
                             (static_cast<uint16_t>(input[input.size() - 2]) << 8);
     uint16_t calculated_crc = crc16(input.data(), input.size() - 2);
     if (received_crc != calculated_crc)
     {
-        return Result<Bytes>::Err(-2, "CRC mismatch");
+        return Result<Buffer>::Err(-2, "CRC mismatch");
     }
-    return Result<Bytes>::Ok(Bytes(input.begin(), input.begin() + input.size() - 2));
+    
+    return Result<Buffer>::Ok(Buffer(std::vector<uint8_t>(input.data(), input.data() + input.size() - 2)));
 }
 
-Result<HoverboardEvent *> HoverboardActor::parse_info_msg(const Bytes &input)
+Result<HoverboardEvent *> HoverboardActor::parse_info_msg(const Buffer &input)
 {
     HoverboardEvent* hb_event = new HoverboardEvent();
     if ( hb_event->decode(input) != 0)
@@ -219,28 +220,33 @@ void HoverboardActor::on_message(const ActorMessage &msg)
                         { handle_uart_bytes(uart_rxd.payload); });
 }
 
-void HoverboardActor::handle_uart_bytes(const Bytes &data)
+void HoverboardActor::handle_uart_bytes(const Buffer &data)
 {
     DEBUG("Processing UART RX data (%d bytes)", data.size());
-    for (auto b : data.to_vector())
+    for (int i = 0; i < data.size(); i++)
     {
+        uint8_t b = data[i];
+        DEBUG("UART RX byte: 0x%02X", b);
+        {
         if (b == COBS_SEPARATOR)
         {
             DEBUG("COBS frame received (%d bytes)", uart_read_buffer.size());
             HoverboardEvent event;
             auto result = cobs_decode(uart_read_buffer)
                 .and_then(check_crc);
-            result.just([&](Bytes &decoded)
+            result.just([&](const Buffer &decoded)
                        {
-                        HoverboardEvent* event = new HoverboardEvent();
-                        if (event->decode(decoded) == 0)
+                        Envelope* env = new Envelope();
+                        if (env->decode(decoded) == 0)
                         {
-                            emit(event);
+                            TxdMsg* txd_msg = new TxdMsg(*env);
+                            emit(txd_msg);
+                            delete env;
                         }
                         else
                         {
-                            WARN("Failed to decode HoverboardEvent");
-                            delete event;
+                            WARN("Failed to decode Envelope");
+                            delete env;
                         }
                        });
 
@@ -249,9 +255,10 @@ void HoverboardActor::handle_uart_bytes(const Bytes &data)
         }
         else
         {
-            uart_read_buffer.push(b);
+            uart_read_buffer.push_back(b);
         }
     }
+}
 }
 
 void HoverboardActor::on_timer(int id)
@@ -345,7 +352,7 @@ void uart_event_task(void *pvParameters)
     vTaskDelete(NULL);
 }
 
-void HoverboardActor::write_uart(const Bytes &data)
+void HoverboardActor::write_uart(const Buffer &data)
 {
     uart_write_bytes(UART_PORT, (const char *)data.data(), data.size());
 }

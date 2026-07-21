@@ -39,6 +39,7 @@ impl Endpoint {
             let announce_payload = EndpointAnnounce {
                 id: Some(self.id),
                 name: Some(self.name.clone()),
+                description: None,
                 services: None,
                 events: None,
                 replies: None,
@@ -108,7 +109,7 @@ impl Endpoint {
                     if self.broker_addr.lock().await.is_none() {
                         info!("Setting broker address to {}", addr);
                         self.broker_addr.lock().await.replace(addr);
-                    } else if (*self.broker_addr.lock().await != Some(addr)) {
+                    } else if *self.broker_addr.lock().await != Some(addr) {
                         warn!(
                             "Received EndpointAnnounceReply from unexpected broker address {} (expected {})",
                             addr,

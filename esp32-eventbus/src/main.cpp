@@ -30,6 +30,31 @@ EventBus eventbus(200);
 Log logger;
 esp_err_t nvs_ota_init();
 char hostname[24];
+std::unordered_map<uint32_t,std::string> message_type_map = {
+    {EndpointAnnounce::MSG_ID, "EndpointAnnounce"},
+    {TxdMsg::MSG_ID, "TxdMsg"},
+    {RxdMsg::MSG_ID, "RxdMsg"},
+    {WifiConnected::MSG_ID, "WifiConnected"},
+    {WifiDisconnected::MSG_ID, "WifiDisconnected"},
+    {LedBlink::MSG_ID, "LedBlink"},
+    {LedOn::MSG_ID, "LedOn"},
+    {LedOff::MSG_ID, "LedOff"},
+    {LedPulse::MSG_ID, "LedPulse"},
+    {TimerMsg::MSG_ID, "TimerMsg"},
+    {Msg::MSG_ID, "Msg"},
+    {UartRxd::MSG_ID, "UartRxd"}, 
+    {Transmitting::MSG_ID, "Transmitting"},
+    {PingRequest::MSG_ID, "PingRequest"},
+    {PingReply::MSG_ID, "PingReply"},
+    {Max31855Read::MSG_ID, "Max31855Read"},
+    {Max31855Event::MSG_ID, "Max31855Event"},
+    {HeatingRequest::MSG_ID, "HeatingRequest"},
+    {HeatingEvent::MSG_ID, "HeatingEvent"},
+    {HoverboardRequest::MSG_ID, "HoverboardRequest"},
+    {HoverboardEvent::MSG_ID, "HoverboardEvent"},
+    {WifiEvent::MSG_ID, "WifiEvent"},
+    {SysEvent::MSG_ID, "SysEvent"},
+};
 
 extern "C" void app_main()
 {
@@ -57,12 +82,12 @@ extern "C" void app_main()
   eventbus.register_actor(new HoverboardActor("hb")); // hoverboard interface
 #endif
   // debugging handler to log all eventbus traffic, comment for beauty
-  /*eventbus.register_handler([](const Envelope &env) // just log eventbus traffic
+  eventbus.register_handler([](const Msg &msg) // just log eventbus traffic
                             {
-                              const char *src = env.src ? env.src->name() : "";
-                              const char *dst = env.dst ? env.dst->name() : "";
-                              INFO(" Event '%s' => '%s' : %s", src, dst, env.msg->type_name()); // comment for beauty
-                            });*/
+                              uint32_t msg_type_id = msg.msg_id();
+                              std::string msg_type_str = message_type_map.find(msg_type_id) != message_type_map.end() ? message_type_map[msg_type_id] : std::to_string(msg_type_id);
+                              INFO("EventBus message received: %s", msg_type_str.c_str());
+                            });
   eventbus.loop();
 }
 /*

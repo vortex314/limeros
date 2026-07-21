@@ -9,14 +9,20 @@
 
 struct WifiConnected : public Msg
 {
-    static uint32_t msg_id() { return FNV("WifiConnected"); };
-    static const char *msg_name() { return "WifiConnected"; };
+    static const uint32_t MSG_ID = FNV("WifiConnected");
+    static constexpr const char *MSG_NAME = "WifiConnected";
+
+    virtual uint32_t msg_id() const { return MSG_ID; };
+    virtual const char *msg_name() const { return MSG_NAME; };
 };
 
 struct WifiDisconnected : public Msg
 {
-    static uint32_t msg_id() { return FNV("WifiDisconnected"); };
-    static const char *msg_name() { return "WifiDisconnected"; };
+    static const uint32_t MSG_ID = FNV("WifiDisconnected");
+    static constexpr const char *MSG_NAME = "WifiDisconnected";
+
+    virtual uint32_t msg_id() const { return MSG_ID; };
+    virtual const char *msg_name() const { return MSG_NAME; };
 };
 
 

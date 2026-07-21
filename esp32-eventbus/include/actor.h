@@ -59,8 +59,11 @@ public:
 class TimerMsg : public Msg
 {
 public:
-    static uint32_t msg_id() { return FNV("TimerMsg"); }
-    static const char *msg_name() { return "TimerMsg"; }
+    static const uint32_t MSG_ID = FNV("TimerMsg");
+    static constexpr const char *MSG_NAME = "TimerMsg";
+
+    virtual uint32_t msg_id() const { return MSG_ID; };
+    virtual const char *msg_name() const { return MSG_NAME; };
     int timer_id;
     TimerMsg(int id) : timer_id(id) {}
 };
@@ -312,39 +315,6 @@ public:
     void handle_expired_timers();
 };
 
-typedef struct PropInfo
-{
-    const char *name;
-    const char *type;
-    const char *desc;
-    const char *mode;
-    Option<float> min;
-    Option<float> max;
-} PropInfo;
 
-class Unicast : public Msg {
-public:
-    static uint32_t msg_id() { return FNV("PublishTxd"); };
-    static const char* msg_name() { return "PublishTxd"; };
-
-    Envelope env;
-    Unicast(const Envelope &env) : env(env) {}
-};
-
-class PublishRxd : public Msg {
-public:
-    static uint32_t msg_id() { return FNV("PublishRxd"); };
-    static const char* msg_name() { return "PublishRxd"; };
-    Envelope env;
-    PublishRxd(const Envelope &env) : env(env) {}
-};
-
-
-template <typename T>
-void handle(std::optional<T> &v, std::function<void(const T &)> f)
-{
-    if (v)
-        f(*v);
-}
 
 #endif

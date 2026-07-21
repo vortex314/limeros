@@ -101,30 +101,112 @@ public:
 };
 */
 
+class Buffer {
+    private :
+        uint8_t* _buffer;
+        size_t _capacity;
+        size_t _index;
+        bool _own_memory = false;
+
+    public :
+        Buffer(uint8_t* buffer, size_t capacity) : _buffer(buffer), _capacity(capacity), _index(0) {}
+        Buffer(size_t capacity) {
+            _buffer = (uint8_t*)malloc(capacity);
+            _capacity = capacity;
+            _index = 0;
+            _own_memory = true;     
+        }
+        Buffer (std::vector<uint8_t> vec) {
+            _capacity = vec.size();
+            _buffer = (uint8_t*)malloc(_capacity);
+            if (_buffer) {
+                std::copy(vec.begin(), vec.end(), _buffer);
+                _index = _capacity;
+                _own_memory = true;
+            } else {
+                _capacity = 0;
+                _index = 0;
+                _own_memory = false;
+                WARN("Failed to allocate memory in Buffer constructor");
+            }
+        }
+        ~Buffer() {
+            if (_own_memory) {
+                free(_buffer);
+            }
+        }
+        uint8_t* data() const { return _buffer; };
+        size_t size() const { return _index; }
+        uint8_t operator[](size_t index) const { assert(index < _index); return _buffer[index]; }
+        uint8_t& operator[](size_t index) { assert(index < _index); return _buffer[index]; }
+        void clear() { _index = 0; }
+        void resize(size_t new_size) {
+            if (_index > new_size) {
+                _index = new_size;
+            }
+        }
+        void capacity(size_t new_capacity) {
+            if (new_capacity > _capacity) {
+                if (_own_memory) {
+                    uint8_t* new_buffer = (uint8_t*)realloc(_buffer, new_capacity);
+                    if (new_buffer) {
+                        _buffer = new_buffer;
+                        _capacity = new_capacity;
+                    } else {
+                        WARN("Failed to resize buffer in Buffer::capacity");
+                    }
+                } else {
+                    WARN("Cannot resize non-owning buffer in Buffer::capacity");
+                }
+            } else {
+                // Do nothing if new_capacity <= _capacity
+            }
+        }
+        std::vector<uint8_t> to_vector() const {
+            return std::vector<uint8_t>(_buffer, _buffer + _index);
+        }
+        size_t capacity() const { return _capacity; }
+        int push_back(uint8_t b) {
+            if (_index < _capacity) {
+                _buffer[_index++] = b;
+                return 0;
+            }
+            WARN("Buffer overflow in Buffer::push");
+            return ENOSPC;
+        }
+};
+
 // ---------------------- abstract class Msg ------------------
 
 class Msg
 {
 public:
-    static uint32_t msg_id() { return FNV("Msg"); };
-    static const char *msg_name() { return "Msg"; };
+    static const uint32_t MSG_ID = FNV("Msg");
+    static constexpr const char *MSG_NAME ="Msg";
+
+    virtual uint32_t msg_id() const { return MSG_ID; };
+    virtual const char *msg_name() const { return MSG_NAME; };
+
+    virtual ~Msg() = default;
+
     template <typename T>
     void handle_if(std::function<void(const T &)> f) const
     {
-        if (msg_id() == T::msg_id())
+        if (msg_id() == T::MSG_ID)
             f(static_cast<const T &>(*this));
     }
     template <typename T>
-    bool is() const { return msg_id() == T::msg_id(); }
-    int encode(Bytes &buffer)
+    bool is() const { return msg_id() == T::MSG_ID  ; }
+    virtual int encode(Buffer &buffer) const
     {
         ERROR("encode not implemented for %s", msg_name());
         return ENOTSUP;
     }
-    int decode(const Bytes &buffer)
+    virtual int decode(const Buffer &buffer)
     {
         WARN("decode not implemented for %s", msg_name());
         return ENOTSUP;
     }
 };
+
 

@@ -190,6 +190,9 @@ pub struct EndpointAnnounce {
     /// Name of the announcing endpoint
     #[cbor(key = 1)]
     pub name: Option<String>,
+    /// Description of the announcing endpoint
+    #[cbor(key = 6)]
+    pub description: Option<String>,
     /// List of services provided by the endpoint
     #[cbor(key = 2)]
     pub services: Option<Vec<u32>>,
@@ -373,13 +376,25 @@ impl Msg for GenericReply {
 pub struct HeatingEvent {
     /// Current temperature in Celsius
     #[cbor(key = 0)]
-    pub temperature: Option<f32>,
+    pub temperature_c: Option<f32>,
     /// Setpoint temperature in Celsius
     #[cbor(key = 1)]
-    pub setpoint: Option<f32>,
-    /// Heating status
+    pub setpoint_c: Option<f32>,
+    /// Heating enabled or disabled
     #[cbor(key = 2)]
-    pub heating: Option<bool>,
+    pub enabled: Option<bool>,
+    /// Output percentage of the heating element
+    #[cbor(key = 3)]
+    pub output_pct: Option<f32>,
+    /// Heater is currently on or off
+    #[cbor(key = 4)]
+    pub heater_on: Option<bool>,
+    /// Fault detected in the heating system
+    #[cbor(key = 5)]
+    pub fault: Option<bool>,
+    /// Timestamp in milliseconds since epoch
+    #[cbor(key = 6)]
+    pub timestamp_ms: Option<u64>,
 }
 
 impl HeatingEvent {
@@ -401,6 +416,58 @@ impl HeatingEvent {
 }
 
 impl Msg for HeatingEvent {
+    fn id() -> u32 {
+        Self::id()
+    }
+
+    fn name() -> &'static str {
+        Self::name()
+    }
+}
+
+
+
+#[derive(Debug, Clone, PartialEq, cbor2::Cbor)]
+pub struct HeatingRequest {
+    /// Setpoint temperature in Celsius
+    #[cbor(key = 0)]
+    pub setpoint_c: Option<f32>,
+    /// Enable or disable heating
+    #[cbor(key = 1)]
+    pub enabled: Option<bool>,
+    /// Proportional gain for PID controller
+    #[cbor(key = 2)]
+    pub kp: Option<f32>,
+    /// Integral gain for PID controller
+    #[cbor(key = 3)]
+    pub ki: Option<f32>,
+    /// Derivative gain for PID controller
+    #[cbor(key = 4)]
+    pub kd: Option<f32>,
+    /// Reset the integral term of the PID controller
+    #[cbor(key = 5)]
+    pub reset_integral: Option<bool>,
+}
+
+impl HeatingRequest {
+    pub fn id() -> u32 {
+        578653874
+    }
+
+    pub fn name() -> &'static str {
+        "HeatingRequest"
+    }
+
+    pub fn from_bytes(data: &[u8]) -> anyhow::Result<Self> {
+        cbor2::from_reader(data).context("Failed to deserialize from CBOR")
+    }
+
+    pub fn to_bytes(&self) -> anyhow::Result<Vec<u8>> {
+        cbor2::to_vec(self).context("Failed to serialize to CBOR")
+    }
+}
+
+impl Msg for HeatingRequest {
     fn id() -> u32 {
         Self::id()
     }
@@ -515,13 +582,13 @@ pub struct HoverboardEvent {
     pub aux_input2_cmd: Option<i32>,
     /// Total DC Link current A *100
     #[cbor(key = 33)]
-    pub dc_curr: Option<f32>,
+    pub dc_curr: Option<i32>,
     /// Right DC Link current A *100
     #[cbor(key = 34)]
-    pub rdc_curr: Option<f32>,
+    pub rdc_curr: Option<i32>,
     /// Left DC Link current A *100
     #[cbor(key = 35)]
-    pub ldc_curr: Option<f32>,
+    pub ldc_curr: Option<i32>,
     /// Left Motor Command RPM
     #[cbor(key = 36)]
     pub cmdl: Option<i32>,
@@ -548,10 +615,10 @@ pub struct HoverboardEvent {
     pub str_coef: Option<i32>,
     /// Calibrated Battery Voltage *100
     #[cbor(key = 44)]
-    pub batv: Option<f32>,
+    pub batv: Option<i32>,
     /// Calibrated Temperature C *10
     #[cbor(key = 45)]
-    pub temp: Option<f32>,
+    pub temp: Option<i32>,
 }
 
 impl HoverboardEvent {
@@ -616,6 +683,58 @@ impl HoverboardRequest {
 }
 
 impl Msg for HoverboardRequest {
+    fn id() -> u32 {
+        Self::id()
+    }
+
+    fn name() -> &'static str {
+        Self::name()
+    }
+}
+
+
+
+#[derive(Debug, Clone, PartialEq, cbor2::Cbor)]
+pub struct ImuEvent {
+    /// Gyroscope X axis in deg/s
+    #[cbor(key = 0)]
+    pub gyro_x: Option<f32>,
+    /// Gyroscope Y axis in deg/s
+    #[cbor(key = 1)]
+    pub gyro_y: Option<f32>,
+    /// Gyroscope Z axis in deg/s
+    #[cbor(key = 2)]
+    pub gyro_z: Option<f32>,
+    /// Accelerometer X axis in m/s^2
+    #[cbor(key = 3)]
+    pub accel_x: Option<f32>,
+    /// Accelerometer Y axis in m/s^2
+    #[cbor(key = 4)]
+    pub accel_y: Option<f32>,
+    /// Accelerometer Z axis in m/s^2
+    #[cbor(key = 5)]
+    pub accel_z: Option<f32>,
+}
+
+impl ImuEvent {
+    pub fn id() -> u32 {
+        1802836182
+    }
+
+    pub fn name() -> &'static str {
+        "ImuEvent"
+    }
+
+    pub fn from_bytes(data: &[u8]) -> anyhow::Result<Self> {
+        cbor2::from_reader(data).context("Failed to deserialize from CBOR")
+    }
+
+    pub fn to_bytes(&self) -> anyhow::Result<Vec<u8>> {
+        cbor2::to_vec(self).context("Failed to serialize to CBOR")
+    }
+}
+
+impl Msg for ImuEvent {
     fn id() -> u32 {
         Self::id()
     }
@@ -917,11 +1036,11 @@ pub struct SysEvent {
     #[cbor(key = 2)]
     pub free_heap: Option<u64>,
     #[cbor(key = 3)]
-    pub flash: Option<u64>,
+    pub flash_size: Option<u64>,
     #[cbor(key = 4)]
-    pub cpu_board: Option<String>,
+    pub cpu_board_type: Option<String>,
     #[cbor(key = 5)]
-    pub build_date: Option<String>,
+    pub build_date_time: Option<String>,
 }
 
 impl SysEvent {
@@ -1027,6 +1146,49 @@ impl SysRequest {
 }
 
 impl Msg for SysRequest {
+    fn id() -> u32 {
+        Self::id()
+    }
+
+    fn name() -> &'static str {
+        Self::name()
+    }
+}
+
+
+
+#[derive(Debug, Clone, PartialEq, cbor2::Cbor)]
+pub struct UsEvent {
+    /// Distance in meters
+    #[cbor(key = 0)]
+    pub distance: Option<f32>,
+    /// Temperature in Celsius
+    #[cbor(key = 1)]
+    pub temperature: Option<f32>,
+    /// Status code, 0 if no error
+    #[cbor(key = 2)]
+    pub status: Option<i32>,
+}
+
+impl UsEvent {
+    pub fn id() -> u32 {
+        1082063571
+    }
+
+    pub fn name() -> &'static str {
+        "UsEvent"
+    }
+
+    pub fn from_bytes(data: &[u8]) -> anyhow::Result<Self> {
+        cbor2::from_reader(data).context("Failed to deserialize from CBOR")
+    }
+
+    pub fn to_bytes(&self) -> anyhow::Result<Vec<u8>> {
+        cbor2::to_vec(self).context("Failed to serialize to CBOR")
+    }
+}
+
+impl Msg for UsEvent {
     fn id() -> u32 {
         Self::id()
     }

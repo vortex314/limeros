@@ -4,7 +4,6 @@
 #include <strings.h>
 #include <wifi_actor.h>
 #include <esp_mac.h>
-#include <zenoh_actor.h>
 #include <util.h>
 
 #include <string.h>
@@ -79,9 +78,9 @@ void WifiActor::on_start()
   }
 }
 
-void WifiActor::on_message(const ActorMessage &env)
+void WifiActor::on_message(const ActorMessage &msg)
 {
-  env.msg->handle<TimerMsg>([&](const TimerMsg &msg)
+  msg.handle_if<TimerMsg>([&](const TimerMsg &msg)
                             { handle_timer(msg.timer_id); });
 }
 
@@ -155,63 +154,7 @@ void WifiActor::event_handler(void *arg, esp_event_base_t event_base,
   }
 }
 
-/*Res WifiActor::net_init(void)
-{
-  CHECK_ESP(esp_netif_init());
-  CHECK_ESP(esp_event_loop_create_default());
-  esp_netif = esp_netif_create_default_wifi_sta();
-  assert(esp_netif);
-  wifi_init_config_t config = WIFI_INIT_CONFIG_DEFAULT();
-  CHECK_ESP(esp_wifi_init(&config));
 
-  CHECK_ESP(esp_event_handler_instance_register(
-      WIFI_EVENT, ESP_EVENT_ANY_ID, &event_handler, this, &handler_any_id));
-  CHECK_ESP(esp_event_handler_instance_register(
-      IP_EVENT, IP_EVENT_STA_GOT_IP, &event_handler, this, &handler_got_ip));
-  CHECK_ESP(esp_wifi_set_mode(WIFI_MODE_STA));
-  CHECK_ESP(esp_wifi_start());
-  return ResOk;
-}*/
-
-/*Res WifiActor::wifi_set_config(const char* wifi_ssid, const char *wifi_password)
-{
-  wifi_config_t wifi_config;
-  bzero(&wifi_config, sizeof(wifi_config));
-  strcpy((char *)wifi_config.sta.ssid, wifi_ssid);
-  strcpy((char *)wifi_config.sta.password, wifi_password);
-
-  INFO("Setting WiFi configuration SSID '%s' PSWD '%s'", wifi_config.sta.ssid,
-        wifi_config.sta.password);
-  CHECK_ESP(esp_wifi_set_config(WIFI_IF_STA, &wifi_config));
-  return ResOk;
-}*/
-
-static PropInfo wifi_prop_info[] = {
-    {"mac", "S", "MAC address of primary net interface", "R", nullptr, nullptr},
-    {"ip", "S", "IO V4 address", "R", nullptr, nullptr},
-    {"netmask", "S", "MAC address of primary net interface", "R", nullptr, nullptr},
-    {"mac", "S", "MAC address of primary net interface", "R", nullptr, nullptr},
-};
-
-static constexpr int info_size = sizeof(wifi_prop_info) / sizeof(PropInfo);
-
-/*const InfoProp *WifiMsg::info(int idx)
-{
-  if (idx >= sizeof(info_props_wifi) / sizeof(InfoProp))
-    return nullptr;
-  return &info_props_wifi[idx];
-}*/
-
-/*
-
-  static int idx_wifi = 0;
-  const InfoProp *prop_wifi = wifi_msg.info(idx_wifi);
-  if (prop_wifi == NULL) {
-    idx_wifi = 0;
-    prop_wifi = wifi_msg.info(idx_wifi);
-  }
-  publish_topic_value("info/wifi", *(InfoProp *)prop_wifi);
-*/
 
 std::string ip4addr_to_str(esp_ip4_addr_t *ip)
 {

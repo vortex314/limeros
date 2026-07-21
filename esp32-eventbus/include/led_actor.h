@@ -5,6 +5,7 @@
 #include <driver/gpio.h>
 #include <soc/gpio_num.h>
 #include <msgs.h>
+#include <mc_actor.h>
 
 #ifndef GPIO_LED
 #define GPIO_LED GPIO_NUM_2
@@ -14,8 +15,11 @@
 struct LedBlink : public Msg
 {
 public:
-    static uint32_t msg_id() { return FNV("LedBlink"); };
-    static const char* msg_name() { return "LedBlink"; };
+    static const uint32_t MSG_ID = FNV("LedBlink");
+    static constexpr const char *MSG_NAME = "LedBlink";
+
+    virtual uint32_t msg_id() const { return MSG_ID; };
+    virtual const char *msg_name() const { return MSG_NAME; };
     uint32_t interval_msec;
     LedBlink(uint32_t interval_msec) : interval_msec(interval_msec) {};
 };
@@ -23,21 +27,30 @@ public:
 struct LedOff : public Msg
 {
 public:
-    static uint32_t msg_id() { return FNV("LedOff"); };
-    static const char* msg_name() { return "LedOff"; };
+    static const uint32_t MSG_ID = FNV("LedOff");
+    static constexpr const char *MSG_NAME = "LedOff";
+
+    virtual uint32_t msg_id() const { return MSG_ID; };
+    virtual const char *msg_name() const { return MSG_NAME; };
 };
 
 struct LedOn : public Msg
 {
 public:
-    static uint32_t msg_id() { return FNV("LedOn"); };
-    static const char* msg_name() { return "LedOn"; };
+    static const uint32_t MSG_ID = FNV("LedOn");
+    static constexpr const char *MSG_NAME = "LedOn";
+
+    virtual uint32_t msg_id() const { return MSG_ID; };
+    virtual const char *msg_name() const { return MSG_NAME; };
 };
 struct LedPulse : public Msg
 {
 public:
-    static uint32_t msg_id() { return FNV("LedPulse"); };
-    static const char* msg_name() { return "LedPulse"; };
+    static const uint32_t MSG_ID = FNV("LedPulse");
+    static constexpr const char *MSG_NAME = "LedPulse";
+
+    virtual uint32_t msg_id() const { return MSG_ID; };
+    virtual const char *msg_name() const { return MSG_NAME; };
     uint32_t duration_msec;
     LedPulse(uint32_t duration_msec) : duration_msec(duration_msec) {};
 };

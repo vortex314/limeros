@@ -58,8 +58,11 @@
 class Max31855Read : public Msg
 {
 public:
-    static uint32_t msg_id() { return FNV("Max31855Read"); }
-    static const char *msg_name() { return "Max31855Read"; }
+    static const uint32_t MSG_ID = FNV("Max31855Read");
+    static constexpr const char *MSG_NAME = "Max31855Read";
+
+  virtual uint32_t msg_id() const { return MSG_ID; };
+  virtual const char *msg_name() const { return MSG_NAME; };
 };
 
 

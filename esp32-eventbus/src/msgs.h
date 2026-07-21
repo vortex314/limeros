@@ -16,7 +16,7 @@
 #define cbor_check(X) { \
     CborError err = X; \
     if (err != CborNoError) { \
-        WARN("failed cbor : %s",#X); \
+        WARN("failed cbor : %s : %d",#X, err); \
          return EINVAL; \
     }   \
     }
@@ -28,8 +28,12 @@
 
 class BrokerSubscribeRequest : public Msg {
 public:
-    static uint32_t msg_id() { return FNV("BrokerSubscribeRequest"); }
-    static const char* msg_name() { return "BrokerSubscribeRequest"; }
+
+    static const uint32_t MSG_ID = FNV("BrokerSubscribeRequest");
+    static constexpr const char *MSG_NAME ="BrokerSubscribeRequest";
+
+    virtual uint32_t msg_id() const { return MSG_ID; };
+    virtual const char *msg_name() const { return MSG_NAME; };
 
     typedef enum FieldId {
         SRC = 0,
@@ -40,32 +44,36 @@ public:
 
     /// Serialize this message into a CBOR map keyed by field id.
     /// Writes into the parent encoder as a single map item.
-    int encode(Bytes& buffer)  {
+    int encode(Buffer& buffer) const {
+        buffer.clear();
         CborEncoder encoder;
         cbor_encoder_init(&encoder,buffer.data(),buffer.capacity(),0);
         // Count how many optional fields are set.
         uint32_t fieldCount = 0;
-        src.for_each([&](const auto&) { fieldCount++; });
-        msg_type.for_each([&](const auto&) { fieldCount++; });
+        if (src.is_some()) { fieldCount++; }
+        if (msg_type.is_some()) { fieldCount++; }
 
         CborEncoder mapEncoder;
         cbor_check(cbor_encoder_create_map(&encoder, &mapEncoder, fieldCount));
-        src.for_each([&](const auto& value) {
+        if ( src) {
+            const auto& value = *src;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::SRC));
             cbor_check(cbor_encode_uint(&mapEncoder, value));
-        });
-        msg_type.for_each([&](const auto& value) {
+        };
+        if ( msg_type) {
+            const auto& value = *msg_type;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::MSG_TYPE));
             cbor_check(cbor_encode_uint(&mapEncoder, value));
-        });
+        };
 
          cbor_check(cbor_encoder_close_container(&encoder, &mapEncoder));
+        buffer.resize(cbor_encoder_get_buffer_size(&encoder, buffer.data()));
          return 0;
     }
 
     /// Deserialize a BrokerSubscribeRequest from a CBOR map value.
     /// `it` must point to the map; after decoding it is advanced past the map.
-     int decode(const Bytes& buffer) {
+     int decode(const Buffer& buffer) {
         CborParser parser;
         CborValue it;
         cbor_check(cbor_parser_init(buffer.data(), buffer.size(), 0, &parser, &it));
@@ -132,8 +140,12 @@ public:
 
 class CompassEvent : public Msg {
 public:
-    static uint32_t msg_id() { return FNV("CompassEvent"); }
-    static const char* msg_name() { return "CompassEvent"; }
+
+    static const uint32_t MSG_ID = FNV("CompassEvent");
+    static constexpr const char *MSG_NAME ="CompassEvent";
+
+    virtual uint32_t msg_id() const { return MSG_ID; };
+    virtual const char *msg_name() const { return MSG_NAME; };
 
     typedef enum FieldId {
         HEADING = 0,
@@ -158,67 +170,78 @@ public:
 
     /// Serialize this message into a CBOR map keyed by field id.
     /// Writes into the parent encoder as a single map item.
-    int encode(Bytes& buffer)  {
+    int encode(Buffer& buffer) const {
+        buffer.clear();
         CborEncoder encoder;
         cbor_encoder_init(&encoder,buffer.data(),buffer.capacity(),0);
         // Count how many optional fields are set.
         uint32_t fieldCount = 0;
-        heading.for_each([&](const auto&) { fieldCount++; });
-        pitch.for_each([&](const auto&) { fieldCount++; });
-        roll.for_each([&](const auto&) { fieldCount++; });
-        mag_x.for_each([&](const auto&) { fieldCount++; });
-        mag_y.for_each([&](const auto&) { fieldCount++; });
-        mag_z.for_each([&](const auto&) { fieldCount++; });
-        accel_x.for_each([&](const auto&) { fieldCount++; });
-        accel_y.for_each([&](const auto&) { fieldCount++; });
-        accel_z.for_each([&](const auto&) { fieldCount++; });
+        if (heading.is_some()) { fieldCount++; }
+        if (pitch.is_some()) { fieldCount++; }
+        if (roll.is_some()) { fieldCount++; }
+        if (mag_x.is_some()) { fieldCount++; }
+        if (mag_y.is_some()) { fieldCount++; }
+        if (mag_z.is_some()) { fieldCount++; }
+        if (accel_x.is_some()) { fieldCount++; }
+        if (accel_y.is_some()) { fieldCount++; }
+        if (accel_z.is_some()) { fieldCount++; }
 
         CborEncoder mapEncoder;
         cbor_check(cbor_encoder_create_map(&encoder, &mapEncoder, fieldCount));
-        heading.for_each([&](const auto& value) {
+        if ( heading) {
+            const auto& value = *heading;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::HEADING));
             cbor_check(cbor_encode_float(&mapEncoder, value));
-        });
-        pitch.for_each([&](const auto& value) {
+        };
+        if ( pitch) {
+            const auto& value = *pitch;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::PITCH));
             cbor_check(cbor_encode_float(&mapEncoder, value));
-        });
-        roll.for_each([&](const auto& value) {
+        };
+        if ( roll) {
+            const auto& value = *roll;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::ROLL));
             cbor_check(cbor_encode_float(&mapEncoder, value));
-        });
-        mag_x.for_each([&](const auto& value) {
+        };
+        if ( mag_x) {
+            const auto& value = *mag_x;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::MAG_X));
             cbor_check(cbor_encode_float(&mapEncoder, value));
-        });
-        mag_y.for_each([&](const auto& value) {
+        };
+        if ( mag_y) {
+            const auto& value = *mag_y;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::MAG_Y));
             cbor_check(cbor_encode_float(&mapEncoder, value));
-        });
-        mag_z.for_each([&](const auto& value) {
+        };
+        if ( mag_z) {
+            const auto& value = *mag_z;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::MAG_Z));
             cbor_check(cbor_encode_float(&mapEncoder, value));
-        });
-        accel_x.for_each([&](const auto& value) {
+        };
+        if ( accel_x) {
+            const auto& value = *accel_x;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::ACCEL_X));
             cbor_check(cbor_encode_float(&mapEncoder, value));
-        });
-        accel_y.for_each([&](const auto& value) {
+        };
+        if ( accel_y) {
+            const auto& value = *accel_y;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::ACCEL_Y));
             cbor_check(cbor_encode_float(&mapEncoder, value));
-        });
-        accel_z.for_each([&](const auto& value) {
+        };
+        if ( accel_z) {
+            const auto& value = *accel_z;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::ACCEL_Z));
             cbor_check(cbor_encode_float(&mapEncoder, value));
-        });
+        };
 
          cbor_check(cbor_encoder_close_container(&encoder, &mapEncoder));
+        buffer.resize(cbor_encoder_get_buffer_size(&encoder, buffer.data()));
          return 0;
     }
 
     /// Deserialize a CompassEvent from a CBOR map value.
     /// `it` must point to the map; after decoding it is advanced past the map.
-     int decode(const Bytes& buffer) {
+     int decode(const Buffer& buffer) {
         CborParser parser;
         CborValue it;
         cbor_check(cbor_parser_init(buffer.data(), buffer.size(), 0, &parser, &it));
@@ -398,8 +421,12 @@ public:
 
 class DeviceAliveEvent : public Msg {
 public:
-    static uint32_t msg_id() { return FNV("DeviceAliveEvent"); }
-    static const char* msg_name() { return "DeviceAliveEvent"; }
+
+    static const uint32_t MSG_ID = FNV("DeviceAliveEvent");
+    static constexpr const char *MSG_NAME ="DeviceAliveEvent";
+
+    virtual uint32_t msg_id() const { return MSG_ID; };
+    virtual const char *msg_name() const { return MSG_NAME; };
 
     typedef enum FieldId {
         DEVICE = 0,
@@ -412,37 +439,42 @@ public:
 
     /// Serialize this message into a CBOR map keyed by field id.
     /// Writes into the parent encoder as a single map item.
-    int encode(Bytes& buffer)  {
+    int encode(Buffer& buffer) const {
+        buffer.clear();
         CborEncoder encoder;
         cbor_encoder_init(&encoder,buffer.data(),buffer.capacity(),0);
         // Count how many optional fields are set.
         uint32_t fieldCount = 0;
-        device.for_each([&](const auto&) { fieldCount++; });
-        endpoint.for_each([&](const auto&) { fieldCount++; });
-        timestamp.for_each([&](const auto&) { fieldCount++; });
+        if (device.is_some()) { fieldCount++; }
+        if (endpoint.is_some()) { fieldCount++; }
+        if (timestamp.is_some()) { fieldCount++; }
 
         CborEncoder mapEncoder;
         cbor_check(cbor_encoder_create_map(&encoder, &mapEncoder, fieldCount));
-        device.for_each([&](const auto& value) {
+        if ( device) {
+            const auto& value = *device;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::DEVICE));
             cbor_check(cbor_encode_text_string(&mapEncoder, value.c_str(), value.length()));
-        });
-        endpoint.for_each([&](const auto& value) {
+        };
+        if ( endpoint) {
+            const auto& value = *endpoint;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::ENDPOINT));
             cbor_check(cbor_encode_text_string(&mapEncoder, value.c_str(), value.length()));
-        });
-        timestamp.for_each([&](const auto& value) {
+        };
+        if ( timestamp) {
+            const auto& value = *timestamp;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::TIMESTAMP));
             cbor_check(cbor_encode_uint(&mapEncoder, value));
-        });
+        };
 
          cbor_check(cbor_encoder_close_container(&encoder, &mapEncoder));
+        buffer.resize(cbor_encoder_get_buffer_size(&encoder, buffer.data()));
          return 0;
     }
 
     /// Deserialize a DeviceAliveEvent from a CBOR map value.
     /// `it` must point to the map; after decoding it is advanced past the map.
-     int decode(const Bytes& buffer) {
+     int decode(const Buffer& buffer) {
         CborParser parser;
         CborValue it;
         cbor_check(cbor_parser_init(buffer.data(), buffer.size(), 0, &parser, &it));
@@ -518,8 +550,12 @@ public:
 
 class EndpointAnnounce : public Msg {
 public:
-    static uint32_t msg_id() { return FNV("EndpointAnnounce"); }
-    static const char* msg_name() { return "EndpointAnnounce"; }
+
+    static const uint32_t MSG_ID = FNV("EndpointAnnounce");
+    static constexpr const char *MSG_NAME ="EndpointAnnounce";
+
+    virtual uint32_t msg_id() const { return MSG_ID; };
+    virtual const char *msg_name() const { return MSG_NAME; };
 
     typedef enum FieldId {
         ID = 0,
@@ -540,34 +576,39 @@ public:
 
     /// Serialize this message into a CBOR map keyed by field id.
     /// Writes into the parent encoder as a single map item.
-    int encode(Bytes& buffer)  {
+    int encode(Buffer& buffer) const {
+        buffer.clear();
         CborEncoder encoder;
         cbor_encoder_init(&encoder,buffer.data(),buffer.capacity(),0);
         // Count how many optional fields are set.
         uint32_t fieldCount = 0;
-        id.for_each([&](const auto&) { fieldCount++; });
-        name.for_each([&](const auto&) { fieldCount++; });
-        description.for_each([&](const auto&) { fieldCount++; });
-        services.for_each([&](const auto&) { fieldCount++; });
-        events.for_each([&](const auto&) { fieldCount++; });
-        replies.for_each([&](const auto&) { fieldCount++; });
-        subscribes.for_each([&](const auto&) { fieldCount++; });
+        if (id.is_some()) { fieldCount++; }
+        if (name.is_some()) { fieldCount++; }
+        if (description.is_some()) { fieldCount++; }
+        if (services.is_some()) { fieldCount++; }
+        if (events.is_some()) { fieldCount++; }
+        if (replies.is_some()) { fieldCount++; }
+        if (subscribes.is_some()) { fieldCount++; }
 
         CborEncoder mapEncoder;
         cbor_check(cbor_encoder_create_map(&encoder, &mapEncoder, fieldCount));
-        id.for_each([&](const auto& value) {
+        if ( id) {
+            const auto& value = *id;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::ID));
             cbor_check(cbor_encode_uint(&mapEncoder, value));
-        });
-        name.for_each([&](const auto& value) {
+        };
+        if ( name) {
+            const auto& value = *name;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::NAME));
             cbor_check(cbor_encode_text_string(&mapEncoder, value.c_str(), value.length()));
-        });
-        description.for_each([&](const auto& value) {
+        };
+        if ( description) {
+            const auto& value = *description;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::DESCRIPTION));
             cbor_check(cbor_encode_text_string(&mapEncoder, value.c_str(), value.length()));
-        });
-        services.for_each([&](const auto& value) {
+        };
+        if ( services) {
+            const auto& value = *services;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::SERVICES));
             {
             CborEncoder arrEncoder;
@@ -577,8 +618,9 @@ public:
             }
             cbor_check(cbor_encoder_close_container(&mapEncoder, &arrEncoder));
         }
-        });
-        events.for_each([&](const auto& value) {
+        };
+        if ( events) {
+            const auto& value = *events;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::EVENTS));
             {
             CborEncoder arrEncoder;
@@ -588,8 +630,9 @@ public:
             }
             cbor_check(cbor_encoder_close_container(&mapEncoder, &arrEncoder));
         }
-        });
-        replies.for_each([&](const auto& value) {
+        };
+        if ( replies) {
+            const auto& value = *replies;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::REPLIES));
             {
             CborEncoder arrEncoder;
@@ -599,8 +642,9 @@ public:
             }
             cbor_check(cbor_encoder_close_container(&mapEncoder, &arrEncoder));
         }
-        });
-        subscribes.for_each([&](const auto& value) {
+        };
+        if ( subscribes) {
+            const auto& value = *subscribes;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::SUBSCRIBES));
             {
             CborEncoder arrEncoder;
@@ -610,15 +654,16 @@ public:
             }
             cbor_check(cbor_encoder_close_container(&mapEncoder, &arrEncoder));
         }
-        });
+        };
 
          cbor_check(cbor_encoder_close_container(&encoder, &mapEncoder));
+        buffer.resize(cbor_encoder_get_buffer_size(&encoder, buffer.data()));
          return 0;
     }
 
     /// Deserialize a EndpointAnnounce from a CBOR map value.
     /// `it` must point to the map; after decoding it is advanced past the map.
-     int decode(const Bytes& buffer) {
+     int decode(const Buffer& buffer) {
         CborParser parser;
         CborValue it;
         cbor_check(cbor_parser_init(buffer.data(), buffer.size(), 0, &parser, &it));
@@ -778,8 +823,12 @@ public:
 
 class EndpointAnnounceReply : public Msg {
 public:
-    static uint32_t msg_id() { return FNV("EndpointAnnounceReply"); }
-    static const char* msg_name() { return "EndpointAnnounceReply"; }
+
+    static const uint32_t MSG_ID = FNV("EndpointAnnounceReply");
+    static constexpr const char *MSG_NAME ="EndpointAnnounceReply";
+
+    virtual uint32_t msg_id() const { return MSG_ID; };
+    virtual const char *msg_name() const { return MSG_NAME; };
 
     typedef enum FieldId {
         UTC = 0,
@@ -788,27 +837,30 @@ public:
 
     /// Serialize this message into a CBOR map keyed by field id.
     /// Writes into the parent encoder as a single map item.
-    int encode(Bytes& buffer)  {
+    int encode(Buffer& buffer) const {
+        buffer.clear();
         CborEncoder encoder;
         cbor_encoder_init(&encoder,buffer.data(),buffer.capacity(),0);
         // Count how many optional fields are set.
         uint32_t fieldCount = 0;
-        utc.for_each([&](const auto&) { fieldCount++; });
+        if (utc.is_some()) { fieldCount++; }
 
         CborEncoder mapEncoder;
         cbor_check(cbor_encoder_create_map(&encoder, &mapEncoder, fieldCount));
-        utc.for_each([&](const auto& value) {
+        if ( utc) {
+            const auto& value = *utc;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::UTC));
             cbor_check(cbor_encode_uint(&mapEncoder, value));
-        });
+        };
 
          cbor_check(cbor_encoder_close_container(&encoder, &mapEncoder));
+        buffer.resize(cbor_encoder_get_buffer_size(&encoder, buffer.data()));
          return 0;
     }
 
     /// Deserialize a EndpointAnnounceReply from a CBOR map value.
     /// `it` must point to the map; after decoding it is advanced past the map.
-     int decode(const Bytes& buffer) {
+     int decode(const Buffer& buffer) {
         CborParser parser;
         CborValue it;
         cbor_check(cbor_parser_init(buffer.data(), buffer.size(), 0, &parser, &it));
@@ -864,8 +916,12 @@ public:
 
 class Envelope : public Msg {
 public:
-    static uint32_t msg_id() { return FNV("Envelope"); }
-    static const char* msg_name() { return "Envelope"; }
+
+    static const uint32_t MSG_ID = FNV("Envelope");
+    static constexpr const char *MSG_NAME ="Envelope";
+
+    virtual uint32_t msg_id() const { return MSG_ID; };
+    virtual const char *msg_name() const { return MSG_NAME; };
 
     typedef enum FieldId {
         SRC = 0,
@@ -884,52 +940,60 @@ public:
 
     /// Serialize this message into a CBOR map keyed by field id.
     /// Writes into the parent encoder as a single map item.
-    int encode(Bytes& buffer)  {
+    int encode(Buffer& buffer) const {
+        buffer.clear();
         CborEncoder encoder;
         cbor_encoder_init(&encoder,buffer.data(),buffer.capacity(),0);
         // Count how many optional fields are set.
         uint32_t fieldCount = 0;
-        src.for_each([&](const auto&) { fieldCount++; });
-        dst.for_each([&](const auto&) { fieldCount++; });
-        msg_type.for_each([&](const auto&) { fieldCount++; });
-        request_id.for_each([&](const auto&) { fieldCount++; });
-        instance_id.for_each([&](const auto&) { fieldCount++; });
-        payload.for_each([&](const auto&) { fieldCount++; });
+        if (src.is_some()) { fieldCount++; }
+        if (dst.is_some()) { fieldCount++; }
+        if (msg_type.is_some()) { fieldCount++; }
+        if (request_id.is_some()) { fieldCount++; }
+        if (instance_id.is_some()) { fieldCount++; }
+        if (payload.is_some()) { fieldCount++; }
 
         CborEncoder mapEncoder;
         cbor_check(cbor_encoder_create_map(&encoder, &mapEncoder, fieldCount));
-        src.for_each([&](const auto& value) {
+        if ( src) {
+            const auto& value = *src;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::SRC));
             cbor_check(cbor_encode_uint(&mapEncoder, value));
-        });
-        dst.for_each([&](const auto& value) {
+        };
+        if ( dst) {
+            const auto& value = *dst;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::DST));
             cbor_check(cbor_encode_uint(&mapEncoder, value));
-        });
-        msg_type.for_each([&](const auto& value) {
+        };
+        if ( msg_type) {
+            const auto& value = *msg_type;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::MSG_TYPE));
             cbor_check(cbor_encode_uint(&mapEncoder, value));
-        });
-        request_id.for_each([&](const auto& value) {
+        };
+        if ( request_id) {
+            const auto& value = *request_id;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::REQUEST_ID));
             cbor_check(cbor_encode_uint(&mapEncoder, value));
-        });
-        instance_id.for_each([&](const auto& value) {
+        };
+        if ( instance_id) {
+            const auto& value = *instance_id;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::INSTANCE_ID));
             cbor_check(cbor_encode_uint(&mapEncoder, value));
-        });
-        payload.for_each([&](const auto& value) {
+        };
+        if ( payload) {
+            const auto& value = *payload;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::PAYLOAD));
             cbor_check(cbor_encode_byte_string(&mapEncoder, value.data(), value.size()));
-        });
+        };
 
          cbor_check(cbor_encoder_close_container(&encoder, &mapEncoder));
+        buffer.resize(cbor_encoder_get_buffer_size(&encoder, buffer.data()));
          return 0;
     }
 
     /// Deserialize a Envelope from a CBOR map value.
     /// `it` must point to the map; after decoding it is advanced past the map.
-     int decode(const Bytes& buffer) {
+     int decode(const Buffer& buffer) {
         CborParser parser;
         CborValue it;
         cbor_check(cbor_parser_init(buffer.data(), buffer.size(), 0, &parser, &it));
@@ -1038,8 +1102,12 @@ public:
 
 class GenericReply : public Msg {
 public:
-    static uint32_t msg_id() { return FNV("GenericReply"); }
-    static const char* msg_name() { return "GenericReply"; }
+
+    static const uint32_t MSG_ID = FNV("GenericReply");
+    static constexpr const char *MSG_NAME ="GenericReply";
+
+    virtual uint32_t msg_id() const { return MSG_ID; };
+    virtual const char *msg_name() const { return MSG_NAME; };
 
     typedef enum FieldId {
         REQ_ID = 0,
@@ -1054,42 +1122,48 @@ public:
 
     /// Serialize this message into a CBOR map keyed by field id.
     /// Writes into the parent encoder as a single map item.
-    int encode(Bytes& buffer)  {
+    int encode(Buffer& buffer) const {
+        buffer.clear();
         CborEncoder encoder;
         cbor_encoder_init(&encoder,buffer.data(),buffer.capacity(),0);
         // Count how many optional fields are set.
         uint32_t fieldCount = 0;
-        req_id.for_each([&](const auto&) { fieldCount++; });
-        error_code.for_each([&](const auto&) { fieldCount++; });
-        message.for_each([&](const auto&) { fieldCount++; });
-        msg_type.for_each([&](const auto&) { fieldCount++; });
+        if (req_id.is_some()) { fieldCount++; }
+        if (error_code.is_some()) { fieldCount++; }
+        if (message.is_some()) { fieldCount++; }
+        if (msg_type.is_some()) { fieldCount++; }
 
         CborEncoder mapEncoder;
         cbor_check(cbor_encoder_create_map(&encoder, &mapEncoder, fieldCount));
-        req_id.for_each([&](const auto& value) {
+        if ( req_id) {
+            const auto& value = *req_id;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::REQ_ID));
             cbor_check(cbor_encode_uint(&mapEncoder, value));
-        });
-        error_code.for_each([&](const auto& value) {
+        };
+        if ( error_code) {
+            const auto& value = *error_code;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::ERROR_CODE));
             cbor_check(cbor_encode_uint(&mapEncoder, value));
-        });
-        message.for_each([&](const auto& value) {
+        };
+        if ( message) {
+            const auto& value = *message;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::MESSAGE));
             cbor_check(cbor_encode_text_string(&mapEncoder, value.c_str(), value.length()));
-        });
-        msg_type.for_each([&](const auto& value) {
+        };
+        if ( msg_type) {
+            const auto& value = *msg_type;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::MSG_TYPE));
             cbor_check(cbor_encode_uint(&mapEncoder, value));
-        });
+        };
 
          cbor_check(cbor_encoder_close_container(&encoder, &mapEncoder));
+        buffer.resize(cbor_encoder_get_buffer_size(&encoder, buffer.data()));
          return 0;
     }
 
     /// Deserialize a GenericReply from a CBOR map value.
     /// `it` must point to the map; after decoding it is advanced past the map.
-     int decode(const Bytes& buffer) {
+     int decode(const Buffer& buffer) {
         CborParser parser;
         CborValue it;
         cbor_check(cbor_parser_init(buffer.data(), buffer.size(), 0, &parser, &it));
@@ -1177,8 +1251,12 @@ public:
 
 class HeatingEvent : public Msg {
 public:
-    static uint32_t msg_id() { return FNV("HeatingEvent"); }
-    static const char* msg_name() { return "HeatingEvent"; }
+
+    static const uint32_t MSG_ID = FNV("HeatingEvent");
+    static constexpr const char *MSG_NAME ="HeatingEvent";
+
+    virtual uint32_t msg_id() const { return MSG_ID; };
+    virtual const char *msg_name() const { return MSG_NAME; };
 
     typedef enum FieldId {
         TEMPERATURE_C = 0,
@@ -1199,57 +1277,66 @@ public:
 
     /// Serialize this message into a CBOR map keyed by field id.
     /// Writes into the parent encoder as a single map item.
-    int encode(Bytes& buffer)  {
+    int encode(Buffer& buffer) const {
+        buffer.clear();
         CborEncoder encoder;
         cbor_encoder_init(&encoder,buffer.data(),buffer.capacity(),0);
         // Count how many optional fields are set.
         uint32_t fieldCount = 0;
-        temperature_c.for_each([&](const auto&) { fieldCount++; });
-        setpoint_c.for_each([&](const auto&) { fieldCount++; });
-        enabled.for_each([&](const auto&) { fieldCount++; });
-        output_pct.for_each([&](const auto&) { fieldCount++; });
-        heater_on.for_each([&](const auto&) { fieldCount++; });
-        fault.for_each([&](const auto&) { fieldCount++; });
-        timestamp_ms.for_each([&](const auto&) { fieldCount++; });
+        if (temperature_c.is_some()) { fieldCount++; }
+        if (setpoint_c.is_some()) { fieldCount++; }
+        if (enabled.is_some()) { fieldCount++; }
+        if (output_pct.is_some()) { fieldCount++; }
+        if (heater_on.is_some()) { fieldCount++; }
+        if (fault.is_some()) { fieldCount++; }
+        if (timestamp_ms.is_some()) { fieldCount++; }
 
         CborEncoder mapEncoder;
         cbor_check(cbor_encoder_create_map(&encoder, &mapEncoder, fieldCount));
-        temperature_c.for_each([&](const auto& value) {
+        if ( temperature_c) {
+            const auto& value = *temperature_c;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::TEMPERATURE_C));
             cbor_check(cbor_encode_float(&mapEncoder, value));
-        });
-        setpoint_c.for_each([&](const auto& value) {
+        };
+        if ( setpoint_c) {
+            const auto& value = *setpoint_c;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::SETPOINT_C));
             cbor_check(cbor_encode_float(&mapEncoder, value));
-        });
-        enabled.for_each([&](const auto& value) {
+        };
+        if ( enabled) {
+            const auto& value = *enabled;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::ENABLED));
             cbor_check(cbor_encode_boolean(&mapEncoder, value));
-        });
-        output_pct.for_each([&](const auto& value) {
+        };
+        if ( output_pct) {
+            const auto& value = *output_pct;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::OUTPUT_PCT));
             cbor_check(cbor_encode_float(&mapEncoder, value));
-        });
-        heater_on.for_each([&](const auto& value) {
+        };
+        if ( heater_on) {
+            const auto& value = *heater_on;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::HEATER_ON));
             cbor_check(cbor_encode_boolean(&mapEncoder, value));
-        });
-        fault.for_each([&](const auto& value) {
+        };
+        if ( fault) {
+            const auto& value = *fault;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::FAULT));
             cbor_check(cbor_encode_boolean(&mapEncoder, value));
-        });
-        timestamp_ms.for_each([&](const auto& value) {
+        };
+        if ( timestamp_ms) {
+            const auto& value = *timestamp_ms;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::TIMESTAMP_MS));
             cbor_check(cbor_encode_uint(&mapEncoder, value));
-        });
+        };
 
          cbor_check(cbor_encoder_close_container(&encoder, &mapEncoder));
+        buffer.resize(cbor_encoder_get_buffer_size(&encoder, buffer.data()));
          return 0;
     }
 
     /// Deserialize a HeatingEvent from a CBOR map value.
     /// `it` must point to the map; after decoding it is advanced past the map.
-     int decode(const Bytes& buffer) {
+     int decode(const Buffer& buffer) {
         CborParser parser;
         CborValue it;
         cbor_check(cbor_parser_init(buffer.data(), buffer.size(), 0, &parser, &it));
@@ -1371,8 +1458,12 @@ public:
 
 class HeatingRequest : public Msg {
 public:
-    static uint32_t msg_id() { return FNV("HeatingRequest"); }
-    static const char* msg_name() { return "HeatingRequest"; }
+
+    static const uint32_t MSG_ID = FNV("HeatingRequest");
+    static constexpr const char *MSG_NAME ="HeatingRequest";
+
+    virtual uint32_t msg_id() const { return MSG_ID; };
+    virtual const char *msg_name() const { return MSG_NAME; };
 
     typedef enum FieldId {
         SETPOINT_C = 0,
@@ -1391,52 +1482,60 @@ public:
 
     /// Serialize this message into a CBOR map keyed by field id.
     /// Writes into the parent encoder as a single map item.
-    int encode(Bytes& buffer)  {
+    int encode(Buffer& buffer) const {
+        buffer.clear();
         CborEncoder encoder;
         cbor_encoder_init(&encoder,buffer.data(),buffer.capacity(),0);
         // Count how many optional fields are set.
         uint32_t fieldCount = 0;
-        setpoint_c.for_each([&](const auto&) { fieldCount++; });
-        enabled.for_each([&](const auto&) { fieldCount++; });
-        kp.for_each([&](const auto&) { fieldCount++; });
-        ki.for_each([&](const auto&) { fieldCount++; });
-        kd.for_each([&](const auto&) { fieldCount++; });
-        reset_integral.for_each([&](const auto&) { fieldCount++; });
+        if (setpoint_c.is_some()) { fieldCount++; }
+        if (enabled.is_some()) { fieldCount++; }
+        if (kp.is_some()) { fieldCount++; }
+        if (ki.is_some()) { fieldCount++; }
+        if (kd.is_some()) { fieldCount++; }
+        if (reset_integral.is_some()) { fieldCount++; }
 
         CborEncoder mapEncoder;
         cbor_check(cbor_encoder_create_map(&encoder, &mapEncoder, fieldCount));
-        setpoint_c.for_each([&](const auto& value) {
+        if ( setpoint_c) {
+            const auto& value = *setpoint_c;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::SETPOINT_C));
             cbor_check(cbor_encode_float(&mapEncoder, value));
-        });
-        enabled.for_each([&](const auto& value) {
+        };
+        if ( enabled) {
+            const auto& value = *enabled;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::ENABLED));
             cbor_check(cbor_encode_boolean(&mapEncoder, value));
-        });
-        kp.for_each([&](const auto& value) {
+        };
+        if ( kp) {
+            const auto& value = *kp;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::KP));
             cbor_check(cbor_encode_float(&mapEncoder, value));
-        });
-        ki.for_each([&](const auto& value) {
+        };
+        if ( ki) {
+            const auto& value = *ki;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::KI));
             cbor_check(cbor_encode_float(&mapEncoder, value));
-        });
-        kd.for_each([&](const auto& value) {
+        };
+        if ( kd) {
+            const auto& value = *kd;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::KD));
             cbor_check(cbor_encode_float(&mapEncoder, value));
-        });
-        reset_integral.for_each([&](const auto& value) {
+        };
+        if ( reset_integral) {
+            const auto& value = *reset_integral;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::RESET_INTEGRAL));
             cbor_check(cbor_encode_boolean(&mapEncoder, value));
-        });
+        };
 
          cbor_check(cbor_encoder_close_container(&encoder, &mapEncoder));
+        buffer.resize(cbor_encoder_get_buffer_size(&encoder, buffer.data()));
          return 0;
     }
 
     /// Deserialize a HeatingRequest from a CBOR map value.
     /// `it` must point to the map; after decoding it is advanced past the map.
-     int decode(const Bytes& buffer) {
+     int decode(const Buffer& buffer) {
         CborParser parser;
         CborValue it;
         cbor_check(cbor_parser_init(buffer.data(), buffer.size(), 0, &parser, &it));
@@ -1555,8 +1654,12 @@ public:
 
 class HoverboardEvent : public Msg {
 public:
-    static uint32_t msg_id() { return FNV("HoverboardEvent"); }
-    static const char* msg_name() { return "HoverboardEvent"; }
+
+    static const uint32_t MSG_ID = FNV("HoverboardEvent");
+    static constexpr const char *MSG_NAME ="HoverboardEvent";
+
+    virtual uint32_t msg_id() const { return MSG_ID; };
+    virtual const char *msg_name() const { return MSG_NAME; };
 
     typedef enum FieldId {
         CTRL_MOD = 0,
@@ -1655,252 +1758,300 @@ public:
 
     /// Serialize this message into a CBOR map keyed by field id.
     /// Writes into the parent encoder as a single map item.
-    int encode(Bytes& buffer)  {
+    int encode(Buffer& buffer) const {
+        buffer.clear();
         CborEncoder encoder;
         cbor_encoder_init(&encoder,buffer.data(),buffer.capacity(),0);
         // Count how many optional fields are set.
         uint32_t fieldCount = 0;
-        ctrl_mod.for_each([&](const auto&) { fieldCount++; });
-        ctrl_typ.for_each([&](const auto&) { fieldCount++; });
-        cur_mot_max.for_each([&](const auto&) { fieldCount++; });
-        rpm_mot_max.for_each([&](const auto&) { fieldCount++; });
-        fi_weak_ena.for_each([&](const auto&) { fieldCount++; });
-        fi_weak_hi.for_each([&](const auto&) { fieldCount++; });
-        fi_weak_lo.for_each([&](const auto&) { fieldCount++; });
-        fi_weak_max.for_each([&](const auto&) { fieldCount++; });
-        phase_adv_max_deg.for_each([&](const auto&) { fieldCount++; });
-        input1_raw.for_each([&](const auto&) { fieldCount++; });
-        input1_typ.for_each([&](const auto&) { fieldCount++; });
-        input1_min.for_each([&](const auto&) { fieldCount++; });
-        input1_mid.for_each([&](const auto&) { fieldCount++; });
-        input1_max.for_each([&](const auto&) { fieldCount++; });
-        input1_cmd.for_each([&](const auto&) { fieldCount++; });
-        input2_raw.for_each([&](const auto&) { fieldCount++; });
-        input2_typ.for_each([&](const auto&) { fieldCount++; });
-        input2_min.for_each([&](const auto&) { fieldCount++; });
-        input2_mid.for_each([&](const auto&) { fieldCount++; });
-        input2_max.for_each([&](const auto&) { fieldCount++; });
-        input2_cmd.for_each([&](const auto&) { fieldCount++; });
-        aux_input1_raw.for_each([&](const auto&) { fieldCount++; });
-        aux_input1_typ.for_each([&](const auto&) { fieldCount++; });
-        aux_input1_min.for_each([&](const auto&) { fieldCount++; });
-        aux_input1_mid.for_each([&](const auto&) { fieldCount++; });
-        aux_input1_max.for_each([&](const auto&) { fieldCount++; });
-        aux_input1_cmd.for_each([&](const auto&) { fieldCount++; });
-        aux_input2_raw.for_each([&](const auto&) { fieldCount++; });
-        aux_input2_typ.for_each([&](const auto&) { fieldCount++; });
-        aux_input2_min.for_each([&](const auto&) { fieldCount++; });
-        aux_input2_mid.for_each([&](const auto&) { fieldCount++; });
-        aux_input2_max.for_each([&](const auto&) { fieldCount++; });
-        aux_input2_cmd.for_each([&](const auto&) { fieldCount++; });
-        dc_curr.for_each([&](const auto&) { fieldCount++; });
-        rdc_curr.for_each([&](const auto&) { fieldCount++; });
-        ldc_curr.for_each([&](const auto&) { fieldCount++; });
-        cmdl.for_each([&](const auto&) { fieldCount++; });
-        cmdr.for_each([&](const auto&) { fieldCount++; });
-        spd_avg.for_each([&](const auto&) { fieldCount++; });
-        spdl.for_each([&](const auto&) { fieldCount++; });
-        spdr.for_each([&](const auto&) { fieldCount++; });
-        filter_rate.for_each([&](const auto&) { fieldCount++; });
-        spd_coef.for_each([&](const auto&) { fieldCount++; });
-        str_coef.for_each([&](const auto&) { fieldCount++; });
-        batv.for_each([&](const auto&) { fieldCount++; });
-        temp.for_each([&](const auto&) { fieldCount++; });
+        if (ctrl_mod.is_some()) { fieldCount++; }
+        if (ctrl_typ.is_some()) { fieldCount++; }
+        if (cur_mot_max.is_some()) { fieldCount++; }
+        if (rpm_mot_max.is_some()) { fieldCount++; }
+        if (fi_weak_ena.is_some()) { fieldCount++; }
+        if (fi_weak_hi.is_some()) { fieldCount++; }
+        if (fi_weak_lo.is_some()) { fieldCount++; }
+        if (fi_weak_max.is_some()) { fieldCount++; }
+        if (phase_adv_max_deg.is_some()) { fieldCount++; }
+        if (input1_raw.is_some()) { fieldCount++; }
+        if (input1_typ.is_some()) { fieldCount++; }
+        if (input1_min.is_some()) { fieldCount++; }
+        if (input1_mid.is_some()) { fieldCount++; }
+        if (input1_max.is_some()) { fieldCount++; }
+        if (input1_cmd.is_some()) { fieldCount++; }
+        if (input2_raw.is_some()) { fieldCount++; }
+        if (input2_typ.is_some()) { fieldCount++; }
+        if (input2_min.is_some()) { fieldCount++; }
+        if (input2_mid.is_some()) { fieldCount++; }
+        if (input2_max.is_some()) { fieldCount++; }
+        if (input2_cmd.is_some()) { fieldCount++; }
+        if (aux_input1_raw.is_some()) { fieldCount++; }
+        if (aux_input1_typ.is_some()) { fieldCount++; }
+        if (aux_input1_min.is_some()) { fieldCount++; }
+        if (aux_input1_mid.is_some()) { fieldCount++; }
+        if (aux_input1_max.is_some()) { fieldCount++; }
+        if (aux_input1_cmd.is_some()) { fieldCount++; }
+        if (aux_input2_raw.is_some()) { fieldCount++; }
+        if (aux_input2_typ.is_some()) { fieldCount++; }
+        if (aux_input2_min.is_some()) { fieldCount++; }
+        if (aux_input2_mid.is_some()) { fieldCount++; }
+        if (aux_input2_max.is_some()) { fieldCount++; }
+        if (aux_input2_cmd.is_some()) { fieldCount++; }
+        if (dc_curr.is_some()) { fieldCount++; }
+        if (rdc_curr.is_some()) { fieldCount++; }
+        if (ldc_curr.is_some()) { fieldCount++; }
+        if (cmdl.is_some()) { fieldCount++; }
+        if (cmdr.is_some()) { fieldCount++; }
+        if (spd_avg.is_some()) { fieldCount++; }
+        if (spdl.is_some()) { fieldCount++; }
+        if (spdr.is_some()) { fieldCount++; }
+        if (filter_rate.is_some()) { fieldCount++; }
+        if (spd_coef.is_some()) { fieldCount++; }
+        if (str_coef.is_some()) { fieldCount++; }
+        if (batv.is_some()) { fieldCount++; }
+        if (temp.is_some()) { fieldCount++; }
 
         CborEncoder mapEncoder;
         cbor_check(cbor_encoder_create_map(&encoder, &mapEncoder, fieldCount));
-        ctrl_mod.for_each([&](const auto& value) {
+        if ( ctrl_mod) {
+            const auto& value = *ctrl_mod;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::CTRL_MOD));
             cbor_check(cbor_encode_int(&mapEncoder, value));
-        });
-        ctrl_typ.for_each([&](const auto& value) {
+        };
+        if ( ctrl_typ) {
+            const auto& value = *ctrl_typ;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::CTRL_TYP));
             cbor_check(cbor_encode_int(&mapEncoder, value));
-        });
-        cur_mot_max.for_each([&](const auto& value) {
+        };
+        if ( cur_mot_max) {
+            const auto& value = *cur_mot_max;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::CUR_MOT_MAX));
             cbor_check(cbor_encode_int(&mapEncoder, value));
-        });
-        rpm_mot_max.for_each([&](const auto& value) {
+        };
+        if ( rpm_mot_max) {
+            const auto& value = *rpm_mot_max;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::RPM_MOT_MAX));
             cbor_check(cbor_encode_int(&mapEncoder, value));
-        });
-        fi_weak_ena.for_each([&](const auto& value) {
+        };
+        if ( fi_weak_ena) {
+            const auto& value = *fi_weak_ena;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::FI_WEAK_ENA));
             cbor_check(cbor_encode_int(&mapEncoder, value));
-        });
-        fi_weak_hi.for_each([&](const auto& value) {
+        };
+        if ( fi_weak_hi) {
+            const auto& value = *fi_weak_hi;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::FI_WEAK_HI));
             cbor_check(cbor_encode_int(&mapEncoder, value));
-        });
-        fi_weak_lo.for_each([&](const auto& value) {
+        };
+        if ( fi_weak_lo) {
+            const auto& value = *fi_weak_lo;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::FI_WEAK_LO));
             cbor_check(cbor_encode_int(&mapEncoder, value));
-        });
-        fi_weak_max.for_each([&](const auto& value) {
+        };
+        if ( fi_weak_max) {
+            const auto& value = *fi_weak_max;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::FI_WEAK_MAX));
             cbor_check(cbor_encode_int(&mapEncoder, value));
-        });
-        phase_adv_max_deg.for_each([&](const auto& value) {
+        };
+        if ( phase_adv_max_deg) {
+            const auto& value = *phase_adv_max_deg;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::PHASE_ADV_MAX_DEG));
             cbor_check(cbor_encode_int(&mapEncoder, value));
-        });
-        input1_raw.for_each([&](const auto& value) {
+        };
+        if ( input1_raw) {
+            const auto& value = *input1_raw;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::INPUT1_RAW));
             cbor_check(cbor_encode_int(&mapEncoder, value));
-        });
-        input1_typ.for_each([&](const auto& value) {
+        };
+        if ( input1_typ) {
+            const auto& value = *input1_typ;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::INPUT1_TYP));
             cbor_check(cbor_encode_int(&mapEncoder, value));
-        });
-        input1_min.for_each([&](const auto& value) {
+        };
+        if ( input1_min) {
+            const auto& value = *input1_min;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::INPUT1_MIN));
             cbor_check(cbor_encode_int(&mapEncoder, value));
-        });
-        input1_mid.for_each([&](const auto& value) {
+        };
+        if ( input1_mid) {
+            const auto& value = *input1_mid;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::INPUT1_MID));
             cbor_check(cbor_encode_int(&mapEncoder, value));
-        });
-        input1_max.for_each([&](const auto& value) {
+        };
+        if ( input1_max) {
+            const auto& value = *input1_max;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::INPUT1_MAX));
             cbor_check(cbor_encode_int(&mapEncoder, value));
-        });
-        input1_cmd.for_each([&](const auto& value) {
+        };
+        if ( input1_cmd) {
+            const auto& value = *input1_cmd;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::INPUT1_CMD));
             cbor_check(cbor_encode_int(&mapEncoder, value));
-        });
-        input2_raw.for_each([&](const auto& value) {
+        };
+        if ( input2_raw) {
+            const auto& value = *input2_raw;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::INPUT2_RAW));
             cbor_check(cbor_encode_int(&mapEncoder, value));
-        });
-        input2_typ.for_each([&](const auto& value) {
+        };
+        if ( input2_typ) {
+            const auto& value = *input2_typ;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::INPUT2_TYP));
             cbor_check(cbor_encode_int(&mapEncoder, value));
-        });
-        input2_min.for_each([&](const auto& value) {
+        };
+        if ( input2_min) {
+            const auto& value = *input2_min;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::INPUT2_MIN));
             cbor_check(cbor_encode_int(&mapEncoder, value));
-        });
-        input2_mid.for_each([&](const auto& value) {
+        };
+        if ( input2_mid) {
+            const auto& value = *input2_mid;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::INPUT2_MID));
             cbor_check(cbor_encode_int(&mapEncoder, value));
-        });
-        input2_max.for_each([&](const auto& value) {
+        };
+        if ( input2_max) {
+            const auto& value = *input2_max;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::INPUT2_MAX));
             cbor_check(cbor_encode_int(&mapEncoder, value));
-        });
-        input2_cmd.for_each([&](const auto& value) {
+        };
+        if ( input2_cmd) {
+            const auto& value = *input2_cmd;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::INPUT2_CMD));
             cbor_check(cbor_encode_int(&mapEncoder, value));
-        });
-        aux_input1_raw.for_each([&](const auto& value) {
+        };
+        if ( aux_input1_raw) {
+            const auto& value = *aux_input1_raw;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::AUX_INPUT1_RAW));
             cbor_check(cbor_encode_int(&mapEncoder, value));
-        });
-        aux_input1_typ.for_each([&](const auto& value) {
+        };
+        if ( aux_input1_typ) {
+            const auto& value = *aux_input1_typ;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::AUX_INPUT1_TYP));
             cbor_check(cbor_encode_int(&mapEncoder, value));
-        });
-        aux_input1_min.for_each([&](const auto& value) {
+        };
+        if ( aux_input1_min) {
+            const auto& value = *aux_input1_min;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::AUX_INPUT1_MIN));
             cbor_check(cbor_encode_int(&mapEncoder, value));
-        });
-        aux_input1_mid.for_each([&](const auto& value) {
+        };
+        if ( aux_input1_mid) {
+            const auto& value = *aux_input1_mid;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::AUX_INPUT1_MID));
             cbor_check(cbor_encode_int(&mapEncoder, value));
-        });
-        aux_input1_max.for_each([&](const auto& value) {
+        };
+        if ( aux_input1_max) {
+            const auto& value = *aux_input1_max;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::AUX_INPUT1_MAX));
             cbor_check(cbor_encode_int(&mapEncoder, value));
-        });
-        aux_input1_cmd.for_each([&](const auto& value) {
+        };
+        if ( aux_input1_cmd) {
+            const auto& value = *aux_input1_cmd;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::AUX_INPUT1_CMD));
             cbor_check(cbor_encode_int(&mapEncoder, value));
-        });
-        aux_input2_raw.for_each([&](const auto& value) {
+        };
+        if ( aux_input2_raw) {
+            const auto& value = *aux_input2_raw;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::AUX_INPUT2_RAW));
             cbor_check(cbor_encode_int(&mapEncoder, value));
-        });
-        aux_input2_typ.for_each([&](const auto& value) {
+        };
+        if ( aux_input2_typ) {
+            const auto& value = *aux_input2_typ;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::AUX_INPUT2_TYP));
             cbor_check(cbor_encode_int(&mapEncoder, value));
-        });
-        aux_input2_min.for_each([&](const auto& value) {
+        };
+        if ( aux_input2_min) {
+            const auto& value = *aux_input2_min;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::AUX_INPUT2_MIN));
             cbor_check(cbor_encode_int(&mapEncoder, value));
-        });
-        aux_input2_mid.for_each([&](const auto& value) {
+        };
+        if ( aux_input2_mid) {
+            const auto& value = *aux_input2_mid;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::AUX_INPUT2_MID));
             cbor_check(cbor_encode_int(&mapEncoder, value));
-        });
-        aux_input2_max.for_each([&](const auto& value) {
+        };
+        if ( aux_input2_max) {
+            const auto& value = *aux_input2_max;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::AUX_INPUT2_MAX));
             cbor_check(cbor_encode_int(&mapEncoder, value));
-        });
-        aux_input2_cmd.for_each([&](const auto& value) {
+        };
+        if ( aux_input2_cmd) {
+            const auto& value = *aux_input2_cmd;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::AUX_INPUT2_CMD));
             cbor_check(cbor_encode_int(&mapEncoder, value));
-        });
-        dc_curr.for_each([&](const auto& value) {
+        };
+        if ( dc_curr) {
+            const auto& value = *dc_curr;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::DC_CURR));
             cbor_check(cbor_encode_int(&mapEncoder, value));
-        });
-        rdc_curr.for_each([&](const auto& value) {
+        };
+        if ( rdc_curr) {
+            const auto& value = *rdc_curr;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::RDC_CURR));
             cbor_check(cbor_encode_int(&mapEncoder, value));
-        });
-        ldc_curr.for_each([&](const auto& value) {
+        };
+        if ( ldc_curr) {
+            const auto& value = *ldc_curr;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::LDC_CURR));
             cbor_check(cbor_encode_int(&mapEncoder, value));
-        });
-        cmdl.for_each([&](const auto& value) {
+        };
+        if ( cmdl) {
+            const auto& value = *cmdl;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::CMDL));
             cbor_check(cbor_encode_int(&mapEncoder, value));
-        });
-        cmdr.for_each([&](const auto& value) {
+        };
+        if ( cmdr) {
+            const auto& value = *cmdr;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::CMDR));
             cbor_check(cbor_encode_int(&mapEncoder, value));
-        });
-        spd_avg.for_each([&](const auto& value) {
+        };
+        if ( spd_avg) {
+            const auto& value = *spd_avg;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::SPD_AVG));
             cbor_check(cbor_encode_int(&mapEncoder, value));
-        });
-        spdl.for_each([&](const auto& value) {
+        };
+        if ( spdl) {
+            const auto& value = *spdl;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::SPDL));
             cbor_check(cbor_encode_int(&mapEncoder, value));
-        });
-        spdr.for_each([&](const auto& value) {
+        };
+        if ( spdr) {
+            const auto& value = *spdr;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::SPDR));
             cbor_check(cbor_encode_int(&mapEncoder, value));
-        });
-        filter_rate.for_each([&](const auto& value) {
+        };
+        if ( filter_rate) {
+            const auto& value = *filter_rate;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::FILTER_RATE));
             cbor_check(cbor_encode_int(&mapEncoder, value));
-        });
-        spd_coef.for_each([&](const auto& value) {
+        };
+        if ( spd_coef) {
+            const auto& value = *spd_coef;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::SPD_COEF));
             cbor_check(cbor_encode_int(&mapEncoder, value));
-        });
-        str_coef.for_each([&](const auto& value) {
+        };
+        if ( str_coef) {
+            const auto& value = *str_coef;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::STR_COEF));
             cbor_check(cbor_encode_int(&mapEncoder, value));
-        });
-        batv.for_each([&](const auto& value) {
+        };
+        if ( batv) {
+            const auto& value = *batv;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::BATV));
             cbor_check(cbor_encode_int(&mapEncoder, value));
-        });
-        temp.for_each([&](const auto& value) {
+        };
+        if ( temp) {
+            const auto& value = *temp;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::TEMP));
             cbor_check(cbor_encode_int(&mapEncoder, value));
-        });
+        };
 
          cbor_check(cbor_encoder_close_container(&encoder, &mapEncoder));
+        buffer.resize(cbor_encoder_get_buffer_size(&encoder, buffer.data()));
          return 0;
     }
 
     /// Deserialize a HoverboardEvent from a CBOR map value.
     /// `it` must point to the map; after decoding it is advanced past the map.
-     int decode(const Bytes& buffer) {
+     int decode(const Buffer& buffer) {
         CborParser parser;
         CborValue it;
         cbor_check(cbor_parser_init(buffer.data(), buffer.size(), 0, &parser, &it));
@@ -2451,8 +2602,12 @@ public:
 
 class HoverboardRequest : public Msg {
 public:
-    static uint32_t msg_id() { return FNV("HoverboardRequest"); }
-    static const char* msg_name() { return "HoverboardRequest"; }
+
+    static const uint32_t MSG_ID = FNV("HoverboardRequest");
+    static constexpr const char *MSG_NAME ="HoverboardRequest";
+
+    virtual uint32_t msg_id() const { return MSG_ID; };
+    virtual const char *msg_name() const { return MSG_NAME; };
 
     typedef enum FieldId {
         REQ_ID = 0,
@@ -2465,37 +2620,42 @@ public:
 
     /// Serialize this message into a CBOR map keyed by field id.
     /// Writes into the parent encoder as a single map item.
-    int encode(Bytes& buffer)  {
+    int encode(Buffer& buffer) const {
+        buffer.clear();
         CborEncoder encoder;
         cbor_encoder_init(&encoder,buffer.data(),buffer.capacity(),0);
         // Count how many optional fields are set.
         uint32_t fieldCount = 0;
-        req_id.for_each([&](const auto&) { fieldCount++; });
-        speed.for_each([&](const auto&) { fieldCount++; });
-        steer.for_each([&](const auto&) { fieldCount++; });
+        if (req_id.is_some()) { fieldCount++; }
+        if (speed.is_some()) { fieldCount++; }
+        if (steer.is_some()) { fieldCount++; }
 
         CborEncoder mapEncoder;
         cbor_check(cbor_encoder_create_map(&encoder, &mapEncoder, fieldCount));
-        req_id.for_each([&](const auto& value) {
+        if ( req_id) {
+            const auto& value = *req_id;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::REQ_ID));
             cbor_check(cbor_encode_uint(&mapEncoder, value));
-        });
-        speed.for_each([&](const auto& value) {
+        };
+        if ( speed) {
+            const auto& value = *speed;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::SPEED));
             cbor_check(cbor_encode_int(&mapEncoder, value));
-        });
-        steer.for_each([&](const auto& value) {
+        };
+        if ( steer) {
+            const auto& value = *steer;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::STEER));
             cbor_check(cbor_encode_int(&mapEncoder, value));
-        });
+        };
 
          cbor_check(cbor_encoder_close_container(&encoder, &mapEncoder));
+        buffer.resize(cbor_encoder_get_buffer_size(&encoder, buffer.data()));
          return 0;
     }
 
     /// Deserialize a HoverboardRequest from a CBOR map value.
     /// `it` must point to the map; after decoding it is advanced past the map.
-     int decode(const Bytes& buffer) {
+     int decode(const Buffer& buffer) {
         CborParser parser;
         CborValue it;
         cbor_check(cbor_parser_init(buffer.data(), buffer.size(), 0, &parser, &it));
@@ -2573,8 +2733,12 @@ public:
 
 class ImuEvent : public Msg {
 public:
-    static uint32_t msg_id() { return FNV("ImuEvent"); }
-    static const char* msg_name() { return "ImuEvent"; }
+
+    static const uint32_t MSG_ID = FNV("ImuEvent");
+    static constexpr const char *MSG_NAME ="ImuEvent";
+
+    virtual uint32_t msg_id() const { return MSG_ID; };
+    virtual const char *msg_name() const { return MSG_NAME; };
 
     typedef enum FieldId {
         GYRO_X = 0,
@@ -2593,52 +2757,60 @@ public:
 
     /// Serialize this message into a CBOR map keyed by field id.
     /// Writes into the parent encoder as a single map item.
-    int encode(Bytes& buffer)  {
+    int encode(Buffer& buffer) const {
+        buffer.clear();
         CborEncoder encoder;
         cbor_encoder_init(&encoder,buffer.data(),buffer.capacity(),0);
         // Count how many optional fields are set.
         uint32_t fieldCount = 0;
-        gyro_x.for_each([&](const auto&) { fieldCount++; });
-        gyro_y.for_each([&](const auto&) { fieldCount++; });
-        gyro_z.for_each([&](const auto&) { fieldCount++; });
-        accel_x.for_each([&](const auto&) { fieldCount++; });
-        accel_y.for_each([&](const auto&) { fieldCount++; });
-        accel_z.for_each([&](const auto&) { fieldCount++; });
+        if (gyro_x.is_some()) { fieldCount++; }
+        if (gyro_y.is_some()) { fieldCount++; }
+        if (gyro_z.is_some()) { fieldCount++; }
+        if (accel_x.is_some()) { fieldCount++; }
+        if (accel_y.is_some()) { fieldCount++; }
+        if (accel_z.is_some()) { fieldCount++; }
 
         CborEncoder mapEncoder;
         cbor_check(cbor_encoder_create_map(&encoder, &mapEncoder, fieldCount));
-        gyro_x.for_each([&](const auto& value) {
+        if ( gyro_x) {
+            const auto& value = *gyro_x;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::GYRO_X));
             cbor_check(cbor_encode_float(&mapEncoder, value));
-        });
-        gyro_y.for_each([&](const auto& value) {
+        };
+        if ( gyro_y) {
+            const auto& value = *gyro_y;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::GYRO_Y));
             cbor_check(cbor_encode_float(&mapEncoder, value));
-        });
-        gyro_z.for_each([&](const auto& value) {
+        };
+        if ( gyro_z) {
+            const auto& value = *gyro_z;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::GYRO_Z));
             cbor_check(cbor_encode_float(&mapEncoder, value));
-        });
-        accel_x.for_each([&](const auto& value) {
+        };
+        if ( accel_x) {
+            const auto& value = *accel_x;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::ACCEL_X));
             cbor_check(cbor_encode_float(&mapEncoder, value));
-        });
-        accel_y.for_each([&](const auto& value) {
+        };
+        if ( accel_y) {
+            const auto& value = *accel_y;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::ACCEL_Y));
             cbor_check(cbor_encode_float(&mapEncoder, value));
-        });
-        accel_z.for_each([&](const auto& value) {
+        };
+        if ( accel_z) {
+            const auto& value = *accel_z;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::ACCEL_Z));
             cbor_check(cbor_encode_float(&mapEncoder, value));
-        });
+        };
 
          cbor_check(cbor_encoder_close_container(&encoder, &mapEncoder));
+        buffer.resize(cbor_encoder_get_buffer_size(&encoder, buffer.data()));
          return 0;
     }
 
     /// Deserialize a ImuEvent from a CBOR map value.
     /// `it` must point to the map; after decoding it is advanced past the map.
-     int decode(const Bytes& buffer) {
+     int decode(const Buffer& buffer) {
         CborParser parser;
         CborValue it;
         cbor_check(cbor_parser_init(buffer.data(), buffer.size(), 0, &parser, &it));
@@ -2773,8 +2945,12 @@ public:
 
 class Max31855Event : public Msg {
 public:
-    static uint32_t msg_id() { return FNV("Max31855Event"); }
-    static const char* msg_name() { return "Max31855Event"; }
+
+    static const uint32_t MSG_ID = FNV("Max31855Event");
+    static constexpr const char *MSG_NAME ="Max31855Event";
+
+    virtual uint32_t msg_id() const { return MSG_ID; };
+    virtual const char *msg_name() const { return MSG_NAME; };
 
     typedef enum FieldId {
         THERMOCOUPLE_TEMP = 0,
@@ -2793,52 +2969,60 @@ public:
 
     /// Serialize this message into a CBOR map keyed by field id.
     /// Writes into the parent encoder as a single map item.
-    int encode(Bytes& buffer)  {
+    int encode(Buffer& buffer) const {
+        buffer.clear();
         CborEncoder encoder;
         cbor_encoder_init(&encoder,buffer.data(),buffer.capacity(),0);
         // Count how many optional fields are set.
         uint32_t fieldCount = 0;
-        thermocouple_temp.for_each([&](const auto&) { fieldCount++; });
-        internal_temp.for_each([&](const auto&) { fieldCount++; });
-        fault.for_each([&](const auto&) { fieldCount++; });
-        fault_short_vcc.for_each([&](const auto&) { fieldCount++; });
-        fault_short_gnd.for_each([&](const auto&) { fieldCount++; });
-        fault_open_tc.for_each([&](const auto&) { fieldCount++; });
+        if (thermocouple_temp.is_some()) { fieldCount++; }
+        if (internal_temp.is_some()) { fieldCount++; }
+        if (fault.is_some()) { fieldCount++; }
+        if (fault_short_vcc.is_some()) { fieldCount++; }
+        if (fault_short_gnd.is_some()) { fieldCount++; }
+        if (fault_open_tc.is_some()) { fieldCount++; }
 
         CborEncoder mapEncoder;
         cbor_check(cbor_encoder_create_map(&encoder, &mapEncoder, fieldCount));
-        thermocouple_temp.for_each([&](const auto& value) {
+        if ( thermocouple_temp) {
+            const auto& value = *thermocouple_temp;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::THERMOCOUPLE_TEMP));
             cbor_check(cbor_encode_float(&mapEncoder, value));
-        });
-        internal_temp.for_each([&](const auto& value) {
+        };
+        if ( internal_temp) {
+            const auto& value = *internal_temp;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::INTERNAL_TEMP));
             cbor_check(cbor_encode_float(&mapEncoder, value));
-        });
-        fault.for_each([&](const auto& value) {
+        };
+        if ( fault) {
+            const auto& value = *fault;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::FAULT));
             cbor_check(cbor_encode_boolean(&mapEncoder, value));
-        });
-        fault_short_vcc.for_each([&](const auto& value) {
+        };
+        if ( fault_short_vcc) {
+            const auto& value = *fault_short_vcc;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::FAULT_SHORT_VCC));
             cbor_check(cbor_encode_boolean(&mapEncoder, value));
-        });
-        fault_short_gnd.for_each([&](const auto& value) {
+        };
+        if ( fault_short_gnd) {
+            const auto& value = *fault_short_gnd;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::FAULT_SHORT_GND));
             cbor_check(cbor_encode_boolean(&mapEncoder, value));
-        });
-        fault_open_tc.for_each([&](const auto& value) {
+        };
+        if ( fault_open_tc) {
+            const auto& value = *fault_open_tc;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::FAULT_OPEN_TC));
             cbor_check(cbor_encode_boolean(&mapEncoder, value));
-        });
+        };
 
          cbor_check(cbor_encoder_close_container(&encoder, &mapEncoder));
+        buffer.resize(cbor_encoder_get_buffer_size(&encoder, buffer.data()));
          return 0;
     }
 
     /// Deserialize a Max31855Event from a CBOR map value.
     /// `it` must point to the map; after decoding it is advanced past the map.
-     int decode(const Bytes& buffer) {
+     int decode(const Buffer& buffer) {
         CborParser parser;
         CborValue it;
         cbor_check(cbor_parser_init(buffer.data(), buffer.size(), 0, &parser, &it));
@@ -2941,8 +3125,12 @@ public:
 
 class PingReply : public Msg {
 public:
-    static uint32_t msg_id() { return FNV("PingReply"); }
-    static const char* msg_name() { return "PingReply"; }
+
+    static const uint32_t MSG_ID = FNV("PingReply");
+    static constexpr const char *MSG_NAME ="PingReply";
+
+    virtual uint32_t msg_id() const { return MSG_ID; };
+    virtual const char *msg_name() const { return MSG_NAME; };
 
     typedef enum FieldId {
         REQ_ID = 0,
@@ -2953,32 +3141,36 @@ public:
 
     /// Serialize this message into a CBOR map keyed by field id.
     /// Writes into the parent encoder as a single map item.
-    int encode(Bytes& buffer)  {
+    int encode(Buffer& buffer) const {
+        buffer.clear();
         CborEncoder encoder;
         cbor_encoder_init(&encoder,buffer.data(),buffer.capacity(),0);
         // Count how many optional fields are set.
         uint32_t fieldCount = 0;
-        req_id.for_each([&](const auto&) { fieldCount++; });
-        timestamp.for_each([&](const auto&) { fieldCount++; });
+        if (req_id.is_some()) { fieldCount++; }
+        if (timestamp.is_some()) { fieldCount++; }
 
         CborEncoder mapEncoder;
         cbor_check(cbor_encoder_create_map(&encoder, &mapEncoder, fieldCount));
-        req_id.for_each([&](const auto& value) {
+        if ( req_id) {
+            const auto& value = *req_id;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::REQ_ID));
             cbor_check(cbor_encode_uint(&mapEncoder, value));
-        });
-        timestamp.for_each([&](const auto& value) {
+        };
+        if ( timestamp) {
+            const auto& value = *timestamp;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::TIMESTAMP));
             cbor_check(cbor_encode_uint(&mapEncoder, value));
-        });
+        };
 
          cbor_check(cbor_encoder_close_container(&encoder, &mapEncoder));
+        buffer.resize(cbor_encoder_get_buffer_size(&encoder, buffer.data()));
          return 0;
     }
 
     /// Deserialize a PingReply from a CBOR map value.
     /// `it` must point to the map; after decoding it is advanced past the map.
-     int decode(const Bytes& buffer) {
+     int decode(const Buffer& buffer) {
         CborParser parser;
         CborValue it;
         cbor_check(cbor_parser_init(buffer.data(), buffer.size(), 0, &parser, &it));
@@ -3045,8 +3237,12 @@ public:
 
 class PingRequest : public Msg {
 public:
-    static uint32_t msg_id() { return FNV("PingRequest"); }
-    static const char* msg_name() { return "PingRequest"; }
+
+    static const uint32_t MSG_ID = FNV("PingRequest");
+    static constexpr const char *MSG_NAME ="PingRequest";
+
+    virtual uint32_t msg_id() const { return MSG_ID; };
+    virtual const char *msg_name() const { return MSG_NAME; };
 
     typedef enum FieldId {
         REQ_ID = 0,
@@ -3057,32 +3253,36 @@ public:
 
     /// Serialize this message into a CBOR map keyed by field id.
     /// Writes into the parent encoder as a single map item.
-    int encode(Bytes& buffer)  {
+    int encode(Buffer& buffer) const {
+        buffer.clear();
         CborEncoder encoder;
         cbor_encoder_init(&encoder,buffer.data(),buffer.capacity(),0);
         // Count how many optional fields are set.
         uint32_t fieldCount = 0;
-        req_id.for_each([&](const auto&) { fieldCount++; });
-        timestamp.for_each([&](const auto&) { fieldCount++; });
+        if (req_id.is_some()) { fieldCount++; }
+        if (timestamp.is_some()) { fieldCount++; }
 
         CborEncoder mapEncoder;
         cbor_check(cbor_encoder_create_map(&encoder, &mapEncoder, fieldCount));
-        req_id.for_each([&](const auto& value) {
+        if ( req_id) {
+            const auto& value = *req_id;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::REQ_ID));
             cbor_check(cbor_encode_uint(&mapEncoder, value));
-        });
-        timestamp.for_each([&](const auto& value) {
+        };
+        if ( timestamp) {
+            const auto& value = *timestamp;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::TIMESTAMP));
             cbor_check(cbor_encode_uint(&mapEncoder, value));
-        });
+        };
 
          cbor_check(cbor_encoder_close_container(&encoder, &mapEncoder));
+        buffer.resize(cbor_encoder_get_buffer_size(&encoder, buffer.data()));
          return 0;
     }
 
     /// Deserialize a PingRequest from a CBOR map value.
     /// `it` must point to the map; after decoding it is advanced past the map.
-     int decode(const Bytes& buffer) {
+     int decode(const Buffer& buffer) {
         CborParser parser;
         CborValue it;
         cbor_check(cbor_parser_init(buffer.data(), buffer.size(), 0, &parser, &it));
@@ -3149,8 +3349,12 @@ public:
 
 class Ps4Event : public Msg {
 public:
-    static uint32_t msg_id() { return FNV("Ps4Event"); }
-    static const char* msg_name() { return "Ps4Event"; }
+
+    static const uint32_t MSG_ID = FNV("Ps4Event");
+    static constexpr const char *MSG_NAME ="Ps4Event";
+
+    virtual uint32_t msg_id() const { return MSG_ID; };
+    virtual const char *msg_name() const { return MSG_NAME; };
 
     typedef enum FieldId {
         BUTTON_LEFT = 0,
@@ -3223,187 +3427,222 @@ public:
 
     /// Serialize this message into a CBOR map keyed by field id.
     /// Writes into the parent encoder as a single map item.
-    int encode(Bytes& buffer)  {
+    int encode(Buffer& buffer) const {
+        buffer.clear();
         CborEncoder encoder;
         cbor_encoder_init(&encoder,buffer.data(),buffer.capacity(),0);
         // Count how many optional fields are set.
         uint32_t fieldCount = 0;
-        button_left.for_each([&](const auto&) { fieldCount++; });
-        button_right.for_each([&](const auto&) { fieldCount++; });
-        button_up.for_each([&](const auto&) { fieldCount++; });
-        button_down.for_each([&](const auto&) { fieldCount++; });
-        button_square.for_each([&](const auto&) { fieldCount++; });
-        button_cross.for_each([&](const auto&) { fieldCount++; });
-        button_circle.for_each([&](const auto&) { fieldCount++; });
-        button_triangle.for_each([&](const auto&) { fieldCount++; });
-        button_left_shoulder.for_each([&](const auto&) { fieldCount++; });
-        button_right_shoulder.for_each([&](const auto&) { fieldCount++; });
-        button_left_trigger.for_each([&](const auto&) { fieldCount++; });
-        button_right_trigger.for_each([&](const auto&) { fieldCount++; });
-        button_left_joystick.for_each([&](const auto&) { fieldCount++; });
-        button_right_joystick.for_each([&](const auto&) { fieldCount++; });
-        button_share.for_each([&](const auto&) { fieldCount++; });
-        button_options.for_each([&](const auto&) { fieldCount++; });
-        button_touchpad.for_each([&](const auto&) { fieldCount++; });
-        button_ps.for_each([&](const auto&) { fieldCount++; });
-        axis_lx.for_each([&](const auto&) { fieldCount++; });
-        axis_ly.for_each([&](const auto&) { fieldCount++; });
-        axis_rx.for_each([&](const auto&) { fieldCount++; });
-        axis_ry.for_each([&](const auto&) { fieldCount++; });
-        gyro_x.for_each([&](const auto&) { fieldCount++; });
-        gyro_y.for_each([&](const auto&) { fieldCount++; });
-        gyro_z.for_each([&](const auto&) { fieldCount++; });
-        accel_x.for_each([&](const auto&) { fieldCount++; });
-        accel_y.for_each([&](const auto&) { fieldCount++; });
-        accel_z.for_each([&](const auto&) { fieldCount++; });
-        connected.for_each([&](const auto&) { fieldCount++; });
-        battery_level.for_each([&](const auto&) { fieldCount++; });
-        bluetooth.for_each([&](const auto&) { fieldCount++; });
-        debug.for_each([&](const auto&) { fieldCount++; });
-        temp.for_each([&](const auto&) { fieldCount++; });
+        if (button_left.is_some()) { fieldCount++; }
+        if (button_right.is_some()) { fieldCount++; }
+        if (button_up.is_some()) { fieldCount++; }
+        if (button_down.is_some()) { fieldCount++; }
+        if (button_square.is_some()) { fieldCount++; }
+        if (button_cross.is_some()) { fieldCount++; }
+        if (button_circle.is_some()) { fieldCount++; }
+        if (button_triangle.is_some()) { fieldCount++; }
+        if (button_left_shoulder.is_some()) { fieldCount++; }
+        if (button_right_shoulder.is_some()) { fieldCount++; }
+        if (button_left_trigger.is_some()) { fieldCount++; }
+        if (button_right_trigger.is_some()) { fieldCount++; }
+        if (button_left_joystick.is_some()) { fieldCount++; }
+        if (button_right_joystick.is_some()) { fieldCount++; }
+        if (button_share.is_some()) { fieldCount++; }
+        if (button_options.is_some()) { fieldCount++; }
+        if (button_touchpad.is_some()) { fieldCount++; }
+        if (button_ps.is_some()) { fieldCount++; }
+        if (axis_lx.is_some()) { fieldCount++; }
+        if (axis_ly.is_some()) { fieldCount++; }
+        if (axis_rx.is_some()) { fieldCount++; }
+        if (axis_ry.is_some()) { fieldCount++; }
+        if (gyro_x.is_some()) { fieldCount++; }
+        if (gyro_y.is_some()) { fieldCount++; }
+        if (gyro_z.is_some()) { fieldCount++; }
+        if (accel_x.is_some()) { fieldCount++; }
+        if (accel_y.is_some()) { fieldCount++; }
+        if (accel_z.is_some()) { fieldCount++; }
+        if (connected.is_some()) { fieldCount++; }
+        if (battery_level.is_some()) { fieldCount++; }
+        if (bluetooth.is_some()) { fieldCount++; }
+        if (debug.is_some()) { fieldCount++; }
+        if (temp.is_some()) { fieldCount++; }
 
         CborEncoder mapEncoder;
         cbor_check(cbor_encoder_create_map(&encoder, &mapEncoder, fieldCount));
-        button_left.for_each([&](const auto& value) {
+        if ( button_left) {
+            const auto& value = *button_left;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::BUTTON_LEFT));
             cbor_check(cbor_encode_boolean(&mapEncoder, value));
-        });
-        button_right.for_each([&](const auto& value) {
+        };
+        if ( button_right) {
+            const auto& value = *button_right;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::BUTTON_RIGHT));
             cbor_check(cbor_encode_boolean(&mapEncoder, value));
-        });
-        button_up.for_each([&](const auto& value) {
+        };
+        if ( button_up) {
+            const auto& value = *button_up;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::BUTTON_UP));
             cbor_check(cbor_encode_boolean(&mapEncoder, value));
-        });
-        button_down.for_each([&](const auto& value) {
+        };
+        if ( button_down) {
+            const auto& value = *button_down;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::BUTTON_DOWN));
             cbor_check(cbor_encode_boolean(&mapEncoder, value));
-        });
-        button_square.for_each([&](const auto& value) {
+        };
+        if ( button_square) {
+            const auto& value = *button_square;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::BUTTON_SQUARE));
             cbor_check(cbor_encode_boolean(&mapEncoder, value));
-        });
-        button_cross.for_each([&](const auto& value) {
+        };
+        if ( button_cross) {
+            const auto& value = *button_cross;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::BUTTON_CROSS));
             cbor_check(cbor_encode_boolean(&mapEncoder, value));
-        });
-        button_circle.for_each([&](const auto& value) {
+        };
+        if ( button_circle) {
+            const auto& value = *button_circle;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::BUTTON_CIRCLE));
             cbor_check(cbor_encode_boolean(&mapEncoder, value));
-        });
-        button_triangle.for_each([&](const auto& value) {
+        };
+        if ( button_triangle) {
+            const auto& value = *button_triangle;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::BUTTON_TRIANGLE));
             cbor_check(cbor_encode_boolean(&mapEncoder, value));
-        });
-        button_left_shoulder.for_each([&](const auto& value) {
+        };
+        if ( button_left_shoulder) {
+            const auto& value = *button_left_shoulder;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::BUTTON_LEFT_SHOULDER));
             cbor_check(cbor_encode_boolean(&mapEncoder, value));
-        });
-        button_right_shoulder.for_each([&](const auto& value) {
+        };
+        if ( button_right_shoulder) {
+            const auto& value = *button_right_shoulder;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::BUTTON_RIGHT_SHOULDER));
             cbor_check(cbor_encode_boolean(&mapEncoder, value));
-        });
-        button_left_trigger.for_each([&](const auto& value) {
+        };
+        if ( button_left_trigger) {
+            const auto& value = *button_left_trigger;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::BUTTON_LEFT_TRIGGER));
             cbor_check(cbor_encode_boolean(&mapEncoder, value));
-        });
-        button_right_trigger.for_each([&](const auto& value) {
+        };
+        if ( button_right_trigger) {
+            const auto& value = *button_right_trigger;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::BUTTON_RIGHT_TRIGGER));
             cbor_check(cbor_encode_boolean(&mapEncoder, value));
-        });
-        button_left_joystick.for_each([&](const auto& value) {
+        };
+        if ( button_left_joystick) {
+            const auto& value = *button_left_joystick;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::BUTTON_LEFT_JOYSTICK));
             cbor_check(cbor_encode_boolean(&mapEncoder, value));
-        });
-        button_right_joystick.for_each([&](const auto& value) {
+        };
+        if ( button_right_joystick) {
+            const auto& value = *button_right_joystick;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::BUTTON_RIGHT_JOYSTICK));
             cbor_check(cbor_encode_boolean(&mapEncoder, value));
-        });
-        button_share.for_each([&](const auto& value) {
+        };
+        if ( button_share) {
+            const auto& value = *button_share;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::BUTTON_SHARE));
             cbor_check(cbor_encode_boolean(&mapEncoder, value));
-        });
-        button_options.for_each([&](const auto& value) {
+        };
+        if ( button_options) {
+            const auto& value = *button_options;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::BUTTON_OPTIONS));
             cbor_check(cbor_encode_boolean(&mapEncoder, value));
-        });
-        button_touchpad.for_each([&](const auto& value) {
+        };
+        if ( button_touchpad) {
+            const auto& value = *button_touchpad;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::BUTTON_TOUCHPAD));
             cbor_check(cbor_encode_boolean(&mapEncoder, value));
-        });
-        button_ps.for_each([&](const auto& value) {
+        };
+        if ( button_ps) {
+            const auto& value = *button_ps;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::BUTTON_PS));
             cbor_check(cbor_encode_boolean(&mapEncoder, value));
-        });
-        axis_lx.for_each([&](const auto& value) {
+        };
+        if ( axis_lx) {
+            const auto& value = *axis_lx;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::AXIS_LX));
             cbor_check(cbor_encode_int(&mapEncoder, value));
-        });
-        axis_ly.for_each([&](const auto& value) {
+        };
+        if ( axis_ly) {
+            const auto& value = *axis_ly;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::AXIS_LY));
             cbor_check(cbor_encode_int(&mapEncoder, value));
-        });
-        axis_rx.for_each([&](const auto& value) {
+        };
+        if ( axis_rx) {
+            const auto& value = *axis_rx;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::AXIS_RX));
             cbor_check(cbor_encode_int(&mapEncoder, value));
-        });
-        axis_ry.for_each([&](const auto& value) {
+        };
+        if ( axis_ry) {
+            const auto& value = *axis_ry;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::AXIS_RY));
             cbor_check(cbor_encode_int(&mapEncoder, value));
-        });
-        gyro_x.for_each([&](const auto& value) {
+        };
+        if ( gyro_x) {
+            const auto& value = *gyro_x;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::GYRO_X));
             cbor_check(cbor_encode_int(&mapEncoder, value));
-        });
-        gyro_y.for_each([&](const auto& value) {
+        };
+        if ( gyro_y) {
+            const auto& value = *gyro_y;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::GYRO_Y));
             cbor_check(cbor_encode_int(&mapEncoder, value));
-        });
-        gyro_z.for_each([&](const auto& value) {
+        };
+        if ( gyro_z) {
+            const auto& value = *gyro_z;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::GYRO_Z));
             cbor_check(cbor_encode_int(&mapEncoder, value));
-        });
-        accel_x.for_each([&](const auto& value) {
+        };
+        if ( accel_x) {
+            const auto& value = *accel_x;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::ACCEL_X));
             cbor_check(cbor_encode_int(&mapEncoder, value));
-        });
-        accel_y.for_each([&](const auto& value) {
+        };
+        if ( accel_y) {
+            const auto& value = *accel_y;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::ACCEL_Y));
             cbor_check(cbor_encode_int(&mapEncoder, value));
-        });
-        accel_z.for_each([&](const auto& value) {
+        };
+        if ( accel_z) {
+            const auto& value = *accel_z;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::ACCEL_Z));
             cbor_check(cbor_encode_int(&mapEncoder, value));
-        });
-        connected.for_each([&](const auto& value) {
+        };
+        if ( connected) {
+            const auto& value = *connected;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::CONNECTED));
             cbor_check(cbor_encode_boolean(&mapEncoder, value));
-        });
-        battery_level.for_each([&](const auto& value) {
+        };
+        if ( battery_level) {
+            const auto& value = *battery_level;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::BATTERY_LEVEL));
             cbor_check(cbor_encode_int(&mapEncoder, value));
-        });
-        bluetooth.for_each([&](const auto& value) {
+        };
+        if ( bluetooth) {
+            const auto& value = *bluetooth;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::BLUETOOTH));
             cbor_check(cbor_encode_boolean(&mapEncoder, value));
-        });
-        debug.for_each([&](const auto& value) {
+        };
+        if ( debug) {
+            const auto& value = *debug;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::DEBUG));
             cbor_check(cbor_encode_text_string(&mapEncoder, value.c_str(), value.length()));
-        });
-        temp.for_each([&](const auto& value) {
+        };
+        if ( temp) {
+            const auto& value = *temp;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::TEMP));
             cbor_check(cbor_encode_int(&mapEncoder, value));
-        });
+        };
 
          cbor_check(cbor_encoder_close_container(&encoder, &mapEncoder));
+        buffer.resize(cbor_encoder_get_buffer_size(&encoder, buffer.data()));
          return 0;
     }
 
     /// Deserialize a Ps4Event from a CBOR map value.
     /// `it` must point to the map; after decoding it is advanced past the map.
-     int decode(const Bytes& buffer) {
+     int decode(const Buffer& buffer) {
         CborParser parser;
         CborValue it;
         cbor_check(cbor_parser_init(buffer.data(), buffer.size(), 0, &parser, &it));
@@ -3730,8 +3969,12 @@ public:
 
 class Ps4Request : public Msg {
 public:
-    static uint32_t msg_id() { return FNV("Ps4Request"); }
-    static const char* msg_name() { return "Ps4Request"; }
+
+    static const uint32_t MSG_ID = FNV("Ps4Request");
+    static constexpr const char *MSG_NAME ="Ps4Request";
+
+    virtual uint32_t msg_id() const { return MSG_ID; };
+    virtual const char *msg_name() const { return MSG_NAME; };
 
     typedef enum FieldId {
         REQ_ID = 0,
@@ -3754,62 +3997,72 @@ public:
 
     /// Serialize this message into a CBOR map keyed by field id.
     /// Writes into the parent encoder as a single map item.
-    int encode(Bytes& buffer)  {
+    int encode(Buffer& buffer) const {
+        buffer.clear();
         CborEncoder encoder;
         cbor_encoder_init(&encoder,buffer.data(),buffer.capacity(),0);
         // Count how many optional fields are set.
         uint32_t fieldCount = 0;
-        req_id.for_each([&](const auto&) { fieldCount++; });
-        rumble_small.for_each([&](const auto&) { fieldCount++; });
-        rumble_large.for_each([&](const auto&) { fieldCount++; });
-        led_red.for_each([&](const auto&) { fieldCount++; });
-        led_green.for_each([&](const auto&) { fieldCount++; });
-        led_blue.for_each([&](const auto&) { fieldCount++; });
-        led_flash_on.for_each([&](const auto&) { fieldCount++; });
-        led_flash_off.for_each([&](const auto&) { fieldCount++; });
+        if (req_id.is_some()) { fieldCount++; }
+        if (rumble_small.is_some()) { fieldCount++; }
+        if (rumble_large.is_some()) { fieldCount++; }
+        if (led_red.is_some()) { fieldCount++; }
+        if (led_green.is_some()) { fieldCount++; }
+        if (led_blue.is_some()) { fieldCount++; }
+        if (led_flash_on.is_some()) { fieldCount++; }
+        if (led_flash_off.is_some()) { fieldCount++; }
 
         CborEncoder mapEncoder;
         cbor_check(cbor_encoder_create_map(&encoder, &mapEncoder, fieldCount));
-        req_id.for_each([&](const auto& value) {
+        if ( req_id) {
+            const auto& value = *req_id;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::REQ_ID));
             cbor_check(cbor_encode_uint(&mapEncoder, value));
-        });
-        rumble_small.for_each([&](const auto& value) {
+        };
+        if ( rumble_small) {
+            const auto& value = *rumble_small;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::RUMBLE_SMALL));
             cbor_check(cbor_encode_int(&mapEncoder, value));
-        });
-        rumble_large.for_each([&](const auto& value) {
+        };
+        if ( rumble_large) {
+            const auto& value = *rumble_large;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::RUMBLE_LARGE));
             cbor_check(cbor_encode_int(&mapEncoder, value));
-        });
-        led_red.for_each([&](const auto& value) {
+        };
+        if ( led_red) {
+            const auto& value = *led_red;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::LED_RED));
             cbor_check(cbor_encode_int(&mapEncoder, value));
-        });
-        led_green.for_each([&](const auto& value) {
+        };
+        if ( led_green) {
+            const auto& value = *led_green;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::LED_GREEN));
             cbor_check(cbor_encode_int(&mapEncoder, value));
-        });
-        led_blue.for_each([&](const auto& value) {
+        };
+        if ( led_blue) {
+            const auto& value = *led_blue;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::LED_BLUE));
             cbor_check(cbor_encode_int(&mapEncoder, value));
-        });
-        led_flash_on.for_each([&](const auto& value) {
+        };
+        if ( led_flash_on) {
+            const auto& value = *led_flash_on;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::LED_FLASH_ON));
             cbor_check(cbor_encode_int(&mapEncoder, value));
-        });
-        led_flash_off.for_each([&](const auto& value) {
+        };
+        if ( led_flash_off) {
+            const auto& value = *led_flash_off;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::LED_FLASH_OFF));
             cbor_check(cbor_encode_int(&mapEncoder, value));
-        });
+        };
 
          cbor_check(cbor_encoder_close_container(&encoder, &mapEncoder));
+        buffer.resize(cbor_encoder_get_buffer_size(&encoder, buffer.data()));
          return 0;
     }
 
     /// Deserialize a Ps4Request from a CBOR map value.
     /// `it` must point to the map; after decoding it is advanced past the map.
-     int decode(const Bytes& buffer) {
+     int decode(const Buffer& buffer) {
         CborParser parser;
         CborValue it;
         cbor_check(cbor_parser_init(buffer.data(), buffer.size(), 0, &parser, &it));
@@ -3942,8 +4195,12 @@ public:
 
 class SysEvent : public Msg {
 public:
-    static uint32_t msg_id() { return FNV("SysEvent"); }
-    static const char* msg_name() { return "SysEvent"; }
+
+    static const uint32_t MSG_ID = FNV("SysEvent");
+    static constexpr const char *MSG_NAME ="SysEvent";
+
+    virtual uint32_t msg_id() const { return MSG_ID; };
+    virtual const char *msg_name() const { return MSG_NAME; };
 
     typedef enum FieldId {
         UTC = 0,
@@ -3962,52 +4219,60 @@ public:
 
     /// Serialize this message into a CBOR map keyed by field id.
     /// Writes into the parent encoder as a single map item.
-    int encode(Bytes& buffer)  {
+    int encode(Buffer& buffer) const {
+        buffer.clear();
         CborEncoder encoder;
         cbor_encoder_init(&encoder,buffer.data(),buffer.capacity(),0);
         // Count how many optional fields are set.
         uint32_t fieldCount = 0;
-        utc.for_each([&](const auto&) { fieldCount++; });
-        uptime.for_each([&](const auto&) { fieldCount++; });
-        free_heap.for_each([&](const auto&) { fieldCount++; });
-        flash_size.for_each([&](const auto&) { fieldCount++; });
-        cpu_board_type.for_each([&](const auto&) { fieldCount++; });
-        build_date_time.for_each([&](const auto&) { fieldCount++; });
+        if (utc.is_some()) { fieldCount++; }
+        if (uptime.is_some()) { fieldCount++; }
+        if (free_heap.is_some()) { fieldCount++; }
+        if (flash_size.is_some()) { fieldCount++; }
+        if (cpu_board_type.is_some()) { fieldCount++; }
+        if (build_date_time.is_some()) { fieldCount++; }
 
         CborEncoder mapEncoder;
         cbor_check(cbor_encoder_create_map(&encoder, &mapEncoder, fieldCount));
-        utc.for_each([&](const auto& value) {
+        if ( utc) {
+            const auto& value = *utc;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::UTC));
             cbor_check(cbor_encode_uint(&mapEncoder, value));
-        });
-        uptime.for_each([&](const auto& value) {
+        };
+        if ( uptime) {
+            const auto& value = *uptime;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::UPTIME));
             cbor_check(cbor_encode_uint(&mapEncoder, value));
-        });
-        free_heap.for_each([&](const auto& value) {
+        };
+        if ( free_heap) {
+            const auto& value = *free_heap;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::FREE_HEAP));
             cbor_check(cbor_encode_uint(&mapEncoder, value));
-        });
-        flash_size.for_each([&](const auto& value) {
+        };
+        if ( flash_size) {
+            const auto& value = *flash_size;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::FLASH_SIZE));
             cbor_check(cbor_encode_uint(&mapEncoder, value));
-        });
-        cpu_board_type.for_each([&](const auto& value) {
+        };
+        if ( cpu_board_type) {
+            const auto& value = *cpu_board_type;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::CPU_BOARD_TYPE));
             cbor_check(cbor_encode_text_string(&mapEncoder, value.c_str(), value.length()));
-        });
-        build_date_time.for_each([&](const auto& value) {
+        };
+        if ( build_date_time) {
+            const auto& value = *build_date_time;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::BUILD_DATE_TIME));
             cbor_check(cbor_encode_text_string(&mapEncoder, value.c_str(), value.length()));
-        });
+        };
 
          cbor_check(cbor_encoder_close_container(&encoder, &mapEncoder));
+        buffer.resize(cbor_encoder_get_buffer_size(&encoder, buffer.data()));
          return 0;
     }
 
     /// Deserialize a SysEvent from a CBOR map value.
     /// `it` must point to the map; after decoding it is advanced past the map.
-     int decode(const Bytes& buffer) {
+     int decode(const Buffer& buffer) {
         CborParser parser;
         CborValue it;
         cbor_check(cbor_parser_init(buffer.data(), buffer.size(), 0, &parser, &it));
@@ -4116,8 +4381,12 @@ public:
 
 class SysReply : public Msg {
 public:
-    static uint32_t msg_id() { return FNV("SysReply"); }
-    static const char* msg_name() { return "SysReply"; }
+
+    static const uint32_t MSG_ID = FNV("SysReply");
+    static constexpr const char *MSG_NAME ="SysReply";
+
+    virtual uint32_t msg_id() const { return MSG_ID; };
+    virtual const char *msg_name() const { return MSG_NAME; };
 
     typedef enum FieldId {
         REQ_ID = 0,
@@ -4130,37 +4399,42 @@ public:
 
     /// Serialize this message into a CBOR map keyed by field id.
     /// Writes into the parent encoder as a single map item.
-    int encode(Bytes& buffer)  {
+    int encode(Buffer& buffer) const {
+        buffer.clear();
         CborEncoder encoder;
         cbor_encoder_init(&encoder,buffer.data(),buffer.capacity(),0);
         // Count how many optional fields are set.
         uint32_t fieldCount = 0;
-        req_id.for_each([&](const auto&) { fieldCount++; });
-        rc.for_each([&](const auto&) { fieldCount++; });
-        message.for_each([&](const auto&) { fieldCount++; });
+        if (req_id.is_some()) { fieldCount++; }
+        if (rc.is_some()) { fieldCount++; }
+        if (message.is_some()) { fieldCount++; }
 
         CborEncoder mapEncoder;
         cbor_check(cbor_encoder_create_map(&encoder, &mapEncoder, fieldCount));
-        req_id.for_each([&](const auto& value) {
+        if ( req_id) {
+            const auto& value = *req_id;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::REQ_ID));
             cbor_check(cbor_encode_uint(&mapEncoder, value));
-        });
-        rc.for_each([&](const auto& value) {
+        };
+        if ( rc) {
+            const auto& value = *rc;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::RC));
             cbor_check(cbor_encode_int(&mapEncoder, value));
-        });
-        message.for_each([&](const auto& value) {
+        };
+        if ( message) {
+            const auto& value = *message;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::MESSAGE));
             cbor_check(cbor_encode_text_string(&mapEncoder, value.c_str(), value.length()));
-        });
+        };
 
          cbor_check(cbor_encoder_close_container(&encoder, &mapEncoder));
+        buffer.resize(cbor_encoder_get_buffer_size(&encoder, buffer.data()));
          return 0;
     }
 
     /// Deserialize a SysReply from a CBOR map value.
     /// `it` must point to the map; after decoding it is advanced past the map.
-     int decode(const Bytes& buffer) {
+     int decode(const Buffer& buffer) {
         CborParser parser;
         CborValue it;
         cbor_check(cbor_parser_init(buffer.data(), buffer.size(), 0, &parser, &it));
@@ -4237,8 +4511,12 @@ public:
 
 class SysRequest : public Msg {
 public:
-    static uint32_t msg_id() { return FNV("SysRequest"); }
-    static const char* msg_name() { return "SysRequest"; }
+
+    static const uint32_t MSG_ID = FNV("SysRequest");
+    static constexpr const char *MSG_NAME ="SysRequest";
+
+    virtual uint32_t msg_id() const { return MSG_ID; };
+    virtual const char *msg_name() const { return MSG_NAME; };
 
     typedef enum FieldId {
         REQ_ID = 0,
@@ -4253,42 +4531,48 @@ public:
 
     /// Serialize this message into a CBOR map keyed by field id.
     /// Writes into the parent encoder as a single map item.
-    int encode(Bytes& buffer)  {
+    int encode(Buffer& buffer) const {
+        buffer.clear();
         CborEncoder encoder;
         cbor_encoder_init(&encoder,buffer.data(),buffer.capacity(),0);
         // Count how many optional fields are set.
         uint32_t fieldCount = 0;
-        req_id.for_each([&](const auto&) { fieldCount++; });
-        set_time.for_each([&](const auto&) { fieldCount++; });
-        reboot.for_each([&](const auto&) { fieldCount++; });
-        console.for_each([&](const auto&) { fieldCount++; });
+        if (req_id.is_some()) { fieldCount++; }
+        if (set_time.is_some()) { fieldCount++; }
+        if (reboot.is_some()) { fieldCount++; }
+        if (console.is_some()) { fieldCount++; }
 
         CborEncoder mapEncoder;
         cbor_check(cbor_encoder_create_map(&encoder, &mapEncoder, fieldCount));
-        req_id.for_each([&](const auto& value) {
+        if ( req_id) {
+            const auto& value = *req_id;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::REQ_ID));
             cbor_check(cbor_encode_uint(&mapEncoder, value));
-        });
-        set_time.for_each([&](const auto& value) {
+        };
+        if ( set_time) {
+            const auto& value = *set_time;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::SET_TIME));
             cbor_check(cbor_encode_uint(&mapEncoder, value));
-        });
-        reboot.for_each([&](const auto& value) {
+        };
+        if ( reboot) {
+            const auto& value = *reboot;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::REBOOT));
             cbor_check(cbor_encode_boolean(&mapEncoder, value));
-        });
-        console.for_each([&](const auto& value) {
+        };
+        if ( console) {
+            const auto& value = *console;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::CONSOLE));
             cbor_check(cbor_encode_text_string(&mapEncoder, value.c_str(), value.length()));
-        });
+        };
 
          cbor_check(cbor_encoder_close_container(&encoder, &mapEncoder));
+        buffer.resize(cbor_encoder_get_buffer_size(&encoder, buffer.data()));
          return 0;
     }
 
     /// Deserialize a SysRequest from a CBOR map value.
     /// `it` must point to the map; after decoding it is advanced past the map.
-     int decode(const Bytes& buffer) {
+     int decode(const Buffer& buffer) {
         CborParser parser;
         CborValue it;
         cbor_check(cbor_parser_init(buffer.data(), buffer.size(), 0, &parser, &it));
@@ -4372,8 +4656,12 @@ public:
 
 class UsEvent : public Msg {
 public:
-    static uint32_t msg_id() { return FNV("UsEvent"); }
-    static const char* msg_name() { return "UsEvent"; }
+
+    static const uint32_t MSG_ID = FNV("UsEvent");
+    static constexpr const char *MSG_NAME ="UsEvent";
+
+    virtual uint32_t msg_id() const { return MSG_ID; };
+    virtual const char *msg_name() const { return MSG_NAME; };
 
     typedef enum FieldId {
         DISTANCE = 0,
@@ -4386,37 +4674,42 @@ public:
 
     /// Serialize this message into a CBOR map keyed by field id.
     /// Writes into the parent encoder as a single map item.
-    int encode(Bytes& buffer)  {
+    int encode(Buffer& buffer) const {
+        buffer.clear();
         CborEncoder encoder;
         cbor_encoder_init(&encoder,buffer.data(),buffer.capacity(),0);
         // Count how many optional fields are set.
         uint32_t fieldCount = 0;
-        distance.for_each([&](const auto&) { fieldCount++; });
-        temperature.for_each([&](const auto&) { fieldCount++; });
-        status.for_each([&](const auto&) { fieldCount++; });
+        if (distance.is_some()) { fieldCount++; }
+        if (temperature.is_some()) { fieldCount++; }
+        if (status.is_some()) { fieldCount++; }
 
         CborEncoder mapEncoder;
         cbor_check(cbor_encoder_create_map(&encoder, &mapEncoder, fieldCount));
-        distance.for_each([&](const auto& value) {
+        if ( distance) {
+            const auto& value = *distance;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::DISTANCE));
             cbor_check(cbor_encode_float(&mapEncoder, value));
-        });
-        temperature.for_each([&](const auto& value) {
+        };
+        if ( temperature) {
+            const auto& value = *temperature;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::TEMPERATURE));
             cbor_check(cbor_encode_float(&mapEncoder, value));
-        });
-        status.for_each([&](const auto& value) {
+        };
+        if ( status) {
+            const auto& value = *status;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::STATUS));
             cbor_check(cbor_encode_int(&mapEncoder, value));
-        });
+        };
 
          cbor_check(cbor_encoder_close_container(&encoder, &mapEncoder));
+        buffer.resize(cbor_encoder_get_buffer_size(&encoder, buffer.data()));
          return 0;
     }
 
     /// Deserialize a UsEvent from a CBOR map value.
     /// `it` must point to the map; after decoding it is advanced past the map.
-     int decode(const Bytes& buffer) {
+     int decode(const Buffer& buffer) {
         CborParser parser;
         CborValue it;
         cbor_check(cbor_parser_init(buffer.data(), buffer.size(), 0, &parser, &it));
@@ -4502,8 +4795,12 @@ public:
 
 class WifiEvent : public Msg {
 public:
-    static uint32_t msg_id() { return FNV("WifiEvent"); }
-    static const char* msg_name() { return "WifiEvent"; }
+
+    static const uint32_t MSG_ID = FNV("WifiEvent");
+    static constexpr const char *MSG_NAME ="WifiEvent";
+
+    virtual uint32_t msg_id() const { return MSG_ID; };
+    virtual const char *msg_name() const { return MSG_NAME; };
 
     typedef enum FieldId {
         IP = 0,
@@ -4526,62 +4823,72 @@ public:
 
     /// Serialize this message into a CBOR map keyed by field id.
     /// Writes into the parent encoder as a single map item.
-    int encode(Bytes& buffer)  {
+    int encode(Buffer& buffer) const {
+        buffer.clear();
         CborEncoder encoder;
         cbor_encoder_init(&encoder,buffer.data(),buffer.capacity(),0);
         // Count how many optional fields are set.
         uint32_t fieldCount = 0;
-        ip.for_each([&](const auto&) { fieldCount++; });
-        gateway.for_each([&](const auto&) { fieldCount++; });
-        netmask.for_each([&](const auto&) { fieldCount++; });
-        ssid.for_each([&](const auto&) { fieldCount++; });
-        bssid.for_each([&](const auto&) { fieldCount++; });
-        channel.for_each([&](const auto&) { fieldCount++; });
-        rssi.for_each([&](const auto&) { fieldCount++; });
-        mac.for_each([&](const auto&) { fieldCount++; });
+        if (ip.is_some()) { fieldCount++; }
+        if (gateway.is_some()) { fieldCount++; }
+        if (netmask.is_some()) { fieldCount++; }
+        if (ssid.is_some()) { fieldCount++; }
+        if (bssid.is_some()) { fieldCount++; }
+        if (channel.is_some()) { fieldCount++; }
+        if (rssi.is_some()) { fieldCount++; }
+        if (mac.is_some()) { fieldCount++; }
 
         CborEncoder mapEncoder;
         cbor_check(cbor_encoder_create_map(&encoder, &mapEncoder, fieldCount));
-        ip.for_each([&](const auto& value) {
+        if ( ip) {
+            const auto& value = *ip;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::IP));
             cbor_check(cbor_encode_text_string(&mapEncoder, value.c_str(), value.length()));
-        });
-        gateway.for_each([&](const auto& value) {
+        };
+        if ( gateway) {
+            const auto& value = *gateway;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::GATEWAY));
             cbor_check(cbor_encode_text_string(&mapEncoder, value.c_str(), value.length()));
-        });
-        netmask.for_each([&](const auto& value) {
+        };
+        if ( netmask) {
+            const auto& value = *netmask;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::NETMASK));
             cbor_check(cbor_encode_text_string(&mapEncoder, value.c_str(), value.length()));
-        });
-        ssid.for_each([&](const auto& value) {
+        };
+        if ( ssid) {
+            const auto& value = *ssid;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::SSID));
             cbor_check(cbor_encode_text_string(&mapEncoder, value.c_str(), value.length()));
-        });
-        bssid.for_each([&](const auto& value) {
+        };
+        if ( bssid) {
+            const auto& value = *bssid;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::BSSID));
             cbor_check(cbor_encode_text_string(&mapEncoder, value.c_str(), value.length()));
-        });
-        channel.for_each([&](const auto& value) {
+        };
+        if ( channel) {
+            const auto& value = *channel;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::CHANNEL));
             cbor_check(cbor_encode_int(&mapEncoder, value));
-        });
-        rssi.for_each([&](const auto& value) {
+        };
+        if ( rssi) {
+            const auto& value = *rssi;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::RSSI));
             cbor_check(cbor_encode_int(&mapEncoder, value));
-        });
-        mac.for_each([&](const auto& value) {
+        };
+        if ( mac) {
+            const auto& value = *mac;
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::MAC));
             cbor_check(cbor_encode_text_string(&mapEncoder, value.c_str(), value.length()));
-        });
+        };
 
          cbor_check(cbor_encoder_close_container(&encoder, &mapEncoder));
+        buffer.resize(cbor_encoder_get_buffer_size(&encoder, buffer.data()));
          return 0;
     }
 
     /// Deserialize a WifiEvent from a CBOR map value.
     /// `it` must point to the map; after decoding it is advanced past the map.
-     int decode(const Bytes& buffer) {
+     int decode(const Buffer& buffer) {
         CborParser parser;
         CborValue it;
         cbor_check(cbor_parser_init(buffer.data(), buffer.size(), 0, &parser, &it));

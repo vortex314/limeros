@@ -12,9 +12,9 @@ SysActor::SysActor(const char *name) : Actor(name)
 
 void SysActor::on_start()
 {
-    DeviceAliveEvent *alive_event = new DeviceAliveEvent();
-    alive_event->publishes.push_back(SysEvent::name_value);
-    emit(alive_event);
+    EndpointAnnounce *announce = new EndpointAnnounce();
+    announce->events={SysEvent::MSG_ID};
+    emit(announce);
 }
 
 SysActor::~SysActor()
@@ -56,14 +56,12 @@ void SysActor::reboot(bool b)
         esp_restart();
 }
 
-void SysActor::on_message(const ActorMessage &env)
+void SysActor::on_message(const ActorMessage &msg)
 {
-    const Msg &msg = *env.msg;
-    msg.handle<SysRequest>([&](auto sys_cmd)
-                       { if ( sys_cmd.reboot) reboot(*sys_cmd.reboot);
-                         if ( sys_cmd.set_time) set_utc(*sys_cmd.set_time); 
-                        if ( sys_cmd.console ) INFO("SysCmd.console from %s: %s", (*env.src).name(), (*sys_cmd.console).c_str()); });
-    msg.handle<TimerMsg>([&](const TimerMsg &msg)
+    msg.handle_if<SysRequest>([&](auto sys_request)
+                       { if ( sys_request.reboot) reboot(*sys_request.reboot);
+                         if ( sys_request.set_time) set_utc(*sys_request.set_time); }); 
+    msg.handle_if<TimerMsg>([&](const TimerMsg &msg)
                          { on_timer(msg.timer_id); });
 }
 void SysActor::on_timer(int id)
@@ -76,16 +74,16 @@ void SysActor::on_timer(int id)
 
 void SysActor::publish_info()
 {
-    SysEvent *sys_info = new SysEvent();
-    sys_info->cpu_board = "ESP32-DEVKIT1";
-    sys_info->free_heap = (int64_t)esp_get_free_heap_size();
-    sys_info->uptime = esp_timer_get_time() / 1000;
+    SysEvent *sys_event = new SysEvent();
+    sys_event->cpu_board_type = "ESP32-DEVKIT1";
+    sys_event->free_heap = (int64_t)esp_get_free_heap_size();
+    sys_event->uptime = esp_timer_get_time() / 1000;
     uint32_t flash_size = 0;
     esp_flash_get_size(NULL, &flash_size);
-    sys_info->flash = (int64_t)flash_size;
-    sys_info->build_date = __DATE__ " " __TIME__;
+    sys_event->flash_size = (int64_t)flash_size;
+    sys_event->build_date_time = __DATE__ " " __TIME__;
     struct timeval tv1;
     gettimeofday(&tv1, NULL);
-    sys_info->utc = tv1.tv_sec;
-    emit(sys_info);
+    sys_event->utc = tv1.tv_sec;
+    emit(sys_event);
 }

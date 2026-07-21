@@ -29,20 +29,35 @@
 #include <lwip/inet.h>
 #include <msgs.h>
 
-class Unicast : public Msg {
+class RxdMsg : public Msg {
 public:
-  static uint32_t msg_id() { return FNV("Unicast"); }
-  static const char *msg_name() { return "Unicast"; }
-  Unicast(Envelope env) : env(env) {}
+  static const uint32_t MSG_ID = FNV("RxdMsg");
+  static constexpr const char *MSG_NAME = "RxdMsg";
+
+  virtual uint32_t msg_id() const { return MSG_ID; };
+  virtual const char *msg_name() const { return MSG_NAME; };
+  RxdMsg(Envelope env) : env(env) {}
     Envelope env;
 };
 
-class Multicast : public Msg {
+class TxdMsg : public Msg {
 public:
-  static uint32_t msg_id() { return FNV("Multicast"); }
-  static const char *msg_name() { return "Multicast"; }
-  Multicast(Envelope env) : env(env) {}
+  static const uint32_t MSG_ID = FNV("TxdMsg");
+  static constexpr const char *MSG_NAME = "TxdMsg";
+
+  virtual uint32_t msg_id() const { return MSG_ID; };
+  virtual const char *msg_name() const { return MSG_NAME; };
+  TxdMsg(Envelope env) : env(env) {}
     Envelope env;
+};
+
+class Transmitting : public Msg {
+public:
+  static const uint32_t MSG_ID = FNV("Transmitting");
+  static constexpr const char *MSG_NAME = "Transmitting";
+
+  virtual uint32_t msg_id() const { return MSG_ID; };
+  virtual const char *msg_name() const { return MSG_NAME; };
 };
 
 class McActor : public Actor
@@ -77,10 +92,10 @@ public:
   void start_unicast_listener();
   void start_multicast_listener();
   void stop_listener();
-  void send_unicast(Envelope &envelope);
-  void send_multicast(Envelope &envelope);
-  void on_udp_raw(const Bytes &request, const sockaddr_in &sender_addr);
-  void on_udp_message(Envelope &udp_message, const sockaddr_in &sender_addr);
+  void send_unicast(const Envelope &envelope);
+  void send_multicast(const Envelope &envelope);
+  void on_udp_raw(const Buffer &request, const sockaddr_in &sender_addr);
+  void on_udp_message(Envelope *udp_message, const sockaddr_in &sender_addr);
   void send_ping_req(uint32_t dst, uint32_t number);
   void send_ping_rep(uint32_t dst, uint32_t number);
   Result<Bytes> encode_message(uint32_t dst, uint32_t src, uint32_t type, const Bytes &value);

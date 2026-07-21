@@ -50,8 +50,8 @@ void Max31855Actor::on_start()
         return;
     }
     EndpointAnnounce *announce = new EndpointAnnounce;
-    announce->events = {Max31855Event::msg_id(), HeatingEvent::msg_id()};
-    announce->services = {Max31855Read::msg_id(), HeatingRequest::msg_id()};
+    announce->events = {Max31855Event::MSG_ID, HeatingEvent::MSG_ID};
+    announce->services = {Max31855Read::MSG_ID, HeatingRequest::MSG_ID};
     emit(announce);
 
     gpio_set_direction(_pin_ssr, GPIO_MODE_OUTPUT);

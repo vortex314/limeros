@@ -16,7 +16,7 @@
 #define cbor_check(X) { \
     CborError err = X; \
     if (err != CborNoError) { \
-        WARN("failed cbor : %s",#X); \
+        WARN("failed cbor : %s : %d",#X, err); \
          return EINVAL; \
     }   \
     }
@@ -342,8 +342,12 @@
 
 class {{ msg.name }} : public Msg {
 public:
-    static uint32_t msg_id() { return FNV("{{ msg.name }}"); }
-    static const char* msg_name() { return "{{ msg.name }}"; }
+
+    static const uint32_t MSG_ID = FNV("{{ msg.name }}");
+    static constexpr const char *MSG_NAME ="{{ msg.name }}";
+
+    virtual uint32_t msg_id() const { return MSG_ID; };
+    virtual const char *msg_name() const { return MSG_NAME; };
 
     typedef enum FieldId {
 {%- for field in msg.fields %}
@@ -359,32 +363,35 @@ public:
 
     /// Serialize this message into a CBOR map keyed by field id.
     /// Writes into the parent encoder as a single map item.
-    int encode(Bytes& buffer)  {
+    int encode(Buffer& buffer) const {
+        buffer.clear();
         CborEncoder encoder;
         cbor_encoder_init(&encoder,buffer.data(),buffer.capacity(),0);
         // Count how many optional fields are set.
         uint32_t fieldCount = 0;
 {%- for field in msg.fields %}
-        {{ field.name }}.for_each([&](const auto&) { fieldCount++; });
+        if ({{ field.name }}.is_some()) { fieldCount++; }
 {%- endfor %}
 
         CborEncoder mapEncoder;
         cbor_check(cbor_encoder_create_map(&encoder, &mapEncoder, fieldCount));
 
 {%- for field in msg.fields %}
-        {{ field.name }}.for_each([&](const auto& value) {
+        if ( {{ field.name }}) {
+            const auto& value = *{{ field.name }};
             cbor_check(cbor_encode_uint(&mapEncoder, FieldId::{{ field.name | upper }}));
             {{ self::encode_value(field=field) }}
-        });
+        };
 {%- endfor %}
 
          cbor_check(cbor_encoder_close_container(&encoder, &mapEncoder));
+        buffer.resize(cbor_encoder_get_buffer_size(&encoder, buffer.data()));
          return 0;
     }
 
     /// Deserialize a {{ msg.name }} from a CBOR map value.
     /// `it` must point to the map; after decoding it is advanced past the map.
-     int decode(const Bytes& buffer) {
+     int decode(const Buffer& buffer) {
         CborParser parser;
         CborValue it;
         cbor_check(cbor_parser_init(buffer.data(), buffer.size(), 0, &parser, &it));

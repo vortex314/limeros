@@ -6,12 +6,16 @@
 #include <option.h>
 #include <msgs.h>
 #include <driver/uart.h>
+#include <mc_actor.h>
 
 class UartRxd : public Msg
 {
 public:
-    static uint32_t msg_id() { return FNV("UartRxd"); }
-    static const char *msg_name() { return "UartRxd"; }
+    static const uint32_t MSG_ID = FNV("UartRxd");
+    static constexpr const char *MSG_NAME = "UartRxd";
+
+    virtual uint32_t msg_id() const { return MSG_ID; };
+    virtual const char *msg_name() const { return MSG_NAME; };
     Bytes payload;
     UartRxd(const Bytes &payload) : payload(payload) {};
 
@@ -32,7 +36,7 @@ public:
     TaskHandle_t uart_task_handle = NULL;
     static const int UART_PORT = UART_NUM_1;
     static const int UART_BUF_SIZE = 1024;
-    Bytes uart_read_buffer;
+    Buffer uart_read_buffer;
 
 public:
     HoverboardActor(const char *name);
@@ -41,11 +45,11 @@ public:
     void on_timer(int timer_id);
     void on_start();
     Result<bool> init_uart();
-    void write_uart(const Bytes &);
-    void handle_uart_bytes(const Bytes &);
-    static Result<Bytes> cobs_decode(const Bytes &input);
-    static Result<Bytes> check_crc(const Bytes &input);
-    static Result<HoverboardEvent *> parse_info_msg(const Bytes &input);
+    void write_uart(const Buffer &);
+    void handle_uart_bytes(const Buffer &);
+    static Result<Buffer> cobs_decode(const Buffer &input);
+    static Result<Buffer> check_crc(const Buffer &input);
+    static Result<HoverboardEvent *> parse_info_msg(const Buffer &input);
 };
 
 #endif
