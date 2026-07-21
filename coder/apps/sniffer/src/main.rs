@@ -14,6 +14,7 @@ use std::io::{BufWriter, Write};
 use std::net::{Ipv4Addr, SocketAddr};
 use std::sync::Arc;
 use tokio::sync::Mutex;
+use generated::generated::{id_to_string, ID_TO_NAME};    
 
 #[derive(Parser, Debug)]
 #[command(about = "Sniff all messages on the bus and log to file")]
@@ -59,7 +60,7 @@ fn format_payload(msg_type: Option<u32>, payload: Option<&[u8]>) -> String {
         ($ty:ty) => {{
             if msg_type == Some(<$ty>::id()) {
                 if let Ok(m) = <$ty>::from_bytes(bytes) {
-                    return format!("{:?}", m);
+                    return serde_json::to_string(&m).unwrap_or_else(|_| format!("{:?}", m));
                 }
             }
         }};
@@ -200,10 +201,11 @@ async fn main() -> Result<()> {
                 if let Ok(announce) = EndpointAnnounce::from_bytes(payload) {
                     if let (Some(ep_id), Some(ep_name)) = (announce.id, announce.name) {
                         let mut nm = name_map.lock().await;
-                        if !nm.contains_key(&ep_id) {
+                        /* if !nm.contains_key(&ep_id) {
                             nm.insert(ep_id, ep_name.clone());
                             info!("Discovered endpoint: {} (id={})", ep_name, ep_id);
-                        }
+                        }*/
+                        ID_TO_NAME.insert(ep_id, ep_name);
                     }
                 }
             }
@@ -219,10 +221,17 @@ async fn main() -> Result<()> {
         let payload_str = format_payload(msg.msg_type, msg.payload.as_deref());
         let req_id = msg.request_id.map(|v| format!("{}", v)).unwrap_or_else(|| "-".to_string());
 
-        let line = format!(
+        /*let line = format!(
             "{} src={} dst={} msg_type={} req_id={} payload={}",
             timestamp, src, dst, mt_name, req_id, payload_str
-        );
+        );*/
+        let mut line = format!("{{");
+        msg.src.map(|s| line.push_str(&format!("\"src\":\"{}\",", id_to_string(s))));
+        msg.dst.map(|d| line.push_str(&format!("\"dst\":\"{}\",", id_to_string(d))));
+        msg.msg_type.map(|mt| line.push_str(&format!("\"msg_type\":\"{}\",", id_to_string(mt))));
+        msg.request_id.map(|rid| line.push_str(&format!("\"request_id\":{},", rid)));
+        line.push_str(&format!("\"payload\":{}", payload_str));
+        line.push_str("}}");
 
         if args.verbose {
             println!("{}", line);

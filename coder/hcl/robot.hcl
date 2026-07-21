@@ -235,13 +235,13 @@ robot "ronald" {
     field "build_date_time" { id = 5 type = "string" }
   }
 
-  message PingRequest { // is send as a reply to EndpointAnnounce, on ip port and addr of the sender
+  message PingRequest { 
     description = "Ping request message"
     field "req_id" { id = 0 type = "uint32" }
     field "timestamp" { id = 1 type = "uint64"  description = "Timestamp in milliseconds since epoch"}
   }
 
-  message PingReply { // is send as a reply to EndpointAnnounce, on ip port and addr of the sender
+  message PingReply { 
     description = "Ping reply message"
     field "req_id" { id = 0 type = "uint32" }
     field "timestamp" { id = 1 type = "uint64"  description = "Timestamp in milliseconds since epoch"}

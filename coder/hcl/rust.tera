@@ -7,6 +7,10 @@ pub trait Msg: Sized + serde::Serialize + serde::de::DeserializeOwned {
     fn id() -> u32;
     fn name() -> &'static str;
 
+    fn to_json(&self) -> anyhow::Result<String> {
+        serde_json::to_string(self).context("Failed to serialize to JSON")
+    }
+
     fn from_bytes(data: &[u8]) -> anyhow::Result<Self> {
         cbor2::from_reader(data).context("Failed to deserialize from CBOR")
     }
@@ -24,7 +28,28 @@ pub const {{ endpoint.name | upper }}_ID: u32 = {{ endpoint.id }};
 {% endfor %}
 
 
+use dashmap::DashMap;
+use lazy_static::lazy_static;
+
+lazy_static! {
+    pub static ref ID_TO_NAME: DashMap<u32, String> = {
+        let m = DashMap::new();
+        {%- for msg in messages %}
+        m.insert({{ msg.id }}, "{{ msg.name }}".to_string());
+        {%- endfor %}
+        {%- for ep in endpoints %}
+        m.insert({{ ep.id }}, "{{ ep.name }}".to_string());
+        {% endfor %}
+        m
+    };
+}
+
+pub fn id_to_string(msg_id: u32) -> String {
+    ID_TO_NAME.get(&msg_id).map(|entry| entry.to_string()).unwrap_or_else(|| format!("Unknown({})", msg_id))
+}
+
 {% for msg in messages %}
+
 
 #[derive(Debug, Clone, PartialEq, cbor2::Cbor)]
 pub struct {{ msg.name }} {

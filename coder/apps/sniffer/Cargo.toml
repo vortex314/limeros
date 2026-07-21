@@ -12,3 +12,4 @@ clap = { version = "4.5.53", features = ["derive"] }
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "time"] }
 chrono = "0.4.45"
 cbor2 = "*"
+serde_json="*"

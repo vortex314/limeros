@@ -1,0 +1,64 @@
+// Auto-generated from robot.hcl — do not edit by hand.
+// Header file — class declarations for generated messages.
+// Every field is `Option<T>`; missing fields are omitted from encoded CBOR.
+// Messages are encoded as CBOR maps keyed by field id.
+// Uses TinyCBOR for CBOR encoding/decoding.
+#ifndef HCL_CPP_TERA
+#define HCL_CPP_TERA
+#pragma once
+
+#include <cbor.h>
+#include <errno.h>
+#include <msg.h>
+#include <unordered_map>
+#include <string>
+
+// ── TinyCBOR helper ────────────────────────────────────────────────────────
+
+#define cbor_check(X) { \
+    CborError err = X; \
+    if (err != CborNoError) { \
+        WARN("failed cbor : %s : %d",#X, err); \
+         return EINVAL; \
+    }   \
+    }
+
+// ── Name lookup ────────────────────────────────────────────────────────────
+
+extern std::unordered_map<uint32_t, const char*> id_to_name;
+const char *id_to_string(uint32_t msg_id);
+
+// ── Messages ───────────────────────────────────────────────────────────────
+
+{% for msg in messages %}
+
+class {{ msg.name }} : public Msg {
+public:
+
+    static const uint32_t MSG_ID = FNV("{{ msg.name }}");
+    static constexpr const char *MSG_NAME ="{{ msg.name }}";
+
+    virtual uint32_t msg_id() const { return MSG_ID; };
+    virtual const char *msg_name() const { return MSG_NAME; };
+
+    typedef enum FieldId {
+{%- for field in msg.fields %}
+        {{ field.name | upper }} = {{ field.id }},
+{%- endfor %}
+    } FieldId;
+
+{%- for field in msg.fields %}
+    Option<{{ field.cpp_type }}> {{ field.name }};     {%- if field.description -%}
+            // {{ field.description }}
+{%- endif -%}
+{%- endfor %}
+
+    /// Serialize this message into a CBOR map keyed by field id.
+    int encode(Buffer& buffer) const;
+
+    /// Deserialize a {{ msg.name }} from a CBOR map value.
+    int decode(const Buffer& buffer);
+};
+
+{% endfor %}
+#endif

@@ -1,16 +1,20 @@
-//! Code generator: reads an HCL robot config and emits code via a Tera template.
+//! Code generator: reads an HCL robot config and emits code via Tera templates.
 //!
-//! Templates live in `hcl/*.tera`.  Use `-t` to pick one:
-//!   cargo run --bin hcl_codegen -- -t rust.tera -o src/messages.rs
-//!   cargo run --bin hcl_codegen -- -t cpp.tera  -o src/messages.h
+//! Usage:
+//!   cargo run --bin codegen \
+//!     -g rust.tera ../generated/src/generated.rs \
+//!     -g cpp_header.tera ../generated/cpp/generated.h \
+//!     -g cpp_source.tera ../generated/cpp/generated.cpp
+//!
+//!   cargo run --bin codegen \
+//!     -i hcl/robot.hcl \
+//!     -g rust.tera ../generated/src/generated.rs
 
 use anyhow::Context;
 use clap::Parser;
-use common::{load_robot_config, MessageConfig, RobotConfig, SubscribeConfig, fnv1a_32};
+use common::{fnv1a_32, load_robot_config, MessageConfig, RobotConfig, SubscribeConfig};
 use serde::Serialize;
 use tera::{Context as TeraContext, Tera};
-
-
 
 #[derive(Parser)]
 #[command(about = "Generate code from an HCL robot config")]
@@ -18,43 +22,77 @@ struct Args {
     /// Path to the HCL robot config
     #[arg(short = 'i', long, default_value = "../../hcl/robot.hcl")]
     input: String,
-    /// Output file
-    #[arg(short = 'o', long, default_value = "../../generated/src/generated.rs")]
-    output: String,
-    /// Tera template name (from hcl/*.tera)
-    #[arg(short = 't', long, default_value = "rust.tera")]
-    template: String,
+
+    /// Template directory
     #[arg(short = 'd', long, default_value = "hcl")]
     template_dir: String,
+
+    /// Template → output pairs (repeatable): -g TEMPLATE OUTPUT
+    #[arg(
+        short = 'g',
+        long = "gen",
+        num_args = 2,
+        value_names = ["TEMPLATE", "OUTPUT"],
+        required = true
+    )]
+    generators: Vec<String>,
 }
 
 fn main() -> anyhow::Result<()> {
     let args = Args::parse();
+
+    // ── Load config and build template context once ──────────────────────
     let cfg = load_robot_config(&args.input)
         .with_context(|| format!("failed to load {}", args.input))?;
-
     let tera_context = build_template_context(&cfg)?;
     let tera = Tera::new(&format!("{}/{}", &args.template_dir, "*.tera"))
         .with_context(|| format!("failed to load templates from {}", &args.template_dir))?;
-    let code = tera
-        .render(&args.template, &tera_context)
-        .with_context(|| format!("template rendering failed for {}", args.template))?;
 
-    std::fs::write(&args.output, &code)
-        .with_context(|| format!("failed to write {}", args.output))?;
+    // ── Iterate over template → output pairs ─────────────────────────────
+    for pair in args.generators.chunks(2) {
+        let template = &pair[0];
+        let output = &pair[1];
 
-    let msg_count = tera_context.get("messages").and_then(|v| v.as_array()).map(|a| a.len()).unwrap_or(0);
-    let ep_count = tera_context.get("endpoints").and_then(|v| v.as_array()).map(|a| a.len()).unwrap_or(0);
+        let code = render_template(&tera, template, &tera_context)
+            .with_context(|| format!("template rendering failed for {template}"))?;
+        std::fs::write(output, &code)
+            .with_context(|| format!("failed to write {output}"))?;
+
+        let ext = template.split('.').next().unwrap_or(template);
+        eprintln!("{ext:>8} -> {output}");
+    }
+
+    let msg_count = tera_context
+        .get("messages")
+        .and_then(|v| v.as_array())
+        .map(|a| a.len())
+        .unwrap_or(0);
+    let ep_count = tera_context
+        .get("endpoints")
+        .and_then(|v| v.as_array())
+        .map(|a| a.len())
+        .unwrap_or(0);
     eprintln!(
-        "Wrote {} messages, {} endpoints to {}",
-        msg_count, ep_count, args.output
+        "Done: {} messages, {} endpoints → {} file(s)",
+        msg_count,
+        ep_count,
+        args.generators.len() / 2
     );
+
     Ok(())
 }
 
+/// Render a single template with the given context.
+fn render_template(
+    tera: &Tera,
+    template_name: &str,
+    ctx: &TeraContext,
+) -> anyhow::Result<String> {
+    tera.render(template_name, ctx)
+        .with_context(|| format!("template rendering failed for {template_name}"))
+}
+
 // ── Template data model ─────────────────────────────────────────────────
-
-
 
 #[derive(Serialize)]
 struct TemplateCtx {
@@ -124,7 +162,7 @@ fn build_template_context(cfg: &RobotConfig) -> anyhow::Result<TeraContext> {
         let ep = &cfg.endpoints[ep_name];
         endpoints.push(EndpointCtx {
             name: ep_name.clone(),
-            id: fnv1a_32(&ep_name),
+            id: fnv1a_32(ep_name),
             const_name: to_const_ident(ep_name),
             interfaces: ep.interfaces.clone(),
             subscribes: ep.subscribes.iter().map(subscribe_to_ctx).collect(),
@@ -140,7 +178,10 @@ fn build_template_context(cfg: &RobotConfig) -> anyhow::Result<TeraContext> {
             model: cfg.model.clone(),
             description: cfg.description.clone().unwrap_or_default(),
             multicast_port: cfg.multicast_port,
-            multicast_addr: cfg.multicast_addr.clone().unwrap_or("224.0.0.1".to_string()),
+            multicast_addr: cfg
+                .multicast_addr
+                .clone()
+                .unwrap_or("224.0.0.1".to_string()),
         },
         messages,
         endpoints,
@@ -165,16 +206,14 @@ fn message_to_ctx(name: &str, msg: &MessageConfig) -> anyhow::Result<MessageCtx>
         .map(|(i, f)| FieldCtx {
             name: f.name.clone(),
             id: f.id.unwrap_or(i as u32),
-            rust_type: hcl_type_to_rust(&f.field_type)
-                .unwrap_or_else(|e| {
-                    eprintln!("warning: {e}, falling back to String");
-                    "String".to_string()
-                }),
-            cpp_type: hcl_type_to_cpp(&f.field_type)
-                .unwrap_or_else(|e| {
-                    eprintln!("warning: {e}, falling back to std::string");
-                    "std::string".to_string()
-                }),
+            rust_type: hcl_type_to_rust(&f.field_type).unwrap_or_else(|e| {
+                eprintln!("warning: {e}, falling back to String");
+                "String".to_string()
+            }),
+            cpp_type: hcl_type_to_cpp(&f.field_type).unwrap_or_else(|e| {
+                eprintln!("warning: {e}, falling back to std::string");
+                "std::string".to_string()
+            }),
             description: f.description.clone().unwrap_or_default(),
             unit: f.unit.clone().unwrap_or_default(),
             index: i,

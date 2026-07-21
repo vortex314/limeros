@@ -48,6 +48,14 @@ public:
             delete _pv;
         }
     }
+    void none()
+    {
+        if (_pv)
+        {
+            delete _pv;
+            _pv = nullptr;
+        }
+    }
     bool operator==(const T t) const
     {
         if (_pv)

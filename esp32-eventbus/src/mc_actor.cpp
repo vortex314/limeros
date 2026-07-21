@@ -22,6 +22,8 @@ McActor::McActor(const char *name, const char *hostname)
 {
     _hostname = std::string(hostname);
     _timer_publish = timer_repetitive(1000);
+    endpoint_name = "hoverboard";
+    endpoint_id = FNV("hoverboard");
 }
 
 McActor::~McActor()
@@ -100,7 +102,7 @@ void McActor::init_event()
     setsockopt(_multicast_socket, IPPROTO_IP, IP_MULTICAST_LOOP, &loop, sizeof(loop));
 
     // Wait for broker discovery via DeviceAliveEvent before sending unicast traffic.
-    _broker_addr.reset();
+    _broker_addr.none();
 }
 
 void McActor::stop_event()
@@ -119,7 +121,7 @@ void McActor::send_unicast(const Envelope &envelope)
         ERROR("Cannot send unicast message, not connected to WiFi");
         return;
     }
-    if (!_broker_addr.has_value())
+    if (!_broker_addr)
     {
         ERROR("Cannot send unicast message, broker address not discovered yet");
         return;
@@ -296,7 +298,6 @@ void show_envelope(const Envelope &env)
 
 void McActor::on_udp_raw(const Buffer &request, const sockaddr_in &sender_addr)
 {
-    print_cbor_diagnostic(request.data(), request.size());
     Envelope *envelope = new Envelope();
     if (envelope->decode(request) == 0)
     {
@@ -324,25 +325,35 @@ void McActor::on_udp_message(Envelope *env, const sockaddr_in &sender_addr)
     if (env->msg_type == PingReply::MSG_ID)
     {
         send_ping_req(env->src.value(), ++_last_ping_number);
+        delete env;
+        return;
     }
-    else if (env->msg_type == EndpointAnnounceReply::MSG_ID)
+    if (env->msg_type == EndpointAnnounceReply::MSG_ID)
     {
         Buffer payload(*(env->payload));
         EndpointAnnounceReply reply;
-        if (reply.decode(payload) != 0)
+        if (reply.decode(payload) == 0)
         {
-            ERROR("Failed to decode EndpointAnnounceReply from UDP message");
-            delete env;
-            return;
+            INFO("Received EndpointAnnounceReply from %s ", socketAddrToString(&sender_addr).c_str());
+            if (_broker_addr)
+            {
+                if (_broker_addr->sin_addr.s_addr != sender_addr.sin_addr.s_addr)
+                {
+                    INFO("Setting (new) broker address to %s", socketAddrToString(&sender_addr).c_str());
+                    _broker_addr = sender_addr;
+                }
+                // ignore otherwise, we already have a broker address
+            }
+            else
+            {
+                INFO("Setting broker address to %s", socketAddrToString(&sender_addr).c_str());
+                _broker_addr = sender_addr;
+            }
         }
-        INFO("Received EndpointAnnounceReply from %s with broker name: %s", socketAddrToString(&sender_addr).c_str(), std::string(env->payload->begin(), env->payload->end()).c_str());
-        _broker_addr = sender_addr;
         delete env;
+        return;
     }
-    else
-    {
-        emit(env);
-    }
+    emit(env);
 }
 
 void McActor::send_multicast(const Envelope &envelope)

@@ -78,7 +78,7 @@ private:
   uint32_t _ping_counter = 0;
   bool _connected = false;
   std::unordered_map<uint32_t, std::pair<sockaddr_in, uint64_t>> _source_map;
-  std::optional<sockaddr_in> _broker_addr = std::nullopt;
+  Option<sockaddr_in> _broker_addr = Option<sockaddr_in>::None();
   uint32_t _last_ping_number = 1;
   std::vector<std::uint32_t> _events;
   std::vector<std::uint32_t> _subscribes;

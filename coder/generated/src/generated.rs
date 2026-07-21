@@ -7,6 +7,10 @@ pub trait Msg: Sized + serde::Serialize + serde::de::DeserializeOwned {
     fn id() -> u32;
     fn name() -> &'static str;
 
+    fn to_json(&self) -> anyhow::Result<String> {
+        serde_json::to_string(self).context("Failed to serialize to JSON")
+    }
+
     fn from_bytes(data: &[u8]) -> anyhow::Result<Self> {
         cbor2::from_reader(data).context("Failed to deserialize from CBOR")
     }
@@ -38,6 +42,61 @@ pub const SNIFFER_ID: u32 = 836480628;
 
 pub const TUI_SNIFFER_ID: u32 = 3577618233;
 
+
+
+use dashmap::DashMap;
+use lazy_static::lazy_static;
+
+lazy_static! {
+    pub static ref ID_TO_NAME: DashMap<u32, String> = {
+        let m = DashMap::new();
+        m.insert(3190208493, "BrokerSubscribeRequest".to_string());
+        m.insert(3197332525, "CompassEvent".to_string());
+        m.insert(2637772092, "DeviceAliveEvent".to_string());
+        m.insert(2371693343, "EndpointAnnounce".to_string());
+        m.insert(3238220441, "EndpointAnnounceReply".to_string());
+        m.insert(1228864117, "Envelope".to_string());
+        m.insert(2578784998, "GenericReply".to_string());
+        m.insert(461737375, "HeatingEvent".to_string());
+        m.insert(578653874, "HeatingRequest".to_string());
+        m.insert(104988481, "HoverboardEvent".to_string());
+        m.insert(2735870956, "HoverboardRequest".to_string());
+        m.insert(1802836182, "ImuEvent".to_string());
+        m.insert(2831607083, "Max31855Event".to_string());
+        m.insert(1594103907, "PingReply".to_string());
+        m.insert(31253678, "PingRequest".to_string());
+        m.insert(4282593576, "Ps4Event".to_string());
+        m.insert(1992038561, "Ps4Request".to_string());
+        m.insert(924742914, "SysEvent".to_string());
+        m.insert(2952492394, "SysReply".to_string());
+        m.insert(2966412411, "SysRequest".to_string());
+        m.insert(1082063571, "UsEvent".to_string());
+        m.insert(3371536624, "WifiEvent".to_string());
+        m.insert(2490238132, "broker".to_string());
+        
+        m.insert(2753264687, "compass".to_string());
+        
+        m.insert(1152836275, "hoverboard".to_string());
+        
+        m.insert(2753177333, "logger".to_string());
+        
+        m.insert(1092332049, "mower".to_string());
+        
+        m.insert(1295055938, "pinger".to_string());
+        
+        m.insert(360195552, "ps4".to_string());
+        
+        m.insert(836480628, "sniffer".to_string());
+        
+        m.insert(3577618233, "tui_sniffer".to_string());
+        
+        m
+    };
+}
+
+pub fn id_to_string(msg_id: u32) -> String {
+    ID_TO_NAME.get(&msg_id).map(|entry| entry.to_string()).unwrap_or_else(|| format!("Unknown({})", msg_id))
+}
 
 
 
@@ -77,6 +136,7 @@ impl Msg for BrokerSubscribeRequest {
         Self::name()
     }
 }
+
 
 
 
@@ -141,6 +201,7 @@ impl Msg for CompassEvent {
 
 
 
+
 #[derive(Debug, Clone, PartialEq, cbor2::Cbor)]
 pub struct DeviceAliveEvent {
     #[cbor(key = 0)]
@@ -179,6 +240,7 @@ impl Msg for DeviceAliveEvent {
         Self::name()
     }
 }
+
 
 
 
@@ -237,6 +299,7 @@ impl Msg for EndpointAnnounce {
 
 
 
+
 #[derive(Debug, Clone, PartialEq, cbor2::Cbor)]
 pub struct EndpointAnnounceReply {
     /// Timestamp in milliseconds since epoch
@@ -271,6 +334,7 @@ impl Msg for EndpointAnnounceReply {
         Self::name()
     }
 }
+
 
 
 
@@ -327,6 +391,7 @@ impl Msg for Envelope {
 
 
 
+
 #[derive(Debug, Clone, PartialEq, cbor2::Cbor)]
 pub struct GenericReply {
     /// For request/reply matching, 0 if not a request/reply
@@ -370,6 +435,7 @@ impl Msg for GenericReply {
         Self::name()
     }
 }
+
 
 
 
@@ -428,6 +494,7 @@ impl Msg for HeatingEvent {
 
 
 
+
 #[derive(Debug, Clone, PartialEq, cbor2::Cbor)]
 pub struct HeatingRequest {
     /// Setpoint temperature in Celsius
@@ -477,6 +544,7 @@ impl Msg for HeatingRequest {
         Self::name()
     }
 }
+
 
 
 
@@ -652,6 +720,7 @@ impl Msg for HoverboardEvent {
 
 
 
+
 #[derive(Debug, Clone, PartialEq, cbor2::Cbor)]
 pub struct HoverboardRequest {
     /// For request/reply matching, 0 if not a request/reply
@@ -692,6 +761,7 @@ impl Msg for HoverboardRequest {
         Self::name()
     }
 }
+
 
 
 
@@ -747,6 +817,7 @@ impl Msg for ImuEvent {
 
 
 
+
 #[derive(Debug, Clone, PartialEq, cbor2::Cbor)]
 pub struct Max31855Event {
     /// Thermocouple temperature in Celsius
@@ -799,6 +870,7 @@ impl Msg for Max31855Event {
 
 
 
+
 #[derive(Debug, Clone, PartialEq, cbor2::Cbor)]
 pub struct PingReply {
     #[cbor(key = 0)]
@@ -838,6 +910,7 @@ impl Msg for PingReply {
 
 
 
+
 #[derive(Debug, Clone, PartialEq, cbor2::Cbor)]
 pub struct PingRequest {
     #[cbor(key = 0)]
@@ -874,6 +947,7 @@ impl Msg for PingRequest {
         Self::name()
     }
 }
+
 
 
 
@@ -977,6 +1051,7 @@ impl Msg for Ps4Event {
 
 
 
+
 #[derive(Debug, Clone, PartialEq, cbor2::Cbor)]
 pub struct Ps4Request {
     /// For request/reply matching, 0 if not a request/reply
@@ -1028,6 +1103,7 @@ impl Msg for Ps4Request {
 
 
 
+
 #[derive(Debug, Clone, PartialEq, cbor2::Cbor)]
 pub struct SysEvent {
     #[cbor(key = 0)]
@@ -1074,6 +1150,7 @@ impl Msg for SysEvent {
 
 
 
+
 #[derive(Debug, Clone, PartialEq, cbor2::Cbor)]
 pub struct SysReply {
     /// For request/reply matching, 0 if not a request/reply
@@ -1112,6 +1189,7 @@ impl Msg for SysReply {
         Self::name()
     }
 }
+
 
 
 
@@ -1158,6 +1236,7 @@ impl Msg for SysRequest {
 
 
 
+
 #[derive(Debug, Clone, PartialEq, cbor2::Cbor)]
 pub struct UsEvent {
     /// Distance in meters
@@ -1198,6 +1277,7 @@ impl Msg for UsEvent {
         Self::name()
     }
 }
+
 
 
 
