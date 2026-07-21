@@ -18,6 +18,7 @@ constexpr uint32_t FNV(const char (&str)[N])
     return fnv1a_32_1(str);
 }
 typedef std::vector<uint8_t> Bytes;
+extern void print_cbor_diagnostic(const uint8_t *data, size_t size);
 /* class Bytes
 {
 private:
@@ -141,9 +142,8 @@ class Buffer {
         uint8_t& operator[](size_t index) { assert(index < _index); return _buffer[index]; }
         void clear() { _index = 0; }
         void resize(size_t new_size) {
-            if (_index > new_size) {
-                _index = new_size;
-            }
+            assert(new_size <= _capacity);
+            _index = new_size;
         }
         void capacity(size_t new_capacity) {
             if (new_capacity > _capacity) {

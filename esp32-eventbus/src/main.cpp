@@ -21,6 +21,7 @@
 #include <hoverboard_actor.h>
 #include <max31855_actor.h>
 #include <log.h>
+#include <cbor.h>
 
 #ifndef DEVICE_NAME
 #error "DEVICE_NAME not defined"
@@ -30,31 +31,52 @@ EventBus eventbus(200);
 Log logger;
 esp_err_t nvs_ota_init();
 char hostname[24];
-std::unordered_map<uint32_t,std::string> message_type_map = {
-    {EndpointAnnounce::MSG_ID, "EndpointAnnounce"},
-    {TxdMsg::MSG_ID, "TxdMsg"},
-    {RxdMsg::MSG_ID, "RxdMsg"},
-    {WifiConnected::MSG_ID, "WifiConnected"},
-    {WifiDisconnected::MSG_ID, "WifiDisconnected"},
-    {LedBlink::MSG_ID, "LedBlink"},
-    {LedOn::MSG_ID, "LedOn"},
-    {LedOff::MSG_ID, "LedOff"},
-    {LedPulse::MSG_ID, "LedPulse"},
-    {TimerMsg::MSG_ID, "TimerMsg"},
-    {Msg::MSG_ID, "Msg"},
-    {UartRxd::MSG_ID, "UartRxd"}, 
-    {Transmitting::MSG_ID, "Transmitting"},
-    {PingRequest::MSG_ID, "PingRequest"},
-    {PingReply::MSG_ID, "PingReply"},
-    {Max31855Read::MSG_ID, "Max31855Read"},
-    {Max31855Event::MSG_ID, "Max31855Event"},
-    {HeatingRequest::MSG_ID, "HeatingRequest"},
-    {HeatingEvent::MSG_ID, "HeatingEvent"},
-    {HoverboardRequest::MSG_ID, "HoverboardRequest"},
-    {HoverboardEvent::MSG_ID, "HoverboardEvent"},
-    {WifiEvent::MSG_ID, "WifiEvent"},
-    {SysEvent::MSG_ID, "SysEvent"},
-};
+extern std::unordered_map<uint32_t, const char *> id_to_name;
+
+void add_local_msgs() {
+  id_to_name[TxdMsg::MSG_ID] = "TxdMsg";
+  id_to_name[RxdMsg::MSG_ID] = "RxdMsg";
+  id_to_name[WifiConnected::MSG_ID] = "WifiConnected";
+  id_to_name[WifiDisconnected::MSG_ID] = "WifiDisconnected";
+  id_to_name[LedBlink::MSG_ID] = "LedBlink";
+  id_to_name[LedOn::MSG_ID] = "LedOn";
+  id_to_name[LedOff::MSG_ID] = "LedOff";
+  id_to_name[LedPulse::MSG_ID] = "LedPulse";
+  id_to_name[TimerMsg::MSG_ID] = "TimerMsg";
+  id_to_name[UartRxd::MSG_ID] = "UartRxd";
+  id_to_name[Transmitting::MSG_ID] = "Transmitting";
+  id_to_name[Max31855Read::MSG_ID] = "Max31855Read";
+}
+
+
+static CborError print_to_buffer(void *token, const char *fmt, ...) {
+    char **out_ptr = (char **)token;
+    va_list args;
+    va_start(args, fmt);
+    int written = vsprintf(*out_ptr, fmt, args);
+    va_end(args);
+    if (written < 0) return CborErrorIO;
+    *out_ptr += written; // Advance the pointer in the buffer
+    return CborNoError;
+}
+
+void print_cbor_diagnostic(const uint8_t *cbor_buf, size_t buf_len) {
+    CborParser parser;
+    CborValue value;
+    
+    if (cbor_parser_init(cbor_buf, buf_len, 0, &parser, &value) != CborNoError) {
+        return;
+    }
+
+    char string_output[512] = {0};
+    char *cursor = string_output;
+
+    // Convert CBOR to diagnostic text
+    cbor_value_to_pretty_stream(print_to_buffer, &cursor, &value, CborPrettyDefaultFlags);
+
+    INFO("CBOR : %s", string_output);
+}
+
 
 extern "C" void app_main()
 {
@@ -83,10 +105,9 @@ extern "C" void app_main()
 #endif
   // debugging handler to log all eventbus traffic, comment for beauty
   eventbus.register_handler([](const Msg &msg) // just log eventbus traffic
-                            {
-                              uint32_t msg_type_id = msg.msg_id();
-                              std::string msg_type_str = message_type_map.find(msg_type_id) != message_type_map.end() ? message_type_map[msg_type_id] : std::to_string(msg_type_id);
-                              INFO("EventBus message received: %s", msg_type_str.c_str());
+                            { 
+                              uint32_t msg_id = msg.msg_id() ? msg.msg_id() : 0;
+                              INFO("EventBus '%s' (%d) Free heap size: %ld", id_to_string(msg_id), msg_id, esp_get_free_heap_size());
                             });
   eventbus.loop();
 }

@@ -8,3 +8,4 @@ edition = "2024"
 serde = { version = "1.0.228", features = ["derive"] }
 cbor2={ version = "*", features = ["derive"] }
 anyhow = "1.0.103"
+serde_bytes = "0.11"

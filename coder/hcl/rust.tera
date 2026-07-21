@@ -33,6 +33,9 @@ pub struct {{ msg.name }} {
     /// {{ field.description }}
 {%- endif %}
     #[cbor(key = {{ field.id }})]
+{%- if field.rust_type == "Vec<u8>" %}
+    #[serde(with = "serde_bytes")]
+{%- endif %}
     pub {{ field.name }}: Option<{{ field.rust_type }}>,
 {%- endfor %}
 }

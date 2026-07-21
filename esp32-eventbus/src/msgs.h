@@ -2,14 +2,57 @@
 // Every field is `Option<T>`; missing fields are omitted from encoded CBOR.
 // Messages are encoded as CBOR maps keyed by field id.
 // Uses TinyCBOR for CBOR encoding/decoding.
-
+#ifndef HCL_CPP_TERA
+#define HCL_CPP_TERA
 #pragma once
 
 #include <cbor.h>
 #include <errno.h>
 #include <msg.h>
 
+std::unordered_map<uint32_t, const char*> id_to_name = {
+    { 3190208493, "BrokerSubscribeRequest" },
+    { 3197332525, "CompassEvent" },
+    { 2637772092, "DeviceAliveEvent" },
+    { 2371693343, "EndpointAnnounce" },
+    { 3238220441, "EndpointAnnounceReply" },
+    { 1228864117, "Envelope" },
+    { 2578784998, "GenericReply" },
+    { 461737375, "HeatingEvent" },
+    { 578653874, "HeatingRequest" },
+    { 104988481, "HoverboardEvent" },
+    { 2735870956, "HoverboardRequest" },
+    { 1802836182, "ImuEvent" },
+    { 2831607083, "Max31855Event" },
+    { 1594103907, "PingReply" },
+    { 31253678, "PingRequest" },
+    { 4282593576, "Ps4Event" },
+    { 1992038561, "Ps4Request" },
+    { 924742914, "SysEvent" },
+    { 2952492394, "SysReply" },
+    { 2966412411, "SysRequest" },
+    { 1082063571, "UsEvent" },
+    { 3371536624, "WifiEvent" },
+    { 2490238132, "broker" },
+    { 2753264687, "compass" },
+    { 1152836275, "hoverboard" },
+    { 2753177333, "logger" },
+    { 1092332049, "mower" },
+    { 1295055938, "pinger" },
+    { 360195552, "ps4" },
+    { 836480628, "sniffer" },
+    { 3577618233, "tui_sniffer" },
+};
 
+const char *id_to_string(uint32_t msg_id)
+{
+  auto it = id_to_name.find(msg_id);
+  if (it != id_to_name.end())
+  {
+    return it->second;
+  }
+  return std::to_string(msg_id).c_str();
+}
 
 // ── TinyCBOR helper ────────────────────────────────────────────────────────
 
@@ -5012,3 +5055,4 @@ public:
 };
 
 
+#endif

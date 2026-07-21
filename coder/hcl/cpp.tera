@@ -2,14 +2,32 @@
 // Every field is `Option<T>`; missing fields are omitted from encoded CBOR.
 // Messages are encoded as CBOR maps keyed by field id.
 // Uses TinyCBOR for CBOR encoding/decoding.
-
+#ifndef HCL_CPP_TERA
+#define HCL_CPP_TERA
 #pragma once
 
 #include <cbor.h>
 #include <errno.h>
 #include <msg.h>
 
+std::unordered_map<uint32_t, const char*> id_to_name = {
+{%- for msg in messages %}
+    { {{ msg.id }}, "{{ msg.name }}" },
+{%- endfor %}
+{%- for ep in endpoints %}
+    { {{ ep.id }}, "{{ ep.name }}" },
+{%- endfor %}
+};
 
+const char *id_to_string(uint32_t msg_id)
+{
+  auto it = id_to_name.find(msg_id);
+  if (it != id_to_name.end())
+  {
+    return it->second;
+  }
+  return std::to_string(msg_id).c_str();
+}
 
 // ── TinyCBOR helper ────────────────────────────────────────────────────────
 
@@ -438,3 +456,4 @@ public:
 };
 
 {% endfor %}
+#endif

@@ -293,6 +293,7 @@ pub struct Envelope {
     pub instance_id: Option<u32>,
     /// Serialized payload of the message
     #[cbor(key = 5)]
+    #[serde(with = "serde_bytes")]
     pub payload: Option<Vec<u8>>,
 }
 
