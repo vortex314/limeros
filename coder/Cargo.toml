@@ -4,6 +4,7 @@ members = [
     "apps/broker",
     "apps/codegen",
     "apps/pinger",
+    "apps/serial_bridge",
     "apps/sniffer",
     "apps/tui_sniffer",
     "generated",

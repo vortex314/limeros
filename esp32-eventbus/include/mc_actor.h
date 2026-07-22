@@ -98,6 +98,8 @@ public:
   void start_unicast_listener();
   void start_multicast_listener();
   void stop_listener();
+  void send_event(const Msg& msg);
+  void broadcast_event(const Msg& msg);
   void send_unicast(const Envelope &envelope);
   void send_multicast(const Envelope &envelope);
   void on_udp_raw(const Buffer &request, const sockaddr_in &sender_addr);

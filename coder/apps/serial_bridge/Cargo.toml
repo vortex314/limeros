@@ -1,0 +1,15 @@
+[package]
+name = "serial_bridge"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+generated = { path = "../../generated" }
+common = { path = "../../common" }
+serialport = "4"
+anyhow = "1"
+clap = { version = "4", features = ["derive"] }
+cbor2 = { version = "*", features = ["derive"] }
+chrono = { version = "0.4", features = ["serde"] }
+log = "0.4"
+env_logger = "0.11"
