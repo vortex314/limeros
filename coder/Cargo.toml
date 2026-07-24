@@ -2,6 +2,7 @@
 members = [
     "common",
     "apps/broker",
+    "apps/broker_actix",
     "apps/codegen",
     "apps/pinger",
     "apps/serial_bridge",

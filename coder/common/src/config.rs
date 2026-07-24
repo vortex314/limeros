@@ -74,6 +74,8 @@ pub struct EndpointConfig {
     pub events: Vec<String>,
     pub replies: Vec<String>,
     pub subscribes: Vec<SubscribeConfig>,
+    /// Optional transport path, e.g. "/dev/ttyUSB0" for serial endpoints.
+    pub transport: Option<String>,
     pub description: Option<String>,
 }
 
@@ -247,6 +249,7 @@ fn parse_endpoint(block: &Block) -> anyhow::Result<(String, EndpointConfig)> {
             events: get_attr_list_strings(body, "events"),
             replies: get_attr_list_strings(body, "replies"),
             subscribes: get_attr_subscribes(body, "subscribes"),
+            transport: get_attr_optional(body, "transport"),
             description: get_attr_optional(body, "description"),
         },
     ))
