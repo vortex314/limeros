@@ -1,181 +1,256 @@
-use anyhow::{Context, Result};
+//! pinger — kameo-based network reachability tester for Limeros.
+//!
+//! Sends PingRequest messages and measures round-trip time from PingReply.
+//! Uses the UdpEndpoint actor for all UDP I/O and broker handshake.
+//!
+//! Architecture:
+//!   UdpEndpoint — handles UDP send/receive, broker announcement
+//!   PingerActor — ping logic, RTT measurement
+
+mod udp_endpoint;
+
+use std::net::Ipv4Addr;
+
 use clap::Parser;
-use common::{
-    base_message::show_cbor_bytes, endpoint, fnv::fnv1a_32, logger, node::UdpNode, RobotConfig,
-};
-use generated::generated as msgs;
+use common::fnv1a_32;
+use generated::generated::{Envelope, PingReply, PingRequest};
+use kameo::prelude::*;
 use log::{debug, info, warn};
-use msgs::{Envelope, PingReply, PingRequest};
-use std::{
-    net::{Ipv4Addr, SocketAddr},
-    sync::Arc,
-};
-use tokio::join;
+
+use udp_endpoint::{RecvEnvelope, SendEnvelope, UdpEndpoint, UdpEndpointConfig};
+
+// ── CLI ────────────────────────────────────────────────────────────────────
 
 #[derive(Parser, Debug)]
-#[command(about = "Pinger endpoint announce client")]
+#[command(about = "Pinger — kameo-based network reachability tester")]
 struct Args {
     /// Multicast group address.
-    #[arg(long, default_value = msgs::MULTICAST_ADDR)]
+    #[arg(long, default_value = "224.0.0.1")]
     group: String,
 
-    /// UDP port (defaults to generated MULTICAST_PORT when omitted).
-    #[arg(long)]
-    port: Option<u16>,
+    /// UDP port (default: 50000).
+    #[arg(long, default_value_t = 50000)]
+    port: u16,
 
     /// Bind interface address.
     #[arg(long, default_value = "0.0.0.0")]
     bind: String,
 
-    /// Device name announced to the broker.
-    #[arg(long, default_value = "pinger")]
-    device: String,
-
-    /// Endpoint name announced to the broker.
+    /// Endpoint name.
     #[arg(long, default_value = "pinger")]
     endpoint: String,
 
-    /// Description announced to the broker.
-    #[arg(long, default_value = "Ping client endpoint")]
-    description: String,
-
-    /// Re-announce period in milliseconds while waiting for broker reply.
+    /// Ping interval in milliseconds.
     #[arg(long, default_value_t = 1000)]
-    announce_ms: u64,
+    interval_ms: u64,
 }
 
-fn decipher_message(cfg: &RobotConfig, msg: Envelope) -> String {
-    let bytes = match msg.payload {
-        Some(b) => b,
-        None => return "<none>".into(),
-    };
+// ── Messages ───────────────────────────────────────────────────────────────
 
-    macro_rules! try_deser {
-        ($ty:ty) => {{
-            if msg.msg_type == Some(<$ty>::id()) {
-                return format!(
-                    " {} -> {} {} {:?}",
-                    cfg.id_to_name(msg.src),
-                    cfg.id_to_name(msg.dst),
-                    cfg.id_to_name(msg.msg_type),
-                    <$ty>::from_bytes(&bytes).unwrap()
-                );
-            }
-        }};
+/// Timer tick to send a PingRequest.
+struct TickPing;
+
+/// Set the transport address after construction (resolves circular dependency).
+struct SetTransport {
+    transport: ActorRef<UdpEndpoint>,
+}
+
+// ── PingerActor ────────────────────────────────────────────────────────────
+
+pub struct PingerActor {
+    endpoint_id: u32,
+    endpoint_name: String,
+    /// The UdpEndpoint we use for all network I/O (set after startup).
+    transport: Option<ActorRef<UdpEndpoint>>,
+}
+
+impl PingerActor {
+    fn new(endpoint_name: String) -> Self {
+        let endpoint_id = fnv1a_32(&endpoint_name);
+        PingerActor {
+            endpoint_id,
+            endpoint_name,
+            transport: None,
+        }
     }
-
-    try_deser!(PingRequest);
-    try_deser!(PingReply);
-    try_deser!(msgs::EndpointAnnounceReply);
-
-    // Fallback to CBOR diagnostic notation
-    return format!(
-        " {} -> {} {} {}",
-        cfg.id_to_name(msg.src),
-        cfg.id_to_name(msg.dst),
-        cfg.id_to_name(msg.msg_type),
-        show_cbor_bytes(&bytes)
-    );
 }
 
-#[tokio::main]
-async fn main() -> Result<()> {
-    logger::init();
-    let args = Args::parse();
+impl Actor for PingerActor {
+    type Args = Self;
+    type Error = anyhow::Error;
 
-    let endpoint_id = fnv1a_32(&args.endpoint);
+    async fn on_start(state: Self::Args, actor_ref: ActorRef<Self>) -> Result<Self, Self::Error> {
+        let endpoint_name = state.endpoint_name.clone();
+        let endpoint_id = state.endpoint_id;
 
-    let port = args.port.unwrap_or(msgs::MULTICAST_PORT as u16);
-    let mc_addr_str = &args.group;
-    let group: Ipv4Addr = mc_addr_str
-        .parse()
-        .with_context(|| format!("failed to parse multicast address {}", mc_addr_str))?;
-    let node = UdpNode::new(endpoint_id, SocketAddr::new(group.into(), port));
-    let config_path = "hcl/robot.hcl";
-    let robot_config = RobotConfig::load_from_file(config_path).context(format!(
-        "failed to load robot configuration from {}",
-        config_path
-    ))?;
-
-    let mut pinger = endpoint::Endpoint::new_from_name(&args.endpoint, node);
-    pinger.bind().await?;
-
-    let pinger = Arc::new(pinger);
-    let pinger2 = pinger.clone();
-    let pinger1 = pinger.clone();
-
-    tokio::spawn(async move {
-        loop {
-            if let Err(e) = pinger2.broker_handshake().await {
-                warn!("Broker handshake failed: {:?}", e);
+        // Periodic PingRequest timer
+        let tick_ref = actor_ref.clone();
+        let interval_ms = 1000u64;
+        tokio::spawn(async move {
+            let mut interval = tokio::time::interval(std::time::Duration::from_millis(interval_ms));
+            loop {
+                interval.tick().await;
+                let _ = tick_ref.tell(TickPing).await;
             }
-            tokio::time::sleep(std::time::Duration::from_millis(args.announce_ms)).await;
-        }
-    });
-    let endpoint_name = args.endpoint.clone();
-    let endpoint_name_2 = endpoint_name.clone();
+        });
 
-    let t1 = tokio::spawn(async move {
-        loop {
-            let ping_request = PingRequest {
-                req_id: Some(1),
-                timestamp: Some(chrono::Utc::now().timestamp_millis() as u64),
-            };
-            let udp_message = Envelope {
-                src: Some(endpoint_id),
-                dst: Some(endpoint_id),
-                msg_type: Some(PingRequest::id()),
-                request_id: ping_request.req_id,
-                instance_id: None,
-                payload: Some(ping_request.to_bytes().unwrap()),
-            };
-            pinger1.send(udp_message).await.unwrap();
-            debug!("Sent PingRequest to broker");
-            tokio::time::sleep(std::time::Duration::from_secs(1)).await;
-        }
-    });
+        info!(
+            "PingerActor '{}' (0x{:08X}) started",
+            endpoint_name, endpoint_id
+        );
 
-    let t2 = tokio::spawn(async move {
-        loop {
-            let (reply, addr) = pinger.receive().await.unwrap();
-            if reply.msg_type == Some(PingRequest::id()) {
-                let ping_request = PingRequest::from_bytes(&reply.payload.unwrap()).unwrap();
+        Ok(state)
+    }
+}
+
+// ── Handle RecvEnvelope (incoming from UdpEndpoint) ───────────────────────
+
+impl Message<RecvEnvelope> for PingerActor {
+    type Reply = ();
+
+    async fn handle(&mut self, msg: RecvEnvelope, _ctx: &mut Context<Self, Self::Reply>) {
+        let env = &msg.envelope;
+        let msg_type = env.msg_type.unwrap_or(0);
+
+        // EndpointAnnounceReply is handled by UdpEndpoint internally,
+        // but may also arrive here. Ignore.
+        if msg_type == generated::generated::EndpointAnnounceReply::id() {
+            return;
+        }
+
+        if msg_type == PingRequest::id() {
+            let payload = match &env.payload {
+                Some(p) => p,
+                None => return,
+            };
+            if let Ok(req) = PingRequest::from_bytes(payload) {
                 debug!(
-                    "Received PingRequest from broker at {}: {:?}",
-                    addr, ping_request
+                    "Received PingRequest req_id={:?} from {}",
+                    req.req_id, msg.addr
                 );
-                let ping_reply = PingReply {
-                    req_id: ping_request.req_id,
+                let reply = PingReply {
+                    req_id: req.req_id,
                     timestamp: Some(chrono::Utc::now().timestamp_micros() as u64),
                 };
-                let reply_message = Envelope {
-                    src: Some(fnv1a_32(&endpoint_name_2)),
-                    dst: reply.src.clone(),
-                    msg_type: Some(PingReply::id()),
-                    request_id: ping_reply.req_id,
-                    instance_id: None,
-                    payload: Some(ping_reply.to_bytes().unwrap()),
-                };
-                let _ = pinger.send(reply_message).await;
-            } else if reply.msg_type == Some(PingReply::id()) {
-                let ping_reply = PingReply::from_bytes(&reply.payload.unwrap()).unwrap();
-                debug!(
-                    "Received PingReply from broker at {}: {:?}",
-                    addr, ping_reply
-                );
-                let delta_ts = chrono::Utc::now().timestamp_micros() as u64
-                    - ping_reply.timestamp.unwrap_or(0);
-                info!("Ping round-trip time: {} µs", delta_ts);
-            } else if reply.msg_type != Some(msgs::EndpointAnnounceReply::id()) {
-                warn!(
-                    "Received unexpected message type {}",
-                    decipher_message(&robot_config, reply)
+                if let Ok(payload) = reply.to_bytes() {
+                    let reply_env = Envelope {
+                        src: Some(self.endpoint_id),
+                        dst: env.src,
+                        msg_type: Some(PingReply::id()),
+                        request_id: reply.req_id,
+                        instance_id: None,
+                        payload: Some(payload),
+                    };
+                    if let Some(ref transport) = self.transport {
+                        let _ = transport
+                            .tell(SendEnvelope {
+                                envelope: reply_env,
+                            })
+                            .await;
+                    }
+                }
+            }
+            return;
+        }
+
+        if msg_type == PingReply::id() {
+            let payload = match &env.payload {
+                Some(p) => p,
+                None => return,
+            };
+            if let Ok(reply) = PingReply::from_bytes(payload) {
+                let now_us = chrono::Utc::now().timestamp_micros() as u64;
+                let sent_us = reply.timestamp.unwrap_or(0);
+                let rtt_us = now_us.saturating_sub(sent_us);
+                info!(
+                    "PingReply from {} — RTT: {} µs ({:.2} ms)",
+                    msg.addr,
+                    rtt_us,
+                    rtt_us as f64 / 1000.0
                 );
             }
         }
-    });
+    }
+}
 
-    let r = join!(t1, t2);
-    info!("Pinger tasks completed: {:?}", r);
+// ── Handle SetTransport ────────────────────────────────────────────────────
+
+impl Message<SetTransport> for PingerActor {
+    type Reply = ();
+
+    async fn handle(&mut self, msg: SetTransport, _ctx: &mut Context<Self, Self::Reply>) {
+        self.transport = Some(msg.transport);
+        info!("PingerActor transport set");
+    }
+}
+
+// ── Handle TickPing ───────────────────────────────────────────────────────
+
+impl Message<TickPing> for PingerActor {
+    type Reply = ();
+
+    async fn handle(&mut self, _msg: TickPing, _ctx: &mut Context<Self, Self::Reply>) {
+        let req = PingRequest {
+            req_id: Some(1),
+            timestamp: Some(chrono::Utc::now().timestamp_millis() as u64),
+        };
+        let payload = match req.to_bytes() {
+            Ok(p) => p,
+            Err(e) => {
+                warn!("Failed to encode PingRequest: {}", e);
+                return;
+            }
+        };
+        let envelope = Envelope {
+            src: Some(self.endpoint_id),
+            dst: Some(self.endpoint_id),
+            msg_type: Some(PingRequest::id()),
+            request_id: req.req_id,
+            instance_id: None,
+            payload: Some(payload),
+        };
+        if let Some(ref transport) = self.transport {
+            let _ = transport
+                .tell(SendEnvelope {
+                    envelope,
+                })
+                .await;
+        }
+    }
+}
+
+// ── Main ───────────────────────────────────────────────────────────────────
+
+#[tokio::main]
+async fn main() -> anyhow::Result<()> {
+    common::logger::init();
+    let args = Args::parse();
+    info!("Starting pinger '{}'...", args.endpoint);
+
+    let group: Ipv4Addr = args.group.parse()?;
+    let bind: Ipv4Addr = args.bind.parse()?;
+
+    // Resolve circular dependency: UdpEndpoint needs PingerActor's ActorRef,
+    // PingerActor needs UdpEndpoint's ActorRef.
+    //
+    // 1. Create PingerActor with no transport yet, then spawn it
+    let pinger_actor = PingerActor::new(args.endpoint.clone());
+    let pinger_ref = kameo::actor::Spawn::spawn(pinger_actor);
+
+    // 2. Create UdpEndpoint pointing at PingerActor, then spawn it
+    let udp_config = UdpEndpointConfig {
+        endpoint_name: args.endpoint.clone(),
+        multicast_group: group,
+        multicast_port: args.port,
+        bind_addr: bind,
+    };
+    let udp_actor = UdpEndpoint::new(udp_config, pinger_ref.clone());
+    let udp_ref = kameo::actor::Spawn::spawn(udp_actor);
+
+    // 3. Give the real UdpEndpoint ActorRef to PingerActor
+    let _ = pinger_ref.tell(SetTransport { transport: udp_ref }).await;
+
+    tokio::signal::ctrl_c().await?;
+    info!("Shutting down.");
     Ok(())
 }

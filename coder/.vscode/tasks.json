@@ -4,14 +4,14 @@
     "version": "2.0.0",
     "tasks": [
         {
-            "label": "Broker",
+            "label": "Broker Kameo",
             "type": "shell",
             "command": "~/.cargo/bin/cargo",
             "args": [
                 "run",
                 "--release",
                 "--bin",
-                "broker"
+                "broker_kameo","--","-i","hcl/robot.hcl"
             ],
             "group": {
                 "kind": "build",

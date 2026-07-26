@@ -1,12 +1,13 @@
 [package]
-name = "pinger"
+name = "broker_kameo"
 version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+kameo = { version = "0.22", default-features = false, features = ["macros"] }
 common = { path = "../../common" }
 generated = { path = "../../generated" }
-kameo = { version = "0.22", default-features = false, features = ["macros"] }
+serialport = "4"
 anyhow = "1"
 clap = { version = "4", features = ["derive"] }
 cbor2 = { version = "*", features = ["derive"] }
@@ -14,3 +15,8 @@ chrono = { version = "0.4", features = ["serde"] }
 log = "0.4"
 env_logger = "0.11"
 tokio = { version = "1", features = ["full"] }
+socket2 = { version = "0.6.5", features = ["all"] }
+dashmap = "6"
+reqwest = { version = "0.13.4", features = ["json"] }
+serde_json ="*"
+base64="*"

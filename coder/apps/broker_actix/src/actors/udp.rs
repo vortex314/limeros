@@ -1,11 +1,13 @@
 //! UDP unicast actor — receives and sends unicast UDP Envelopes.
 
-use std::net::{Ipv4Addr, SocketAddr};
-
 use actix::prelude::*;
 use generated::generated::Envelope;
 use log::{info, warn};
-use tokio::net::UdpSocket;
+use std::{
+    net::{Ipv4Addr, SocketAddr},
+    sync::Arc,
+};
+use tokio::{net::UdpSocket, runtime::Runtime, sync::futures};
 
 use crate::actors::router::{EndpointAddress, IncomingEnvelope};
 
@@ -27,15 +29,27 @@ pub struct UdpSend {
     pub addr: SocketAddr,
 }
 
+/// Receive a raw envelope from a specific UDP address.
+#[derive(Message, Debug)]
+#[rtype(result = "anyhow::Result<()>")]
+pub struct UdpReceive {
+    pub raw: Vec<u8>,
+    pub addr: SocketAddr,
+}
+
 // ── UDP actor ──────────────────────────────────────────────────────────────
 
 pub struct UdpActor {
     router: Addr<crate::actors::router::Router>,
+    socket: Option<Arc<UdpSocket>>,
 }
 
 impl UdpActor {
     pub fn new(router: Addr<crate::actors::router::Router>) -> Self {
-        UdpActor { router }
+        UdpActor {
+            router,
+            socket: None,
+        }
     }
 }
 
@@ -46,51 +60,72 @@ impl Actor for UdpActor {
 impl Handler<StartUnicast> for UdpActor {
     type Result = anyhow::Result<()>;
 
-    fn handle(&mut self, msg: StartUnicast, _ctx: &mut Context<Self>) -> Self::Result {
+    fn handle(&mut self, msg: StartUnicast, ctx: &mut Context<Self>) -> Self::Result {
         let router = self.router.clone();
         let bind = SocketAddr::new(msg.bind_addr.into(), msg.port);
-        let my_addr =_ctx.address();
 
-        tokio::spawn(async move {
-            let socket = match UdpSocket::bind(bind).await {
-                Ok(s) => s,
-                Err(e) => {
-                    warn!("Failed to bind unicast socket on {}: {}", bind, e);
-                    return;
-                }
-            };
-
-            info!("UDP unicast actor listening on {}", bind);
-
-            let mut buf = vec![0u8; 64 * 1024];
-            loop {
-                match socket.recv_from(&mut buf).await {
-                    Ok((len, addr)) => {
-                        let packet = &buf[..len];
-                        match Envelope::from_bytes(packet) {
-                            Ok(envelope) => {
-                                if let Ok(raw) = envelope.to_bytes() {
-                                    router.do_send(IncomingEnvelope {
-                                        envelope,
-                                        raw,
-                                    });
-                                }
-                            }
-                            Err(e) => {
-                                warn!("Failed to decode unicast packet[{}] from {}: {}", len, addr, e);
-                                // display cbor
-                                cbor2::from_reader(&mut &buf[..len]).map(|v: String| info!("CBOR: {:?}", v))
-                                    .unwrap_or_else(|_| info!("CBOR: {:02X?}", &buf[..len]));
-
-                            }
-                        }
-                    }
+        // We need the bind to finish before returning Ok from this
+        // sync handler, but bind() is async. Spawn it, and have the
+        // spawned task report success/failure back via a message.
+        ctx.spawn(
+            async move {
+                match UdpSocket::bind(bind).await {
+                    Ok(s) => Some(s),
                     Err(e) => {
-                        warn!("Unicast recv error: {}", e);
+                        warn!("Failed to bind unicast socket on {}: {}", bind, e);
+                        None
                     }
                 }
             }
-        });
+            .into_actor(self)
+            .map(move |socket_opt, act, ctx| {
+                if let Some(socket) = socket_opt {
+                    let socket = Arc::new(socket);
+                    act.socket = Some(socket.clone());
+
+                    info!("Unicast actor listening on {}", bind);
+
+                    // spawn the read loop on the tokio runtime, feeding
+                    // received packets back to the actor via messages
+                    let router = router.clone();
+                    let read_socket = socket.clone();
+                    tokio::spawn(async move {
+                        let mut buf = vec![0u8; 64 * 1024];
+                        loop {
+                            match read_socket.recv_from(&mut buf).await {
+                                Ok((len, from)) => {
+                                    let packet = buf[..len].to_vec();
+                                    // do decode here, or forward raw + addr to router/actor
+                                    match Envelope::from_bytes(&packet) {
+                                        Ok(envelope) => {
+                                            router.do_send(IncomingEnvelope {
+                                                envelope,
+                                                raw: packet,
+                                            });
+                                        }
+                                        Err(e) => {
+                                            warn!(
+                                                "Failed to decode unicast packet[{}] from {}: {}",
+                                                len, from, e
+                                            );
+                                            // display cbor
+                                            cbor2::from_reader(&mut &buf[..len])
+                                                .map(|v: String| info!("CBOR: {:?}", v))
+                                                .unwrap_or_else(|_| {
+                                                    info!("CBOR: {:02X?}", &buf[..len])
+                                                });
+                                        }
+                                    }
+                                }
+                                Err(e) => {
+                                    warn!("recv error: {}", e);
+                                }
+                            }
+                        }
+                    });
+                }
+            }),
+        );
 
         Ok(())
     }
@@ -101,18 +136,11 @@ impl Handler<UdpSend> for UdpActor {
 
     fn handle(&mut self, msg: UdpSend, _ctx: &mut Context<Self>) -> Self::Result {
         let addr = msg.addr;
-        tokio::spawn(async move {
-            let socket = match UdpSocket::bind("0.0.0.0:0").await {
-                Ok(s) => s,
-                Err(e) => {
-                    warn!("Failed to bind send socket: {}", e);
-                    return;
-                }
-            };
-            if let Err(e) = socket.send_to(&msg.raw, addr).await {
-                warn!("Failed to send UDP to {}: {}", addr, e);
-            }
-        });
+        self.socket
+            .as_ref()
+            .ok_or_else(|| anyhow::anyhow!("UDP socket not initialized"))?
+            .try_send_to(&msg.raw, addr)
+            .map_err(|e| anyhow::anyhow!("Failed to send UDP packet to {}: {}", addr, e))?;
         Ok(())
     }
 }

@@ -48,6 +48,13 @@ pub fn id_to_string(msg_id: u32) -> String {
     ID_TO_NAME.get(&msg_id).map(|entry| entry.to_string()).unwrap_or_else(|| format!("Unknown({})", msg_id))
 }
 
+pub fn opt_id_to_string(msg_id: Option<u32>) -> String {
+    match msg_id {
+        Some(id) => id_to_string(id),
+        None => "None".to_string(),
+    }
+}
+
 {% for msg in messages %}
 
 
@@ -66,7 +73,10 @@ pub struct {{ msg.name }} {
 }
 
 impl {{ msg.name }} {
-    pub fn id() -> u32 {
+    pub const MSG_ID : u32 = {{ msg.id }};
+    pub const MSG_NAME: &'static str = "{{ msg.name }}";
+
+    pub const fn id() -> u32 {
         {{ msg.id }}
     }
 
