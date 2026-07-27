@@ -2,59 +2,60 @@ robot "ronald" {
   model          = "Limero-v1"
   description    = "Hoverboard lawn mower"
   multicast_port = 50000
-  broker_port   = 50001
+  broker_port    = 50001
   multicast_addr = "224.0.0.1"
 
+  serial_ports = ["/dev/ttyUSB0", "/dev/ttyUSB1"]
 
   endpoint "broker" {
-      services    = [$ { message.EndpointAnnounce }, $ { message.EndpointAnnounceReply }, $ { message.PingRequest }, $ { message.PingReply }]
-      description = "Message broker for the hoverboard"
-    }
- 
+    services    = [$ { message.EndpointAnnounce }, $ { message.EndpointAnnounceReply }, $ { message.PingRequest }, $ { message.PingReply }]
+    description = "Message broker for the hoverboard"
+  }
+
   endpoint "pinger" {
-      services    = [$ { message.PingRequest }, $ { message.PingReply }]
-      description = "Pinger device for testing"
-    }
- 
+    services    = [$ { message.PingRequest }, $ { message.PingReply }]
+    description = "Pinger device for testing"
+  }
+
   endpoint "sniffer" {
-      subscribes  = [{ src = null msg_type = null dst = null }]
-    }
+    subscribes = [{ src = null msg_type = null dst = null }]
+  }
 
   endpoint "tui_sniffer" {
-      description = "Sniffer device for all messages"
-      subscribes  = [{ src = null msg_type = null dst = null }]
-    }
+    description = "Sniffer device for all messages"
+    subscribes  = [{ src = null msg_type = null dst = null }]
+  }
 
   endpoint "compass" {
-      services    = [$ { message.SysRequest }]
-      events      = [$ { message.SysEvent } , ${ message.CompassEvent}]
-      description = "Compass device for the hoverboard"
-    }
+    services    = [$ { message.SysRequest }]
+    events      = [$ { message.SysEvent }, $ { message.CompassEvent }]
+    description = "Compass device for the hoverboard"
+  }
 
   endpoint "hoverboard" {
-      transport   = "/dev/ttyUSB0"
-      services    = [$ { message.HoverboardRequest }, $ { message.SysRequest }]
-      events      = [$ { message.HoverboardEvent }, $ { message.SysEvent }]
-      replies     = [$ { message.GenericReply }, $ { message.SysReply }]
-      description = "Hoverboard to drive the mower"
-    }
-  
+    transport   = "/dev/ttyUSB0"
+    services    = [$ { message.HoverboardRequest }, $ { message.SysRequest }]
+    events      = [$ { message.HoverboardEvent }, $ { message.SysEvent }]
+    replies     = [$ { message.GenericReply }, $ { message.SysReply }]
+    description = "Hoverboard to drive the mower"
+  }
+
   endpoint "logger" {
-      description = "Logger interface for the hoverboard"
-      subscribes  = [{ src = "hoverboard" msg_type = "HoverboardEvent" dst = null }]
-    }
+    description = "Logger interface for the hoverboard"
+    subscribes  = [{ src = "hoverboard" msg_type = "HoverboardEvent" dst = null }]
+  }
 
   endpoint "ps4" {
-      description = "PS4 controller for the hoverboard"
-      services    = [$ { message.Ps4Request }, $ { message.SysRequest }]
-      events      = [$ { message.Ps4Event }, $ { message.SysEvent }]
-      replies    = [$ { message.GenericReply }, $ { message.SysReply }]
-    }
+    description = "PS4 controller for the hoverboard"
+    services    = [$ { message.Ps4Request }, $ { message.SysRequest }]
+    events      = [$ { message.Ps4Event }, $ { message.SysEvent }]
+    replies     = [$ { message.GenericReply }, $ { message.SysReply }]
+  }
 
   endpoint "mower" {
-      services    = [$ { message.SystemRequest }]
-      description = "System interface for the mower"
-    }
+    services    = [$ { message.SystemRequest }]
+    description = "System interface for the mower"
+  }
 
   message "HoverboardRequest" {
     description = "Request command for hoverboard drive"
@@ -80,7 +81,7 @@ robot "ronald" {
     field "fi_weak_ena" { id = 4 type = "int32" description = "Enable field weak 0:OFF 1:ON" }
     field "fi_weak_hi" { id = 5 type = "int32" description = "Field weak high RPM" }
     field "fi_weak_lo" { id = 6 type = "int32" description = "Field weak low RPM" }
-    field "fi_weak_max" { id = 7   type = "int32" description = "Field weak max current A (FOC only)" }
+    field "fi_weak_max" { id = 7 type = "int32" description = "Field weak max current A (FOC only)" }
     field "phase_adv_max_deg" { id = 8 type = "int32" description = "Max Phase Adv angle Deg (SIN only)" }
     field "input1_raw" { id = 9 type = "int32" description = "Input1 raw value" }
     field "input1_typ" { id = 10 type = "int32" description = "Input1 type 0:Disabled, 1:Normal Pot, 2:Middle Resting Pot, 3:Auto-detect" }
@@ -102,7 +103,7 @@ robot "ronald" {
     field "aux_input1_cmd" { id = 26 type = "int32" description = "Input1 command value" }
     field "aux_input2_raw" { id = 27 type = "int32" description = "Input2 raw value" }
     field "aux_input2_typ" {
-      id = 28
+      id          = 28
       type        = "enum"
       description = "Input2 type 0:Disabled, 1:Normal Pot, 2:Middle Resting Pot, 3:Auto-detect"
       values = {
@@ -235,28 +236,28 @@ robot "ronald" {
     field "build_date_time" { id = 5 type = "string" }
   }
 
-  message PingRequest { 
+  message PingRequest {
     description = "Ping request message"
     field "req_id" { id = 0 type = "uint32" }
-    field "timestamp" { id = 1 type = "uint64"  description = "Timestamp in milliseconds since epoch"}
+    field "timestamp" { id = 1 type = "uint64" description = "Timestamp in milliseconds since epoch" }
   }
 
-  message PingReply { 
+  message PingReply {
     description = "Ping reply message"
     field "req_id" { id = 0 type = "uint32" }
-    field "timestamp" { id = 1 type = "uint64"  description = "Timestamp in milliseconds since epoch"}
+    field "timestamp" { id = 1 type = "uint64" description = "Timestamp in milliseconds since epoch" }
   }
 
   message BrokerSubscribeRequest {
     description = "Subscribe to a message type from a source endpoint"
     // if no field is set, then subscribe to all sources
     field "src" {
-      id = 0
+      id   = 0
       type = "uint32"
     }
     // if no field is set, then subscribe to all message types
     field "msg_type" {
-      id = 1
+      id   = 1
       type = "uint32"
     }
   }
@@ -277,64 +278,64 @@ robot "ronald" {
     description = "Device alive event message"
     field "device" { id = 0 type = "string" }
     field "endpoint" { id = 1 type = "string" }
-    field "timestamp" { id = 2 type = "uint64"  description = "Timestamp in milliseconds since epoch"}
+    field "timestamp" { id = 2 type = "uint64" description = "Timestamp in milliseconds since epoch" }
   }
 
   message Max31855Event {
     description = "Max31855 event message"
-    field "thermocouple_temp" { id = 0 type = "float"  description = "Thermocouple temperature in Celsius"}
-    field "internal_temp" { id = 1 type = "float"  description = "Internal temperature in Celsius"}
-    field "fault" { id = 2 type = "bool"  description = "Fault detected"}
-    field "fault_short_vcc" { id = 3 type = "bool"  description = "Short to VCC detected"}
-    field "fault_short_gnd" { id = 4 type = "bool"  description = "Short to GND detected"}
-    field "fault_open_tc" { id = 5 type = "bool"  description = "Open thermocouple detected"}
+    field "thermocouple_temp" { id = 0 type = "float" description = "Thermocouple temperature in Celsius" }
+    field "internal_temp" { id = 1 type = "float" description = "Internal temperature in Celsius" }
+    field "fault" { id = 2 type = "bool" description = "Fault detected" }
+    field "fault_short_vcc" { id = 3 type = "bool" description = "Short to VCC detected" }
+    field "fault_short_gnd" { id = 4 type = "bool" description = "Short to GND detected" }
+    field "fault_open_tc" { id = 5 type = "bool" description = "Open thermocouple detected" }
   }
 
   message HeatingEvent {
     description = "Heating event message"
-    field "temperature_c" { id = 0 type = "float"  description = "Current temperature in Celsius"}
-    field "setpoint_c" { id = 1 type = "float"  description = "Setpoint temperature in Celsius"}
-    field "enabled" { id = 2 type = "bool"  description = "Heating enabled or disabled"}
-    field "output_pct" { id = 3 type = "float"  description = "Output percentage of the heating element"}
-    field "heater_on" { id = 4 type = "bool"  description = "Heater is currently on or off"}
-    field  "fault" { id = 5 type = "bool"  description = "Fault detected in the heating system"}
-    field  "timestamp_ms" { id = 6 type = "uint64"  description = "Timestamp in milliseconds since epoch"}
+    field "temperature_c" { id = 0 type = "float" description = "Current temperature in Celsius" }
+    field "setpoint_c" { id = 1 type = "float" description = "Setpoint temperature in Celsius" }
+    field "enabled" { id = 2 type = "bool" description = "Heating enabled or disabled" }
+    field "output_pct" { id = 3 type = "float" description = "Output percentage of the heating element" }
+    field "heater_on" { id = 4 type = "bool" description = "Heater is currently on or off" }
+    field "fault" { id = 5 type = "bool" description = "Fault detected in the heating system" }
+    field "timestamp_ms" { id = 6 type = "uint64" description = "Timestamp in milliseconds since epoch" }
   }
 
   message HeatingRequest {
     description = "Heating request message"
-    field "setpoint_c" { id = 0 type = "float"  description = "Setpoint temperature in Celsius"}
-    field "enabled" { id = 1 type = "bool"  description = "Enable or disable heating"}
-    field "kp" { id = 2 type = "float"  description = "Proportional gain for PID controller"}
-    field "ki" { id = 3 type = "float"  description = "Integral gain for PID controller"}
-    field "kd" { id = 4 type = "float"  description = "Derivative gain for PID controller"}
-    field "reset_integral" { id = 5 type = "bool"  description = "Reset the integral term of the PID controller"}
+    field "setpoint_c" { id = 0 type = "float" description = "Setpoint temperature in Celsius" }
+    field "enabled" { id = 1 type = "bool" description = "Enable or disable heating" }
+    field "kp" { id = 2 type = "float" description = "Proportional gain for PID controller" }
+    field "ki" { id = 3 type = "float" description = "Integral gain for PID controller" }
+    field "kd" { id = 4 type = "float" description = "Derivative gain for PID controller" }
+    field "reset_integral" { id = 5 type = "bool" description = "Reset the integral term of the PID controller" }
   }
-        
+
 
   message Envelope {
     description = "Envelope message for encapsulating other messages"
-    field "src" { id = 0 type = "uint32"  description = "Source endpoint name"}
-    field "dst" { id = 1 type = "uint32"  description = "Destination endpoint name"}
-    field "msg_type" { id = 2 type = "uint32"  description = "Message type name"}
-    field "request_id" { id = 3 type = "uint32"  description = "Request ID for matching request/reply"}
-    field "instance_id" { id = 4 type = "uint32"  description = "Instance ID for matching request/reply"}
-    field "payload" { id = 5 type = "bytes"  description = "Serialized payload of the message"}
+    field "src" { id = 0 type = "uint32" description = "Source endpoint name" }
+    field "dst" { id = 1 type = "uint32" description = "Destination endpoint name" }
+    field "msg_type" { id = 2 type = "uint32" description = "Message type name" }
+    field "request_id" { id = 3 type = "uint32" description = "Request ID for matching request/reply" }
+    field "instance_id" { id = 4 type = "uint32" description = "Instance ID for matching request/reply" }
+    field "payload" { id = 5 type = "bytes" description = "Serialized payload of the message" }
   }
 
   message EndpointAnnounce {
-    field "id" { id = 0 type = "uint32"  description = "Unique identifier for the announcing endpoint"}
+    field "id" { id = 0 type = "uint32" description = "Unique identifier for the announcing endpoint" }
     description = "Endpoint announce message for service discovery"
-    field "name" { id = 1 type = "string"  description = "Name of the announcing endpoint"}
-    field "description" { id = 6 type = "string"  description = "Description of the announcing endpoint"}
-    field "services" { id = 2 type = "uint32[]"  description = "List of services provided by the endpoint"}
-    field "events" { id = 3 type = "uint32[]"  description = "List of events emitted by the endpoint"}
-    field "replies" { id = 4 type = "uint32[]"  description = "List of replies supported by the endpoint"}
-    field "subscribes" { id = 5 type = "uint32[]"  description = "List of subscriptions for the endpoint"}
+    field "name" { id = 1 type = "string" description = "Name of the announcing endpoint" }
+    field "description" { id = 6 type = "string" description = "Description of the announcing endpoint" }
+    field "services" { id = 2 type = "uint32[]" description = "List of services provided by the endpoint" }
+    field "events" { id = 3 type = "uint32[]" description = "List of events emitted by the endpoint" }
+    field "replies" { id = 4 type = "uint32[]" description = "List of replies supported by the endpoint" }
+    field "subscribes" { id = 5 type = "uint32[]" description = "List of subscriptions for the endpoint" }
   }
 
   message EndpointAnnounceReply {
-    field "utc" { id = 0 type = "uint64"  description = "Timestamp in milliseconds since epoch"}
+    field "utc" { id = 0 type = "uint64" description = "Timestamp in milliseconds since epoch" }
     description = "Endpoint announce reply message for service discovery"
   }
 

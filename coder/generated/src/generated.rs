@@ -98,6 +98,13 @@ pub fn id_to_string(msg_id: u32) -> String {
     ID_TO_NAME.get(&msg_id).map(|entry| entry.to_string()).unwrap_or_else(|| format!("Unknown({})", msg_id))
 }
 
+pub fn opt_id_to_string(msg_id: Option<u32>) -> String {
+    match msg_id {
+        Some(id) => id_to_string(id),
+        None => "None".to_string(),
+    }
+}
+
 
 
 
@@ -110,7 +117,10 @@ pub struct BrokerSubscribeRequest {
 }
 
 impl BrokerSubscribeRequest {
-    pub fn id() -> u32 {
+    pub const MSG_ID : u32 = 3190208493;
+    pub const MSG_NAME: &'static str = "BrokerSubscribeRequest";
+
+    pub const fn id() -> u32 {
         3190208493
     }
 
@@ -172,7 +182,10 @@ pub struct CompassEvent {
 }
 
 impl CompassEvent {
-    pub fn id() -> u32 {
+    pub const MSG_ID : u32 = 3197332525;
+    pub const MSG_NAME: &'static str = "CompassEvent";
+
+    pub const fn id() -> u32 {
         3197332525
     }
 
@@ -214,7 +227,10 @@ pub struct DeviceAliveEvent {
 }
 
 impl DeviceAliveEvent {
-    pub fn id() -> u32 {
+    pub const MSG_ID : u32 = 2637772092;
+    pub const MSG_NAME: &'static str = "DeviceAliveEvent";
+
+    pub const fn id() -> u32 {
         2637772092
     }
 
@@ -270,7 +286,10 @@ pub struct EndpointAnnounce {
 }
 
 impl EndpointAnnounce {
-    pub fn id() -> u32 {
+    pub const MSG_ID : u32 = 2371693343;
+    pub const MSG_NAME: &'static str = "EndpointAnnounce";
+
+    pub const fn id() -> u32 {
         2371693343
     }
 
@@ -308,7 +327,10 @@ pub struct EndpointAnnounceReply {
 }
 
 impl EndpointAnnounceReply {
-    pub fn id() -> u32 {
+    pub const MSG_ID : u32 = 3238220441;
+    pub const MSG_NAME: &'static str = "EndpointAnnounceReply";
+
+    pub const fn id() -> u32 {
         3238220441
     }
 
@@ -362,7 +384,10 @@ pub struct Envelope {
 }
 
 impl Envelope {
-    pub fn id() -> u32 {
+    pub const MSG_ID : u32 = 1228864117;
+    pub const MSG_NAME: &'static str = "Envelope";
+
+    pub const fn id() -> u32 {
         1228864117
     }
 
@@ -409,7 +434,10 @@ pub struct GenericReply {
 }
 
 impl GenericReply {
-    pub fn id() -> u32 {
+    pub const MSG_ID : u32 = 2578784998;
+    pub const MSG_NAME: &'static str = "GenericReply";
+
+    pub const fn id() -> u32 {
         2578784998
     }
 
@@ -465,7 +493,10 @@ pub struct HeatingEvent {
 }
 
 impl HeatingEvent {
-    pub fn id() -> u32 {
+    pub const MSG_ID : u32 = 461737375;
+    pub const MSG_NAME: &'static str = "HeatingEvent";
+
+    pub const fn id() -> u32 {
         461737375
     }
 
@@ -518,7 +549,10 @@ pub struct HeatingRequest {
 }
 
 impl HeatingRequest {
-    pub fn id() -> u32 {
+    pub const MSG_ID : u32 = 578653874;
+    pub const MSG_NAME: &'static str = "HeatingRequest";
+
+    pub const fn id() -> u32 {
         578653874
     }
 
@@ -691,7 +725,10 @@ pub struct HoverboardEvent {
 }
 
 impl HoverboardEvent {
-    pub fn id() -> u32 {
+    pub const MSG_ID : u32 = 104988481;
+    pub const MSG_NAME: &'static str = "HoverboardEvent";
+
+    pub const fn id() -> u32 {
         104988481
     }
 
@@ -735,7 +772,10 @@ pub struct HoverboardRequest {
 }
 
 impl HoverboardRequest {
-    pub fn id() -> u32 {
+    pub const MSG_ID : u32 = 2735870956;
+    pub const MSG_NAME: &'static str = "HoverboardRequest";
+
+    pub const fn id() -> u32 {
         2735870956
     }
 
@@ -788,7 +828,10 @@ pub struct ImuEvent {
 }
 
 impl ImuEvent {
-    pub fn id() -> u32 {
+    pub const MSG_ID : u32 = 1802836182;
+    pub const MSG_NAME: &'static str = "ImuEvent";
+
+    pub const fn id() -> u32 {
         1802836182
     }
 
@@ -841,7 +884,10 @@ pub struct Max31855Event {
 }
 
 impl Max31855Event {
-    pub fn id() -> u32 {
+    pub const MSG_ID : u32 = 2831607083;
+    pub const MSG_NAME: &'static str = "Max31855Event";
+
+    pub const fn id() -> u32 {
         2831607083
     }
 
@@ -881,7 +927,10 @@ pub struct PingReply {
 }
 
 impl PingReply {
-    pub fn id() -> u32 {
+    pub const MSG_ID : u32 = 1594103907;
+    pub const MSG_NAME: &'static str = "PingReply";
+
+    pub const fn id() -> u32 {
         1594103907
     }
 
@@ -921,7 +970,10 @@ pub struct PingRequest {
 }
 
 impl PingRequest {
-    pub fn id() -> u32 {
+    pub const MSG_ID : u32 = 31253678;
+    pub const MSG_NAME: &'static str = "PingRequest";
+
+    pub const fn id() -> u32 {
         31253678
     }
 
@@ -1022,7 +1074,10 @@ pub struct Ps4Event {
 }
 
 impl Ps4Event {
-    pub fn id() -> u32 {
+    pub const MSG_ID : u32 = 4282593576;
+    pub const MSG_NAME: &'static str = "Ps4Event";
+
+    pub const fn id() -> u32 {
         4282593576
     }
 
@@ -1074,7 +1129,10 @@ pub struct Ps4Request {
 }
 
 impl Ps4Request {
-    pub fn id() -> u32 {
+    pub const MSG_ID : u32 = 1992038561;
+    pub const MSG_NAME: &'static str = "Ps4Request";
+
+    pub const fn id() -> u32 {
         1992038561
     }
 
@@ -1121,7 +1179,10 @@ pub struct SysEvent {
 }
 
 impl SysEvent {
-    pub fn id() -> u32 {
+    pub const MSG_ID : u32 = 924742914;
+    pub const MSG_NAME: &'static str = "SysEvent";
+
+    pub const fn id() -> u32 {
         924742914
     }
 
@@ -1163,7 +1224,10 @@ pub struct SysReply {
 }
 
 impl SysReply {
-    pub fn id() -> u32 {
+    pub const MSG_ID : u32 = 2952492394;
+    pub const MSG_NAME: &'static str = "SysReply";
+
+    pub const fn id() -> u32 {
         2952492394
     }
 
@@ -1207,7 +1271,10 @@ pub struct SysRequest {
 }
 
 impl SysRequest {
-    pub fn id() -> u32 {
+    pub const MSG_ID : u32 = 2966412411;
+    pub const MSG_NAME: &'static str = "SysRequest";
+
+    pub const fn id() -> u32 {
         2966412411
     }
 
@@ -1251,7 +1318,10 @@ pub struct UsEvent {
 }
 
 impl UsEvent {
-    pub fn id() -> u32 {
+    pub const MSG_ID : u32 = 1082063571;
+    pub const MSG_NAME: &'static str = "UsEvent";
+
+    pub const fn id() -> u32 {
         1082063571
     }
 
@@ -1302,7 +1372,10 @@ pub struct WifiEvent {
 }
 
 impl WifiEvent {
-    pub fn id() -> u32 {
+    pub const MSG_ID : u32 = 3371536624;
+    pub const MSG_NAME: &'static str = "WifiEvent";
+
+    pub const fn id() -> u32 {
         3371536624
     }
 

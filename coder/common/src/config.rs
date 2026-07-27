@@ -43,6 +43,8 @@ pub struct RobotConfig {
     pub multicast_addr: Option<String>,
     /// Optional human-readable description.
     pub description: Option<String>,
+    /// serial ports to use for serial endpoints.
+    pub serial_ports: Option<Vec<String>>,
     /// Named endpoints, keyed by label.
     pub endpoints: HashMap<String, EndpointConfig>,
     /// Named messages, keyed by label.
@@ -225,6 +227,7 @@ pub fn parse_robot_body(body: &Body) -> anyhow::Result<RobotConfig> {
         endpoints,
         messages,
         name,
+        serial_ports: get_attr_list_strings(inner, "serial_ports").into(),
         multicast_port: get_attr_optional(inner, "multicast_port")
             .and_then(|s| s.parse::<u16>().ok())
             .unwrap_or(0),
