@@ -3,10 +3,8 @@
 use generated::generated::Envelope;
 use kameo::prelude::*;
 use log::{info, warn};
-use std::{
-    net::{Ipv4Addr, SocketAddr},
-    sync::Arc,
-};
+use std::net::{Ipv4Addr, SocketAddr};
+use std::sync::Arc;
 use tokio::net::UdpSocket;
 
 // ── Messages ───────────────────────────────────────────────────────────────
@@ -73,8 +71,8 @@ impl Message<StartUnicast> for UdpActor {
                             Ok(envelope) => {
                                 let _ = router_clone
                                     .tell(crate::actors::router::IncomingEnvelope {
-                                        envelope,
-                                        raw: packet,
+                                        envelope: Arc::new(envelope),
+                                        raw: Arc::new(packet),
                                     })
                                     .await;
                             }

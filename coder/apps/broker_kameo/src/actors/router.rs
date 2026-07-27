@@ -1,10 +1,10 @@
 //! Central routing actor — receives Envelopes from transports and forwards
 //! them based on dst/src/msg_type subscription matching.
 
+use std::sync::Arc;
+
 use dashmap::DashMap;
-use generated::generated::{
-    EndpointAnnounce, Envelope, id_to_string, opt_id_to_string,
-};
+use generated::generated::{EndpointAnnounce, Envelope, id_to_string, opt_id_to_string};
 use kameo::prelude::*;
 use log::{debug, info};
 use std::fmt::Display;
@@ -17,7 +17,7 @@ use std::net::SocketAddr;
 pub enum EndpointAddress {
     UdpEndpoint(ActorRef<crate::actors::udp::UdpActor>, SocketAddr),
     SerialEndpoint(ActorRef<crate::actors::serial::SerialActor>, String),
-    InternalActor(ActorRef<crate::actors::logger::LoggerActor>),
+    EnvelopeActor(Recipient<IncomingEnvelope>),
 }
 
 // Manual PartialEq — compares the SocketAddr/port path and ignores the ActorRef
@@ -25,7 +25,10 @@ impl PartialEq for EndpointAddress {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
             (EndpointAddress::UdpEndpoint(_, a), EndpointAddress::UdpEndpoint(_, b)) => a == b,
-            (EndpointAddress::SerialEndpoint(_, a), EndpointAddress::SerialEndpoint(_, b)) => a == b,
+            (EndpointAddress::SerialEndpoint(_, a), EndpointAddress::SerialEndpoint(_, b)) => {
+                a == b
+            }
+            (EndpointAddress::EnvelopeActor(a), EndpointAddress::EnvelopeActor(b)) => a == b,
             _ => false,
         }
     }
@@ -36,7 +39,7 @@ impl Display for EndpointAddress {
         match self {
             EndpointAddress::UdpEndpoint(_, addr) => write!(f, "udp://{}", addr),
             EndpointAddress::SerialEndpoint(_, port) => write!(f, "serial://{}", port),
-            EndpointAddress::InternalActor(_) => write!(f, "internal://actor"),
+            EndpointAddress::EnvelopeActor(_) => write!(f, "envelope://actor"),
         }
     }
 }
@@ -57,12 +60,12 @@ pub struct Subscription {
     pub dst: Option<u32>,
 }
 
-
-/// Incoming envelope from any transport
+/// Incoming envelope from any transport.
+/// Both fields are `Arc` so forwarding to N destinations only bumps refcounts.
 #[derive(Clone)]
 pub struct IncomingEnvelope {
-    pub envelope: Envelope,
-    pub raw: Vec<u8>,
+    pub envelope: Arc<Envelope>,
+    pub raw: Arc<Vec<u8>>,
 }
 
 /// Register a serial actor's address with the router.
@@ -70,6 +73,14 @@ pub struct EndpointUpdate {
     pub envelope: Envelope,
     pub ep_addr: EndpointAddress,
     pub ep_announce: EndpointAnnounce,
+}
+
+pub struct AddRecipient {
+    pub id: u32,
+    pub name: String,
+    pub description : Option<String>,
+    pub recipient: Recipient<IncomingEnvelope>,
+    pub subscription: Subscription,
 }
 
 // ── Router actor ───────────────────────────────────────────────────────────
@@ -87,19 +98,16 @@ pub struct Router {
     serial_addrs: DashMap<String, ActorRef<crate::actors::serial::SerialActor>>,
     /// Our broker id.
     broker_id: u32,
-    /// Logger actor reference.
-    logger_ref: ActorRef<crate::actors::logger::LoggerActor>,
 }
 
 impl Router {
-    pub fn new(broker_id: u32, subscriptions: Vec<Subscription>, logger_ref: ActorRef<crate::actors::logger::LoggerActor>) -> Self {
+    pub fn new(broker_id: u32, subscriptions: Vec<Subscription>) -> Self {
         Router {
             known_endpoints: DashMap::new(),
             subscriptions,
             dynamic_subscriptions: DashMap::new(),
             serial_addrs: DashMap::new(),
             broker_id,
-            logger_ref,
         }
     }
 
@@ -170,44 +178,45 @@ impl Message<IncomingEnvelope> for Router {
     type Reply = ();
 
     async fn handle(&mut self, msg: IncomingEnvelope, _ctx: &mut Context<Self, Self::Reply>) {
-        let env = &msg.envelope;
-
         // Forward to matching subscribers
-        let targets = self.target_addrs(env);
+        let targets = self.target_addrs(&msg.envelope);
         if targets.is_empty() {
             debug!(
                 "dropping src={} dst={} msg_type={} (no matching subscribers)",
-                opt_id_to_string(env.src),
-                opt_id_to_string(env.dst),
-                opt_id_to_string(env.msg_type)
+                opt_id_to_string(msg.envelope.src),
+                opt_id_to_string(msg.envelope.dst),
+                opt_id_to_string(msg.envelope.msg_type)
             );
         }
         for addr in targets {
             debug!(
                 "src={} dst={} msg_type={} to {}",
-                opt_id_to_string(env.src),
-                opt_id_to_string(env.dst),
-                opt_id_to_string(env.msg_type),
+                opt_id_to_string(msg.envelope.src),
+                opt_id_to_string(msg.envelope.dst),
+                opt_id_to_string(msg.envelope.msg_type),
                 addr
             );
             match addr {
                 EndpointAddress::SerialEndpoint(actor, _port) => {
-                    let _ = actor.tell(crate::actors::serial::SerialSend {
-                        frame: msg.raw.clone(),
-                    }).await;
+                    let _ = actor
+                        .tell(crate::actors::serial::SerialSend {
+                            frame: msg.raw.to_vec(),
+                        })
+                        .await;
                 }
                 EndpointAddress::UdpEndpoint(actor, udp_addr) => {
-                    let _ = actor.tell(crate::actors::udp::UdpSend {
-                        raw: msg.raw.clone(),
-                        addr: udp_addr,
-                    }).await;
+                    let _ = actor
+                        .tell(crate::actors::udp::UdpSend {
+                            raw: msg.raw.to_vec(),
+                            addr: udp_addr,
+                        })
+                        .await;
                 }
-                EndpointAddress::InternalActor(actor) => {
-                    let _ = actor.tell(msg.clone()).await;
+                EndpointAddress::EnvelopeActor(recipient) => {
+                    let _ = recipient.tell(msg.clone()).await;
                 }
             }
         }
-        let _ = self.logger_ref.tell(msg.clone()).await;
     }
 }
 
@@ -227,9 +236,34 @@ impl Message<EndpointUpdate> for Router {
             if is_new {
                 info!(
                     "Discovered endpoint '{}' at {}",
-                    id_to_string(endpoint_id), msg.ep_addr
+                    id_to_string(endpoint_id),
+                    msg.ep_addr
                 );
             }
         }
     }
 }
+
+impl Message<AddRecipient> for Router {
+    type Reply = ();
+
+    async fn handle(&mut self, msg: AddRecipient, _ctx: &mut Context<Self, Self::Reply>) {
+        self.known_endpoints.insert(
+            msg.id,
+            KnownEndpoint {
+                announce: EndpointAnnounce {
+                    id: Some(msg.id),
+                    name: Some(msg.name.clone()),
+                    description: msg.description.clone(),
+                    services: None,
+                    events: None,
+                    replies: None,
+                    subscribes: None,
+                },
+                addr: EndpointAddress::EnvelopeActor(msg.recipient),
+            },
+        );
+        self.dynamic_subscriptions.insert(msg.id, vec![msg.subscription]);
+    }
+}   
+     

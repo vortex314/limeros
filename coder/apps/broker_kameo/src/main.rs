@@ -88,16 +88,6 @@ async fn main() -> anyhow::Result<()> {
     let args = Args::parse();
     info!("Starting broker_kameo...");
 
-    let logger_actor = LoggerActor::new(OpenObserveConfig {
-        endpoint: "http://192.168.0.240:5080".to_string(),
-        organization: "default".to_string(),
-        stream: "broker".to_string(),
-        email: "root@example.com".to_string(),
-        password: "Complexpass#123".to_string(),
-    });
-
-    let logger_ref = LoggerActor::spawn(logger_actor);
-
     let cfg =
         load_robot_config(&args.input).with_context(|| format!("failed to load {}", args.input))?;
 
@@ -105,7 +95,19 @@ async fn main() -> anyhow::Result<()> {
     let subscriptions = parse_subscriptions(&cfg);
 
     // Start Router actor
-    let router_actor = Router::spawn(Router::new(broker_id, subscriptions, logger_ref.clone()));
+    let router_actor = Router::spawn(Router::new(broker_id, subscriptions));
+
+    let logger_actor = LoggerActor::new(
+        OpenObserveConfig {
+            endpoint: "http://192.168.0.240:5080".to_string(),
+            organization: "default".to_string(),
+            stream: "broker".to_string(),
+            email: "root@example.com".to_string(),
+            password: "Complexpass#123".to_string(),
+        },
+        router_actor.clone(),
+    );
+    let logger_ref = LoggerActor::spawn(logger_actor);
 
     // Start UDP unicast actor
     let udp_actor = UdpActor::spawn(UdpActor::new(router_actor.clone()));

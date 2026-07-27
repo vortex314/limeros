@@ -1,14 +1,15 @@
 use anyhow::Result;
+use common::fnv;
 use generated::generated::*;
-use kameo::Actor;
-use kameo::actor::Spawn;
+use kameo::prelude::*;
+use kameo::actor::{ActorRef, Spawn};
 use kameo::message::{Context, Message};
 use log::info;
 use log::{error, warn};
 use reqwest::Client;
 use serde_json::{Value, json};
 use std::pin::Pin;
-use std::time::Duration;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tokio::time::{Instant, interval};
 
 use crate::actors::router::IncomingEnvelope;
@@ -53,7 +54,6 @@ pub struct Log(pub LogRecord);
 pub struct Flush; // force flush the buffer
 
 /// The actor itself
-#[derive(Actor)]
 pub struct LoggerActor {
     client: Client,
     config: OpenObserveConfig,
@@ -61,10 +61,11 @@ pub struct LoggerActor {
     max_batch_size: usize,
     flush_interval: Duration,
     last_flush: Instant,
+    router: ActorRef<crate::actors::router::Router>,
 }
 
 impl LoggerActor {
-    pub fn new(config: OpenObserveConfig) -> Self {
+    pub fn new(config: OpenObserveConfig, router: ActorRef<crate::actors::router::Router>) -> Self {
         Self {
             client: Client::new(),
             config,
@@ -72,6 +73,7 @@ impl LoggerActor {
             max_batch_size: 100, // flush when we reach this many records
             flush_interval: Duration::from_secs(2), // or every 2 seconds
             last_flush: Instant::now(),
+            router,
         }
     }
 
@@ -80,7 +82,11 @@ impl LoggerActor {
             return;
         }
 
-        info!("Flushing {} log records to OpenObserve {}", self.buffer.len(), self.config.ingestion_url());
+        info!(
+            "Flushing [{}]records to OpenObserve {}",
+            self.buffer.len(),
+            self.config.ingestion_url()
+        );
 
         let records = std::mem::take(&mut self.buffer);
         let url = self.config.ingestion_url();
@@ -97,7 +103,6 @@ impl LoggerActor {
         {
             Ok(resp) if resp.status().is_success() => {
                 // success – optionally log metrics here
-                info!(" Flushed {} log records to OpenObserve", records.len());
             }
             Ok(resp) => {
                 warn!(
@@ -114,6 +119,28 @@ impl LoggerActor {
         }
 
         self.last_flush = Instant::now();
+    }
+}
+
+impl Actor for LoggerActor {
+    type Args = Self;
+    type Error = anyhow::Error;
+
+    async fn on_start( state: Self::Args, actor_ref: ActorRef<Self>) -> Result<Self, Self::Error> {
+        let router = state.router.clone();
+        router.tell(crate::actors::router::AddRecipient {
+            id:fnv::fnv1a_32("logger"),
+            name: "logger".to_string(),
+            description: Some("LoggerActor for OpenObserve".to_string()),
+            recipient: actor_ref.recipient(),
+            subscription: crate::actors::router::Subscription {
+                msg_type: None, // subscribe to all messages
+                src: None,
+                dst: None,
+            },
+        }).await?;
+
+        Ok(state)
     }
 }
 
@@ -179,9 +206,13 @@ impl Message<IncomingEnvelope> for LoggerActor {
         value["msg_type"] = json!(&opt_id_to_string(envelope.msg_type));
         value["request_id"] = json!(&envelope.request_id);
         value["instance_id"] = json!(&envelope.instance_id);
-        value["time"] = json!(chrono::Utc::now().to_rfc3339());
-   //    info!("value: {}", value);
-
+        value["_timestamp"] = json!(
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_millis()
+        );
+        //    info!("value: {}", value);
 
         let r = self.buffer.push(value);
 
@@ -194,6 +225,8 @@ impl Message<IncomingEnvelope> for LoggerActor {
         Ok(())
     }
 }
+
+
 
 pub fn msg_to_value(msg_type: u32, buffer: &[u8]) -> anyhow::Result<Value> {
     // Implementation goes here

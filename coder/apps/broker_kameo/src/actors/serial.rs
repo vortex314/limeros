@@ -124,7 +124,7 @@ impl Message<SerialReceivedFrame> for SerialActor {
     async fn handle(&mut self, msg: SerialReceivedFrame, _ctx: &mut Context<Self, Self::Reply>) {
         let packet = &msg.raw;
         let envelope = match Envelope::from_bytes(packet) {
-            Ok(e) => e,
+            Ok(e) => Arc::new(e),
             Err(e) => {
                 warn!("Failed to decode Envelope on {}: {}", self.port_path, e);
                 return;
@@ -146,6 +146,8 @@ impl Message<SerialReceivedFrame> for SerialActor {
                 return;
             }
         };
+
+        let raw = Arc::new(packet.to_vec());
 
         if msg_type == generated::generated::EndpointAnnounce::id() {
             let bytes = match envelope.payload.as_ref() {
@@ -181,7 +183,7 @@ impl Message<SerialReceivedFrame> for SerialActor {
                 let _ = self
                     .router
                     .tell(crate::actors::router::EndpointUpdate {
-                        envelope: envelope.clone(),
+                        envelope: (*envelope).clone(),
                         ep_addr,
                         ep_announce,
                     })
@@ -192,14 +194,14 @@ impl Message<SerialReceivedFrame> for SerialActor {
                 .router
                 .tell(IncomingEnvelope {
                     envelope: envelope.clone(),
-                    raw: packet.to_vec(),
+                    raw: raw.clone(),
                 })
                 .await;
         }
 
         // Send EndpointAnnounceReply
         let ep_announce_reply = EndpointAnnounceReply { utc: None };
-        let env = Envelope {
+        let reply_env = Envelope {
             src: Some(BROKER_ID),
             dst: Some(src),
             msg_type: Some(EndpointAnnounceReply::id()),
@@ -207,12 +209,12 @@ impl Message<SerialReceivedFrame> for SerialActor {
             request_id: None,
             instance_id: None,
         };
-        let raw = env.to_bytes().unwrap_or_default();
+        let reply_raw = reply_env.to_bytes().unwrap_or_default();
         let _ = self
             .router
             .tell(IncomingEnvelope {
-                envelope: env,
-                raw,
+                envelope: Arc::new(reply_env),
+                raw: Arc::new(reply_raw),
             })
             .await;
     }

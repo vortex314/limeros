@@ -2,6 +2,7 @@
 //! forwards decoded EndpointAnnounce messages to the Router.
 
 use std::net::{Ipv4Addr, SocketAddr};
+use std::sync::Arc;
 
 use dashmap::DashMap;
 use generated::generated::{
@@ -49,15 +50,41 @@ impl MulticastActor {
         }
     }
 
-    fn handle_packet(&mut self, packet: &[u8], addr: SocketAddr) -> anyhow::Result<()> {
-        let envelope = Envelope::from_bytes(packet)?;
+    async fn handle_packet(&mut self, packet: &[u8], addr: SocketAddr) -> anyhow::Result<()> {
+        let env = Envelope::from_bytes(packet)?;
+        let msg_type = env
+            .msg_type
+            .ok_or_else(|| anyhow::anyhow!("Envelope missing msg_type"))?;
+
+        // Build Arc once — Router forwards it by bumping the refcount
+        let envelope = Arc::new(env);
+        let raw = Arc::new(packet.to_vec());
+
+        self.router
+            .tell(IncomingEnvelope {
+                envelope: envelope.clone(),
+                raw: raw.clone(),
+            })
+            .await?;
+
+        if msg_type == EndpointAnnounce::id() {
+            self.handle_endpoint_announce(&*envelope, addr).await?;
+        }
+        Ok(())
+    }
+
+    async fn handle_endpoint_announce(
+        &mut self,
+        envelope: &Envelope,
+        addr: SocketAddr,
+    ) -> anyhow::Result<()> {
+        let bytes = envelope
+            .payload
+            .as_ref()
+            .ok_or_else(|| anyhow::anyhow!("Envelope missing payload"))?;
         let src = envelope
             .src
             .ok_or_else(|| anyhow::anyhow!("Envelope missing src"))?;
-        let bytes = envelope
-            .payload
-            .as_deref()
-            .ok_or_else(|| anyhow::anyhow!("Envelope missing payload"))?;
         let ep_announce = EndpointAnnounce::from_bytes(bytes)?;
         if let Some(new_addr) = self.known_udp_endpoints.insert(src, addr) {
             if new_addr != addr {
@@ -65,17 +92,16 @@ impl MulticastActor {
                     "UDP endpoint {:?} changed address from {} to {} via multicast",
                     ep_announce.name, new_addr, addr
                 );
+                let envelop_copy = envelope.clone();
                 let ep_update = crate::actors::router::EndpointUpdate {
-                    envelope,
+                    envelope: envelop_copy,
                     ep_addr: EndpointAddress::UdpEndpoint(self.udp_actor.clone(), addr),
                     ep_announce,
                 };
                 // Use tell since we're in sync context — spawn to make it async
-                let router = self.router.clone();
-                tokio::spawn(async move {
-                    let _ = router.tell(ep_update).await;
-                });
+                self.router.tell(ep_update).await?;
             }
+            // else ignore, same address as before
         } else {
             info!(
                 "Discovered new UDP endpoint '{}' == {:?} at {} via multicast",
@@ -84,15 +110,12 @@ impl MulticastActor {
                 addr
             );
             let ep_update = crate::actors::router::EndpointUpdate {
-                envelope,
+                envelope: envelope.clone(),
                 ep_addr: EndpointAddress::UdpEndpoint(self.udp_actor.clone(), addr),
                 ep_announce,
             };
-            let router = self.router.clone();
-            tokio::spawn(async move {
-                let _ = router.tell(ep_update).await;
-            });
-        }
+            self.router.tell(ep_update).await?;
+        };
         let ep_announce_reply = EndpointAnnounceReply { utc: None };
         let env = Envelope {
             src: Some(BROKER_ID),
@@ -103,14 +126,12 @@ impl MulticastActor {
             instance_id: None,
         };
         let raw = env.to_bytes()?;
-        let incoming = IncomingEnvelope {
-            envelope: env,
-            raw,
-        };
-        let router = self.router.clone();
-        tokio::spawn(async move {
-            let _ = router.tell(incoming).await;
-        });
+        self.router
+            .tell(IncomingEnvelope {
+                envelope: Arc::new(env),
+                raw: Arc::new(raw),
+            })
+            .await?;
         Ok(())
     }
 }
@@ -150,15 +171,11 @@ impl Message<StartMulticast> for MulticastActor {
                 match socket.recv_from(&mut buf).await {
                     Ok((len, addr)) => {
                         let packet = buf[..len].to_vec();
-                        let _ = actor_ref
-                            .tell(McastReceive {
-                                raw: packet,
-                                addr,
-                            })
-                            .await;
+                        let _ = actor_ref.tell(McastReceive { raw: packet, addr }).await;
                     }
                     Err(e) => {
                         warn!("Multicast recv error: {}", e);
+                        break;
                     }
                 }
             }
@@ -170,7 +187,7 @@ impl Message<McastReceive> for MulticastActor {
     type Reply = ();
 
     async fn handle(&mut self, msg: McastReceive, _ctx: &mut Context<Self, Self::Reply>) {
-        if let Err(e) = self.handle_packet(&msg.raw, msg.addr) {
+        if let Err(e) = self.handle_packet(&msg.raw, msg.addr).await {
             warn!("Failed to handle multicast packet: {}", e);
         }
     }
