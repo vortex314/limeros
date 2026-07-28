@@ -12,6 +12,7 @@ mod cutter;
 mod hoverboard;
 mod imu;
 mod udp_endpoint;
+mod brain;
 
 use std::net::Ipv4Addr;
 
@@ -20,6 +21,7 @@ use common::fnv1a_32;
 use kameo::prelude::*;
 use log::info;
 
+use brain::BrainActor;
 use compass::CompassActor;
 use cutter::CutterActor;
 use hoverboard::HoverboardActor;
@@ -68,10 +70,18 @@ async fn main() -> anyhow::Result<()> {
     let udp_ref = UdpEndpoint::spawn(UdpEndpoint::new(udp_config));
 
     let endpoint_id = fnv1a_32(&args.endpoint);
-    let _hoverboard_ref = HoverboardActor::spawn(HoverboardActor::new(endpoint_id, udp_ref.clone()));
-    let _cutter_ref = CutterActor::spawn(CutterActor::new(endpoint_id, udp_ref.clone()));
-    let _compass_ref = CompassActor::spawn(CompassActor::new(endpoint_id, udp_ref.clone()));
-    let _imu_ref = ImuActor::spawn(ImuActor::new(endpoint_id, udp_ref.clone()));
+    let hoverboard_ref = HoverboardActor::spawn(HoverboardActor::new(endpoint_id, udp_ref.clone()));
+    let cutter_ref = CutterActor::spawn(CutterActor::new(endpoint_id, udp_ref.clone()));
+    let compass_ref = CompassActor::spawn(CompassActor::new(endpoint_id, udp_ref.clone()));
+    let imu_ref = ImuActor::spawn(ImuActor::new(endpoint_id, udp_ref.clone()));
+
+    let _brain_ref = BrainActor::spawn(BrainActor::new(
+        udp_ref.clone(),
+        hoverboard_ref,
+        cutter_ref,
+        compass_ref,
+        imu_ref,
+    ));
 
     info!("Brain running. Press Ctrl+C to stop.");
     tokio::signal::ctrl_c().await?;
