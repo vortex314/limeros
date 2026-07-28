@@ -4,6 +4,7 @@ members = [
     "apps/broker",
     "apps/broker_actix",
     "apps/broker_kameo",
+    "apps/brain",
     "apps/codegen",
     "apps/pinger",
     "apps/serial_bridge",
