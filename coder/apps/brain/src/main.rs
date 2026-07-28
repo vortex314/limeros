@@ -1,9 +1,11 @@
 //! brain — Limeros control app.
 //!
 //! Architecture:
-//!   UdpEndpoint    — UDP transport with broker handshake
-//!   HoverboardActor — sends HoverboardRequest at 2Hz
+//!   UdpEndpoint     — UDP transport with broker handshake
+//!   HoverboardActor — digital twin of hoverboard (2Hz)
+//!   CutterActor     — digital twin of cutter (2Hz)
 
+mod cutter;
 mod hoverboard;
 mod udp_endpoint;
 
@@ -14,6 +16,7 @@ use common::fnv1a_32;
 use kameo::prelude::*;
 use log::info;
 
+use cutter::CutterActor;
 use hoverboard::HoverboardActor;
 use udp_endpoint::{UdpEndpoint, UdpEndpointConfig};
 
@@ -60,6 +63,7 @@ async fn main() -> anyhow::Result<()> {
 
     let endpoint_id = fnv1a_32(&args.endpoint);
     let _hoverboard_ref = HoverboardActor::spawn(HoverboardActor::new(endpoint_id, udp_ref.clone()));
+    let _cutter_ref = CutterActor::spawn(CutterActor::new(endpoint_id, udp_ref.clone()));
 
     info!("Brain running. Press Ctrl+C to stop.");
     tokio::signal::ctrl_c().await?;
