@@ -9,6 +9,9 @@
 std::unordered_map<uint32_t, const char*> id_to_name = {
     { 3190208493, "BrokerSubscribeRequest" },
     { 3197332525, "CompassEvent" },
+    { 3974472274, "CutterEvent" },
+    { 3901793882, "CutterReply" },
+    { 2133047659, "CutterRequest" },
     { 2637772092, "DeviceAliveEvent" },
     { 2371693343, "EndpointAnnounce" },
     { 3238220441, "EndpointAnnounceReply" },
@@ -17,6 +20,7 @@ std::unordered_map<uint32_t, const char*> id_to_name = {
     { 461737375, "HeatingEvent" },
     { 578653874, "HeatingRequest" },
     { 104988481, "HoverboardEvent" },
+    { 2095960949, "HoverboardReply" },
     { 2735870956, "HoverboardRequest" },
     { 1802836182, "ImuEvent" },
     { 2831607083, "Max31855Event" },
@@ -29,6 +33,7 @@ std::unordered_map<uint32_t, const char*> id_to_name = {
     { 2966412411, "SysRequest" },
     { 1082063571, "UsEvent" },
     { 3371536624, "WifiEvent" },
+    { 2200474099, "brain" },
     { 2490238132, "broker" },
     { 2753264687, "compass" },
     { 1152836275, "hoverboard" },
@@ -375,6 +380,367 @@ int CompassEvent::decode(const Buffer& buffer) {
                     int64_t val;
                     cbor_value_get_int64(&mapValue, &val);
                     accel_z = ((float)val);
+                }
+                break;
+            default:
+                // Unknown field id — skip value.
+                break;
+        }
+
+        cbor_value_advance(&mapValue);  // advance past value to next key (or end)
+    }
+
+    cbor_value_leave_container(&it, &mapValue);
+    return 0;
+}
+
+
+
+int CutterEvent::encode(Buffer& buffer) const {
+    buffer.clear();
+    CborEncoder encoder;
+    cbor_encoder_init(&encoder,buffer.data(),buffer.capacity(),0);
+    // Count how many optional fields are set.
+    uint32_t fieldCount = 0;
+    if (enabled.is_some()) { fieldCount++; }
+    if (rpm.is_some()) { fieldCount++; }
+    if (current.is_some()) { fieldCount++; }
+    if (voltage.is_some()) { fieldCount++; }
+    if (temperature.is_some()) { fieldCount++; }
+
+    CborEncoder mapEncoder;
+    cbor_check(cbor_encoder_create_map(&encoder, &mapEncoder, fieldCount));
+    if ( enabled) {
+        const auto& value = *enabled;
+        cbor_check(cbor_encode_uint(&mapEncoder, FieldId::ENABLED));
+        cbor_check(cbor_encode_boolean(&mapEncoder, value));
+    };
+    if ( rpm) {
+        const auto& value = *rpm;
+        cbor_check(cbor_encode_uint(&mapEncoder, FieldId::RPM));
+        cbor_check(cbor_encode_int(&mapEncoder, value));
+    };
+    if ( current) {
+        const auto& value = *current;
+        cbor_check(cbor_encode_uint(&mapEncoder, FieldId::CURRENT));
+        cbor_check(cbor_encode_float(&mapEncoder, value));
+    };
+    if ( voltage) {
+        const auto& value = *voltage;
+        cbor_check(cbor_encode_uint(&mapEncoder, FieldId::VOLTAGE));
+        cbor_check(cbor_encode_float(&mapEncoder, value));
+    };
+    if ( temperature) {
+        const auto& value = *temperature;
+        cbor_check(cbor_encode_uint(&mapEncoder, FieldId::TEMPERATURE));
+        cbor_check(cbor_encode_float(&mapEncoder, value));
+    };
+
+     cbor_check(cbor_encoder_close_container(&encoder, &mapEncoder));
+    buffer.resize(cbor_encoder_get_buffer_size(&encoder, buffer.data()));
+     return 0;
+}
+
+int CutterEvent::decode(const Buffer& buffer) {
+    CborParser parser;
+    CborValue it;
+    cbor_check(cbor_parser_init(buffer.data(), buffer.size(), 0, &parser, &it));
+    if (!cbor_value_is_map(&it)) {
+        WARN("Expected CBOR map ");
+        return EINVAL;
+    }
+
+    CborValue mapValue;
+    cbor_value_enter_container(&it, &mapValue);
+
+    while (!cbor_value_at_end(&mapValue)) {
+        // Read the map key (must be an unsigned integer — field id).
+        if (!cbor_value_is_unsigned_integer(&mapValue)) {
+            // Skip unknown key type and its value.
+            cbor_value_advance(&mapValue);  // skip key
+            if (!cbor_value_at_end(&mapValue)) {
+                cbor_value_advance(&mapValue);  // skip value
+            }
+            continue;
+        }
+
+        uint64_t keyVal;
+        cbor_value_get_uint64(&mapValue, &keyVal);
+        cbor_value_advance(&mapValue);  // advance to value
+
+        switch ((uint32_t)keyVal) {
+            case CutterEvent::FieldId::ENABLED:
+                if (cbor_value_is_boolean(&mapValue)) {
+                    bool val;
+                    cbor_value_get_boolean(&mapValue, &val);
+                    enabled = (val);
+                }
+                break;
+            case CutterEvent::FieldId::RPM:
+                if (cbor_value_is_unsigned_integer(&mapValue)) {
+                    uint64_t val;
+                    cbor_value_get_uint64(&mapValue, &val);
+                    rpm = ((int32_t)val);
+                } else if (cbor_value_is_negative_integer(&mapValue)) {
+                    int64_t val;
+                    cbor_value_get_int64(&mapValue, &val);
+                    rpm = ((int32_t)val);
+                }
+                break;
+            case CutterEvent::FieldId::CURRENT:
+                if (cbor_value_is_float(&mapValue) || cbor_value_is_double(&mapValue)) {
+                    float val;
+                    cbor_value_get_float(&mapValue, &val);
+                    current = (val);
+                } else if (cbor_value_is_unsigned_integer(&mapValue)) {
+                    uint64_t val;
+                    cbor_value_get_uint64(&mapValue, &val);
+                    current = ((float)val);
+                } else if (cbor_value_is_negative_integer(&mapValue)) {
+                    int64_t val;
+                    cbor_value_get_int64(&mapValue, &val);
+                    current = ((float)val);
+                }
+                break;
+            case CutterEvent::FieldId::VOLTAGE:
+                if (cbor_value_is_float(&mapValue) || cbor_value_is_double(&mapValue)) {
+                    float val;
+                    cbor_value_get_float(&mapValue, &val);
+                    voltage = (val);
+                } else if (cbor_value_is_unsigned_integer(&mapValue)) {
+                    uint64_t val;
+                    cbor_value_get_uint64(&mapValue, &val);
+                    voltage = ((float)val);
+                } else if (cbor_value_is_negative_integer(&mapValue)) {
+                    int64_t val;
+                    cbor_value_get_int64(&mapValue, &val);
+                    voltage = ((float)val);
+                }
+                break;
+            case CutterEvent::FieldId::TEMPERATURE:
+                if (cbor_value_is_float(&mapValue) || cbor_value_is_double(&mapValue)) {
+                    float val;
+                    cbor_value_get_float(&mapValue, &val);
+                    temperature = (val);
+                } else if (cbor_value_is_unsigned_integer(&mapValue)) {
+                    uint64_t val;
+                    cbor_value_get_uint64(&mapValue, &val);
+                    temperature = ((float)val);
+                } else if (cbor_value_is_negative_integer(&mapValue)) {
+                    int64_t val;
+                    cbor_value_get_int64(&mapValue, &val);
+                    temperature = ((float)val);
+                }
+                break;
+            default:
+                // Unknown field id — skip value.
+                break;
+        }
+
+        cbor_value_advance(&mapValue);  // advance past value to next key (or end)
+    }
+
+    cbor_value_leave_container(&it, &mapValue);
+    return 0;
+}
+
+
+
+int CutterReply::encode(Buffer& buffer) const {
+    buffer.clear();
+    CborEncoder encoder;
+    cbor_encoder_init(&encoder,buffer.data(),buffer.capacity(),0);
+    // Count how many optional fields are set.
+    uint32_t fieldCount = 0;
+    if (req_id.is_some()) { fieldCount++; }
+    if (error_code.is_some()) { fieldCount++; }
+    if (message.is_some()) { fieldCount++; }
+    if (msg_type.is_some()) { fieldCount++; }
+
+    CborEncoder mapEncoder;
+    cbor_check(cbor_encoder_create_map(&encoder, &mapEncoder, fieldCount));
+    if ( req_id) {
+        const auto& value = *req_id;
+        cbor_check(cbor_encode_uint(&mapEncoder, FieldId::REQ_ID));
+        cbor_check(cbor_encode_uint(&mapEncoder, value));
+    };
+    if ( error_code) {
+        const auto& value = *error_code;
+        cbor_check(cbor_encode_uint(&mapEncoder, FieldId::ERROR_CODE));
+        cbor_check(cbor_encode_uint(&mapEncoder, value));
+    };
+    if ( message) {
+        const auto& value = *message;
+        cbor_check(cbor_encode_uint(&mapEncoder, FieldId::MESSAGE));
+        cbor_check(cbor_encode_text_string(&mapEncoder, value.c_str(), value.length()));
+    };
+    if ( msg_type) {
+        const auto& value = *msg_type;
+        cbor_check(cbor_encode_uint(&mapEncoder, FieldId::MSG_TYPE));
+        cbor_check(cbor_encode_uint(&mapEncoder, value));
+    };
+
+     cbor_check(cbor_encoder_close_container(&encoder, &mapEncoder));
+    buffer.resize(cbor_encoder_get_buffer_size(&encoder, buffer.data()));
+     return 0;
+}
+
+int CutterReply::decode(const Buffer& buffer) {
+    CborParser parser;
+    CborValue it;
+    cbor_check(cbor_parser_init(buffer.data(), buffer.size(), 0, &parser, &it));
+    if (!cbor_value_is_map(&it)) {
+        WARN("Expected CBOR map ");
+        return EINVAL;
+    }
+
+    CborValue mapValue;
+    cbor_value_enter_container(&it, &mapValue);
+
+    while (!cbor_value_at_end(&mapValue)) {
+        // Read the map key (must be an unsigned integer — field id).
+        if (!cbor_value_is_unsigned_integer(&mapValue)) {
+            // Skip unknown key type and its value.
+            cbor_value_advance(&mapValue);  // skip key
+            if (!cbor_value_at_end(&mapValue)) {
+                cbor_value_advance(&mapValue);  // skip value
+            }
+            continue;
+        }
+
+        uint64_t keyVal;
+        cbor_value_get_uint64(&mapValue, &keyVal);
+        cbor_value_advance(&mapValue);  // advance to value
+
+        switch ((uint32_t)keyVal) {
+            case CutterReply::FieldId::REQ_ID:
+                if (cbor_value_is_unsigned_integer(&mapValue)) {
+                    uint64_t val;
+                    cbor_value_get_uint64(&mapValue, &val);
+                    req_id = ((uint32_t)val);
+                } else if (cbor_value_is_negative_integer(&mapValue)) {
+                    int64_t val;
+                    cbor_value_get_int64(&mapValue, &val);
+                    req_id = ((uint32_t)val);
+                }
+                break;
+            case CutterReply::FieldId::ERROR_CODE:
+                if (cbor_value_is_unsigned_integer(&mapValue)) {
+                    uint64_t val;
+                    cbor_value_get_uint64(&mapValue, &val);
+                    error_code = ((uint32_t)val);
+                } else if (cbor_value_is_negative_integer(&mapValue)) {
+                    int64_t val;
+                    cbor_value_get_int64(&mapValue, &val);
+                    error_code = ((uint32_t)val);
+                }
+                break;
+            case CutterReply::FieldId::MESSAGE:
+                if (cbor_value_is_text_string(&mapValue)) {
+                    size_t len;
+                    cbor_value_get_string_length(&mapValue, &len);
+                    std::string val(len, '\0');
+                    cbor_value_copy_text_string(&mapValue, &val[0], &len, NULL);
+                    val.resize(len);
+                    message = (val);
+                }
+                break;
+            case CutterReply::FieldId::MSG_TYPE:
+                if (cbor_value_is_unsigned_integer(&mapValue)) {
+                    uint64_t val;
+                    cbor_value_get_uint64(&mapValue, &val);
+                    msg_type = ((uint32_t)val);
+                } else if (cbor_value_is_negative_integer(&mapValue)) {
+                    int64_t val;
+                    cbor_value_get_int64(&mapValue, &val);
+                    msg_type = ((uint32_t)val);
+                }
+                break;
+            default:
+                // Unknown field id — skip value.
+                break;
+        }
+
+        cbor_value_advance(&mapValue);  // advance past value to next key (or end)
+    }
+
+    cbor_value_leave_container(&it, &mapValue);
+    return 0;
+}
+
+
+
+int CutterRequest::encode(Buffer& buffer) const {
+    buffer.clear();
+    CborEncoder encoder;
+    cbor_encoder_init(&encoder,buffer.data(),buffer.capacity(),0);
+    // Count how many optional fields are set.
+    uint32_t fieldCount = 0;
+    if (enabled.is_some()) { fieldCount++; }
+    if (rpm.is_some()) { fieldCount++; }
+
+    CborEncoder mapEncoder;
+    cbor_check(cbor_encoder_create_map(&encoder, &mapEncoder, fieldCount));
+    if ( enabled) {
+        const auto& value = *enabled;
+        cbor_check(cbor_encode_uint(&mapEncoder, FieldId::ENABLED));
+        cbor_check(cbor_encode_boolean(&mapEncoder, value));
+    };
+    if ( rpm) {
+        const auto& value = *rpm;
+        cbor_check(cbor_encode_uint(&mapEncoder, FieldId::RPM));
+        cbor_check(cbor_encode_int(&mapEncoder, value));
+    };
+
+     cbor_check(cbor_encoder_close_container(&encoder, &mapEncoder));
+    buffer.resize(cbor_encoder_get_buffer_size(&encoder, buffer.data()));
+     return 0;
+}
+
+int CutterRequest::decode(const Buffer& buffer) {
+    CborParser parser;
+    CborValue it;
+    cbor_check(cbor_parser_init(buffer.data(), buffer.size(), 0, &parser, &it));
+    if (!cbor_value_is_map(&it)) {
+        WARN("Expected CBOR map ");
+        return EINVAL;
+    }
+
+    CborValue mapValue;
+    cbor_value_enter_container(&it, &mapValue);
+
+    while (!cbor_value_at_end(&mapValue)) {
+        // Read the map key (must be an unsigned integer — field id).
+        if (!cbor_value_is_unsigned_integer(&mapValue)) {
+            // Skip unknown key type and its value.
+            cbor_value_advance(&mapValue);  // skip key
+            if (!cbor_value_at_end(&mapValue)) {
+                cbor_value_advance(&mapValue);  // skip value
+            }
+            continue;
+        }
+
+        uint64_t keyVal;
+        cbor_value_get_uint64(&mapValue, &keyVal);
+        cbor_value_advance(&mapValue);  // advance to value
+
+        switch ((uint32_t)keyVal) {
+            case CutterRequest::FieldId::ENABLED:
+                if (cbor_value_is_boolean(&mapValue)) {
+                    bool val;
+                    cbor_value_get_boolean(&mapValue, &val);
+                    enabled = (val);
+                }
+                break;
+            case CutterRequest::FieldId::RPM:
+                if (cbor_value_is_unsigned_integer(&mapValue)) {
+                    uint64_t val;
+                    cbor_value_get_uint64(&mapValue, &val);
+                    rpm = ((int32_t)val);
+                } else if (cbor_value_is_negative_integer(&mapValue)) {
+                    int64_t val;
+                    cbor_value_get_int64(&mapValue, &val);
+                    rpm = ((int32_t)val);
                 }
                 break;
             default:
@@ -2276,23 +2642,108 @@ int HoverboardEvent::decode(const Buffer& buffer) {
 
 
 
+int HoverboardReply::encode(Buffer& buffer) const {
+    buffer.clear();
+    CborEncoder encoder;
+    cbor_encoder_init(&encoder,buffer.data(),buffer.capacity(),0);
+    // Count how many optional fields are set.
+    uint32_t fieldCount = 0;
+    if (speed.is_some()) { fieldCount++; }
+    if (steer.is_some()) { fieldCount++; }
+
+    CborEncoder mapEncoder;
+    cbor_check(cbor_encoder_create_map(&encoder, &mapEncoder, fieldCount));
+    if ( speed) {
+        const auto& value = *speed;
+        cbor_check(cbor_encode_uint(&mapEncoder, FieldId::SPEED));
+        cbor_check(cbor_encode_int(&mapEncoder, value));
+    };
+    if ( steer) {
+        const auto& value = *steer;
+        cbor_check(cbor_encode_uint(&mapEncoder, FieldId::STEER));
+        cbor_check(cbor_encode_int(&mapEncoder, value));
+    };
+
+     cbor_check(cbor_encoder_close_container(&encoder, &mapEncoder));
+    buffer.resize(cbor_encoder_get_buffer_size(&encoder, buffer.data()));
+     return 0;
+}
+
+int HoverboardReply::decode(const Buffer& buffer) {
+    CborParser parser;
+    CborValue it;
+    cbor_check(cbor_parser_init(buffer.data(), buffer.size(), 0, &parser, &it));
+    if (!cbor_value_is_map(&it)) {
+        WARN("Expected CBOR map ");
+        return EINVAL;
+    }
+
+    CborValue mapValue;
+    cbor_value_enter_container(&it, &mapValue);
+
+    while (!cbor_value_at_end(&mapValue)) {
+        // Read the map key (must be an unsigned integer — field id).
+        if (!cbor_value_is_unsigned_integer(&mapValue)) {
+            // Skip unknown key type and its value.
+            cbor_value_advance(&mapValue);  // skip key
+            if (!cbor_value_at_end(&mapValue)) {
+                cbor_value_advance(&mapValue);  // skip value
+            }
+            continue;
+        }
+
+        uint64_t keyVal;
+        cbor_value_get_uint64(&mapValue, &keyVal);
+        cbor_value_advance(&mapValue);  // advance to value
+
+        switch ((uint32_t)keyVal) {
+            case HoverboardReply::FieldId::SPEED:
+                if (cbor_value_is_unsigned_integer(&mapValue)) {
+                    uint64_t val;
+                    cbor_value_get_uint64(&mapValue, &val);
+                    speed = ((int32_t)val);
+                } else if (cbor_value_is_negative_integer(&mapValue)) {
+                    int64_t val;
+                    cbor_value_get_int64(&mapValue, &val);
+                    speed = ((int32_t)val);
+                }
+                break;
+            case HoverboardReply::FieldId::STEER:
+                if (cbor_value_is_unsigned_integer(&mapValue)) {
+                    uint64_t val;
+                    cbor_value_get_uint64(&mapValue, &val);
+                    steer = ((int32_t)val);
+                } else if (cbor_value_is_negative_integer(&mapValue)) {
+                    int64_t val;
+                    cbor_value_get_int64(&mapValue, &val);
+                    steer = ((int32_t)val);
+                }
+                break;
+            default:
+                // Unknown field id — skip value.
+                break;
+        }
+
+        cbor_value_advance(&mapValue);  // advance past value to next key (or end)
+    }
+
+    cbor_value_leave_container(&it, &mapValue);
+    return 0;
+}
+
+
+
 int HoverboardRequest::encode(Buffer& buffer) const {
     buffer.clear();
     CborEncoder encoder;
     cbor_encoder_init(&encoder,buffer.data(),buffer.capacity(),0);
     // Count how many optional fields are set.
     uint32_t fieldCount = 0;
-    if (req_id.is_some()) { fieldCount++; }
     if (speed.is_some()) { fieldCount++; }
     if (steer.is_some()) { fieldCount++; }
 
     CborEncoder mapEncoder;
     cbor_check(cbor_encoder_create_map(&encoder, &mapEncoder, fieldCount));
-    if ( req_id) {
-        const auto& value = *req_id;
-        cbor_check(cbor_encode_uint(&mapEncoder, FieldId::REQ_ID));
-        cbor_check(cbor_encode_uint(&mapEncoder, value));
-    };
     if ( speed) {
         const auto& value = *speed;
         cbor_check(cbor_encode_uint(&mapEncoder, FieldId::SPEED));
@@ -2337,17 +2788,6 @@ int HoverboardRequest::decode(const Buffer& buffer) {
         cbor_value_advance(&mapValue);  // advance to value
 
         switch ((uint32_t)keyVal) {
-            case HoverboardRequest::FieldId::REQ_ID:
-                if (cbor_value_is_unsigned_integer(&mapValue)) {
-                    uint64_t val;
-                    cbor_value_get_uint64(&mapValue, &val);
-                    req_id = ((uint32_t)val);
-                } else if (cbor_value_is_negative_integer(&mapValue)) {
-                    int64_t val;
-                    cbor_value_get_int64(&mapValue, &val);
-                    req_id = ((uint32_t)val);
-                }
-                break;
             case HoverboardRequest::FieldId::SPEED:
                 if (cbor_value_is_unsigned_integer(&mapValue)) {
                     uint64_t val;

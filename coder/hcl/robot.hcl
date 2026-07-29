@@ -4,8 +4,12 @@ robot "ronald" {
   multicast_port = 50000
   broker_port    = 50001
   multicast_addr = "224.0.0.1"
-
   serial_ports = ["/dev/ttyUSB0", "/dev/ttyUSB1"]
+
+  endpoint "brain" {
+    description = "Brain of the hoverboard"
+    subscribes = [[$ { message.HoverboardEvent },$ { message.SysEvent }, $ { message.CompassEvent }, ${ message.ImuEvent }, $ { message.UsEvent }, $ { message.Ps4Event }, $ { message.WifiEvent }, $ { message.DeviceAliveEvent }, $ { message.Max31855Event }, $ { message.HeatingEvent }]]
+  }
 
   endpoint "broker" {
     services    = [$ { message.EndpointAnnounce }, $ { message.EndpointAnnounceReply }, $ { message.PingRequest }, $ { message.PingReply }]
@@ -59,9 +63,14 @@ robot "ronald" {
 
   message "HoverboardRequest" {
     description = "Request command for hoverboard drive"
-    field "req_id" { id = 0 type = "uint32" description = "For request/reply matching, 0 if not a request/reply" }
-    field "speed" { id = 1 type = "int32" unit = "m/s" description = "Speed command for the hoverboard" }
-    field "steer" { id = 2 type = "int32" unit = "deg" description = "Steering command for the hoverboard" }
+    field "speed" { id = 0 type = "int32" unit = "m/s" description = "Speed command for the hoverboard" }
+    field "steer" { id = 1 type = "int32" unit = "deg" description = "Steering command for the hoverboard" }
+  }
+
+  message "HoverboardReply" {
+    description = "Request command for hoverboard drive"
+    field "speed" { id = 0 type = "int32" unit = "m/s" description = "Speed command for the hoverboard" }
+    field "steer" { id = 1 type = "int32" unit = "deg" description = "Steering command for the hoverboard" }
   }
 
   message "GenericReply" {
@@ -130,6 +139,29 @@ robot "ronald" {
     field "str_coef" { id = 43 type = "int32" description = "Steer Coefficient *10" }
     field "batv" { id = 44 type = "int32" description = "Calibrated Battery Voltage *100" }
     field "temp" { id = 45 type = "int32" description = "Calibrated Temperature C *10" }
+  }
+
+  message CutterRequest {
+    description = "Request command for cutter"
+    field "enabled" { id = 0 type = "bool" description = "Enable or disable the cutter" }
+    field "rpm" { id = 1 type = "int32" unit = "RPM" description = "Speed command for the cutter in RPM" }
+  }
+
+  message CutterReply {
+    description = "Reply for cutter request"
+    field "req_id" { id = 0 type = "uint32" description = "For request/reply matching, 0 if not a request/reply" }
+    field "error_code" { id = 1 type = "uint32" description = "Error code, 0 if no error" }
+    field "message" { id = 2 type = "string" description = "Error message or additional information" }
+    field "msg_type" { id = 3 type = "uint32" description = "Message type identifier , the original request" }
+  }
+
+  message CutterEvent {
+    description = "Telemetry emitted by the cutter"
+    field "enabled" { id = 0 type = "bool" description = "Cutter enabled or disabled" }
+    field "rpm" { id = 1 type = "int32" unit = "RPM" description = "Current speed of the cutter in RPM" }
+    field "current" { id = 2 type = "float" unit = "A" description = "Current drawn by the cutter in Amperes" }
+    field "voltage" { id = 3 type = "float" unit = "V" description = "Voltage supplied to the cutter in Volts" }
+    field "temperature" { id = 4 type = "float" unit = "Celsius" description = "Temperature of the cutter in Celsius" }
   }
 
   message CompassEvent {

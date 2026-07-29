@@ -132,7 +132,6 @@ fn main() -> anyhow::Result<()> {
             let req = HoverboardRequest {
                 speed: Some(speed),
                 steer: Some(steer),
-                req_id: None,
             };
             if let Err(e) = send_message(&mut sender_port, &req, src_id) {
                 log::error!("Periodic send error: {e}");

@@ -17,6 +17,7 @@ use anyhow::Context;
 use clap::Parser;
 use common::{RobotConfig, load_robot_config};
 use env_logger::Logger;
+use generated::generated::{Envelope, opt_id_to_string};
 use kameo::prelude::*;
 use log::info;
 
@@ -28,6 +29,17 @@ use actors::udp::{StartUnicast, UdpActor};
 use serde_json::json;
 
 use crate::actors::logger::{Flush, Log, LogRecord, OpenObserveConfig};
+
+pub fn display_envelope(envelope: &Envelope, context: &str) {
+    info!(
+        "{}: src={} dst={} msg_type={} payload_len={}",
+        context,
+        opt_id_to_string(envelope.src),
+        opt_id_to_string(envelope.dst),
+        opt_id_to_string(envelope.msg_type),
+        envelope.payload.as_ref().map(|p| p.len()).unwrap_or(0)
+    );
+}
 
 // ── CLI ────────────────────────────────────────────────────────────────────
 
@@ -107,7 +119,7 @@ async fn main() -> anyhow::Result<()> {
         },
         router_actor.clone(),
     );
-    let logger_ref = LoggerActor::spawn(logger_actor);
+    LoggerActor::spawn(logger_actor);
 
     // Start UDP unicast actor
     let udp_actor = UdpActor::spawn(UdpActor::new(router_actor.clone()));
@@ -133,33 +145,10 @@ async fn main() -> anyhow::Result<()> {
         })
         .await?;
 
-    for i in [0, 10, 20, 30, 40, 50, 60, 70, 80, 90].iter() {
-        logger_ref
-            .tell(Log(LogRecord {
-                level: "info".to_string(),
-                message: format!("Test log message {}", i),
-                fields: json!({
-                    "a": "hello",   // string
-                    "b": 3.14,       // float
-                    "i": i,           // integer
-                    "flag": true,     // boolean
-                }),
-            }))
-            .send()
-            .await?;
-        logger_ref.tell(Flush).send().await?;
-    }
-
     // Start Serial actors for endpoints with a transport setting
-    for (name, ep_cfg) in &cfg.endpoints {
-        if let Some(ref transport) = ep_cfg.transport {
-            info!(
-                "Starting serial actor for endpoint '{}' on {}",
-                name, transport
-            );
-            let _serial =
-                SerialActor::spawn(SerialActor::new(transport.clone(), router_actor.clone()));
-            // Serial actor registers itself with the router via EndpointAnnounce
+    if let Some(ports) = &cfg.serial_ports {
+        for port_name in ports {
+            SerialActor::spawn(SerialActor::new(port_name.clone(), router_actor.clone()));
         }
     }
 

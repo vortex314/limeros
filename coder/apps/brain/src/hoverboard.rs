@@ -3,11 +3,12 @@
 use std::sync::Arc;
 
 use anyhow::Result;
+use common::fnv;
 use generated::generated::{Envelope, HoverboardEvent, HoverboardReply, HoverboardRequest};
 use kameo::prelude::*;
 use log::{info, warn};
 
-use crate::udp_endpoint::{Subscribe, UdpEndpoint};
+use crate::{display_envelope, udp_endpoint::{Subscribe, UdpEndpoint}};
 
 // ── Messages ───────────────────────────────────────────────────────────────
 
@@ -88,6 +89,30 @@ impl HoverboardActor {
         Ok(())
     }
 
+    pub async fn handle_timer_tick(&mut self) {
+         let request = HoverboardRequest {
+            speed: Some(self.speed),
+            steer: Some(self.steer),
+        };
+        let payload = match request.to_bytes() {
+            Ok(p) => p,
+            Err(e) => {
+                warn!("Failed to encode HoverboardRequest: {}", e);
+                return;
+            }
+        };
+        let envelope = Envelope {
+            src: Some(self.endpoint_id),
+            dst: Some(fnv::fnv1a_32("hoverboard")),
+            msg_type: Some(HoverboardRequest::MSG_ID),
+            request_id: None,
+            instance_id: None,
+            payload: Some(payload),
+        };
+        display_envelope(&envelope, "HoverboardActor");
+        let _ = self.gateway.tell(envelope).await;
+    }
+
     pub fn check_envelope(&self, envelope: &Arc<Envelope>) -> Result<()> {
         if envelope.src.is_none() || envelope.msg_type.is_none() {
             return Err(anyhow::anyhow!("Envelope missing required fields"));
@@ -131,26 +156,7 @@ impl Message<TickHoverboard> for HoverboardActor {
     type Reply = ();
 
     async fn handle(&mut self, _msg: TickHoverboard, _ctx: &mut Context<Self, Self::Reply>) {
-        let request = HoverboardRequest {
-            speed: Some(self.speed),
-            steer: Some(self.steer),
-        };
-        let payload = match request.to_bytes() {
-            Ok(p) => p,
-            Err(e) => {
-                warn!("Failed to encode HoverboardRequest: {}", e);
-                return;
-            }
-        };
-        let envelope = Envelope {
-            src: Some(self.endpoint_id),
-            dst: None,
-            msg_type: Some(HoverboardRequest::MSG_ID),
-            request_id: None,
-            instance_id: None,
-            payload: Some(payload),
-        };
-        let _ = self.gateway.tell(envelope).await;
+       self.handle_timer_tick().await;
     }
 }
 
@@ -163,6 +169,7 @@ impl Message<Arc<Envelope>> for HoverboardActor {
         _ctx: &mut Context<Self, Self::Reply>,
     ) -> Self::Reply {
         self.check_envelope(&msg)?;
+        display_envelope(&msg,"HoverboardActor");
         match msg.msg_type {
             Some(HoverboardReply::MSG_ID) => self.handle_hoverboard_reply(msg).await,
             Some(HoverboardEvent::MSG_ID) => self.handle_hoverboard_event(msg).await,

@@ -11,7 +11,10 @@
                 "run",
                 "--release",
                 "--bin",
-                "broker_kameo","--","-i","hcl/robot.hcl"
+                "broker_kameo",
+                "--",
+                "-i",
+                "hcl/robot.hcl"
             ],
             "group": {
                 "kind": "build",
@@ -34,6 +37,34 @@
             }
         },
         {
+            "label": "Brain",
+            "type": "shell",
+            "command": "~/.cargo/bin/cargo",
+            "args": [
+                "run",
+                "--bin",
+                "brain"
+            ],
+            "group": {
+                "kind": "build",
+                //               "isDefault": true   
+            }
+        },
+        {
+            "label": "PS4 Bridge",
+            "type": "shell",
+            "command": "~/.cargo/bin/cargo",
+            "args": [
+                "run",
+                "--bin",
+                "ps4_bridge"
+            ],
+            "group": {
+                "kind": "build",
+                //               "isDefault": true   
+            }
+        },
+        {
             "label": "Sniffer",
             "type": "shell",
             "command": "~/.cargo/bin/cargo",
@@ -47,7 +78,7 @@
                 //               "isDefault": true   
             }
         },
-                        {
+        {
             "label": "Codegen all",
             "type": "shell",
             "command": "~/.cargo/bin/cargo", // note: full path to the cargo
@@ -55,22 +86,39 @@
                 "run",
                 "--bin",
                 "codegen",
-                    "--",
-                      "-i","hcl/robot.hcl","-d","hcl",
-                      "-g","rust.tera","generated/src/generated.rs",
-                      "-g","cpp_header.tera","generated/cpp/generated.h",
-                      "-g","cpp_source.tera","generated/cpp/generated.cpp",
-                      "-g","cpp_header.tera","../esp32-eventbus/src/msgs.h",
-                      "-g","cpp_source.tera","../esp32-eventbus/src/msgs.cpp",
-                        "-g","cpp_header.tera","../../hoverboard-firmware-hack-FOC/Inc/limero/msgs.h",
-                        "-g","cpp_source.tera","../../hoverboard-firmware-hack-FOC/Src/limero/msgs.cpp"
+                "--",
+                "-i",
+                "hcl/robot.hcl",
+                "-d",
+                "hcl",
+                "-g",
+                "rust.tera",
+                "generated/src/generated.rs",
+                "-g",
+                "cpp_header.tera",
+                "generated/cpp/generated.h",
+                "-g",
+                "cpp_source.tera",
+                "generated/cpp/generated.cpp",
+                "-g",
+                "cpp_header.tera",
+                "../esp32-eventbus/src/msgs.h",
+                "-g",
+                "cpp_source.tera",
+                "../esp32-eventbus/src/msgs.cpp",
+                "-g",
+                "cpp_header.tera",
+                "../../hoverboard-firmware-hack-FOC/Inc/limero/msgs.h",
+                "-g",
+                "cpp_source.tera",
+                "../../hoverboard-firmware-hack-FOC/Src/limero/msgs.cpp"
             ],
             "group": {
                 "kind": "build",
                 //               "isDefault": true   
             }
         },
-      {
+        {
             "label": "Codegen rust",
             "type": "shell",
             "command": "~/.cargo/bin/cargo", // note: full path to the cargo
@@ -86,13 +134,14 @@
                 "-t",
                 "rust.tera",
                 "-o",
-                "generated/src/generated.rs"],
+                "generated/src/generated.rs"
+            ],
             "group": {
                 "kind": "build",
                 //               "isDefault": true   
             }
         },
-                       {
+        {
             "label": "Codegen c++ hoverboard",
             "type": "shell",
             "command": "~/.cargo/bin/cargo", // note: full path to the cargo
@@ -108,13 +157,14 @@
                 "-t",
                 "cpp.tera",
                 "-o",
-                "/home/lieven/workspace/hoverboard-firmware-hack-FOC/Inc/limero/msgs.h"],
+                "/home/lieven/workspace/hoverboard-firmware-hack-FOC/Inc/limero/msgs.h"
+            ],
             "group": {
                 "kind": "build",
                 //               "isDefault": true   
             }
         },
-                       {
+        {
             "label": "Codegen c++ ESP32 eventbus",
             "type": "shell",
             "command": "~/.cargo/bin/cargo", // note: full path to the cargo
@@ -130,14 +180,13 @@
                 "-t",
                 "cpp.tera",
                 "-o",
-                "../esp32-eventbus/src/msgs.h"],
+                "../esp32-eventbus/src/msgs.h"
+            ],
             "group": {
                 "kind": "build",
                 //               "isDefault": true   
             }
         },
-          
-
         {
             "label": "Rust MC Limeros",
             "type": "shell",

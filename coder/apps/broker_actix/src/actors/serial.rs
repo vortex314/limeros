@@ -134,7 +134,7 @@ impl Actor for SerialActor {
         {
             Ok(mut port) => {
                 self.serial_port = Some(port.try_clone().expect("Failed to clone serial port"));
-                info!("Serial actor started on {}", port_path);
+                debug!("Serial actor started on {}", port_path);
                 let mut writer = port
                     .try_clone()
                     .expect("Failed to clone serial port for writer");

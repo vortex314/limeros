@@ -24,6 +24,8 @@ pub const MULTICAST_PORT : u16 = 50000;
 pub const MULTICAST_ADDR : &str = "224.0.0.1";
 
 
+pub const BRAIN_ID: u32 = 2200474099;
+
 pub const BROKER_ID: u32 = 2490238132;
 
 pub const COMPASS_ID: u32 = 2753264687;
@@ -52,6 +54,9 @@ lazy_static! {
         let m = DashMap::new();
         m.insert(3190208493, "BrokerSubscribeRequest".to_string());
         m.insert(3197332525, "CompassEvent".to_string());
+        m.insert(3974472274, "CutterEvent".to_string());
+        m.insert(3901793882, "CutterReply".to_string());
+        m.insert(2133047659, "CutterRequest".to_string());
         m.insert(2637772092, "DeviceAliveEvent".to_string());
         m.insert(2371693343, "EndpointAnnounce".to_string());
         m.insert(3238220441, "EndpointAnnounceReply".to_string());
@@ -60,6 +65,7 @@ lazy_static! {
         m.insert(461737375, "HeatingEvent".to_string());
         m.insert(578653874, "HeatingRequest".to_string());
         m.insert(104988481, "HoverboardEvent".to_string());
+        m.insert(2095960949, "HoverboardReply".to_string());
         m.insert(2735870956, "HoverboardRequest".to_string());
         m.insert(1802836182, "ImuEvent".to_string());
         m.insert(2831607083, "Max31855Event".to_string());
@@ -72,6 +78,8 @@ lazy_static! {
         m.insert(2966412411, "SysRequest".to_string());
         m.insert(1082063571, "UsEvent".to_string());
         m.insert(3371536624, "WifiEvent".to_string());
+        m.insert(2200474099, "brain".to_string());
+        
         m.insert(2490238132, "broker".to_string());
         
         m.insert(2753264687, "compass".to_string());
@@ -203,6 +211,153 @@ impl CompassEvent {
 }
 
 impl Msg for CompassEvent {
+    fn id() -> u32 {
+        Self::id()
+    }
+
+    fn name() -> &'static str {
+        Self::name()
+    }
+}
+
+
+
+
+#[derive(Debug, Clone, PartialEq, cbor2::Cbor)]
+pub struct CutterEvent {
+    /// Cutter enabled or disabled
+    #[cbor(key = 0)]
+    pub enabled: Option<bool>,
+    /// Current speed of the cutter in RPM
+    #[cbor(key = 1)]
+    pub rpm: Option<i32>,
+    /// Current drawn by the cutter in Amperes
+    #[cbor(key = 2)]
+    pub current: Option<f32>,
+    /// Voltage supplied to the cutter in Volts
+    #[cbor(key = 3)]
+    pub voltage: Option<f32>,
+    /// Temperature of the cutter in Celsius
+    #[cbor(key = 4)]
+    pub temperature: Option<f32>,
+}
+
+impl CutterEvent {
+    pub const MSG_ID : u32 = 3974472274;
+    pub const MSG_NAME: &'static str = "CutterEvent";
+
+    pub const fn id() -> u32 {
+        3974472274
+    }
+
+    pub fn name() -> &'static str {
+        "CutterEvent"
+    }
+
+    pub fn from_bytes(data: &[u8]) -> anyhow::Result<Self> {
+        cbor2::from_reader(data).context("Failed to deserialize from CBOR")
+    }
+
+    pub fn to_bytes(&self) -> anyhow::Result<Vec<u8>> {
+        cbor2::to_vec(self).context("Failed to serialize to CBOR")
+    }
+}
+
+impl Msg for CutterEvent {
+    fn id() -> u32 {
+        Self::id()
+    }
+
+    fn name() -> &'static str {
+        Self::name()
+    }
+}
+
+
+
+
+#[derive(Debug, Clone, PartialEq, cbor2::Cbor)]
+pub struct CutterReply {
+    /// For request/reply matching, 0 if not a request/reply
+    #[cbor(key = 0)]
+    pub req_id: Option<u32>,
+    /// Error code, 0 if no error
+    #[cbor(key = 1)]
+    pub error_code: Option<u32>,
+    /// Error message or additional information
+    #[cbor(key = 2)]
+    pub message: Option<String>,
+    /// Message type identifier , the original request
+    #[cbor(key = 3)]
+    pub msg_type: Option<u32>,
+}
+
+impl CutterReply {
+    pub const MSG_ID : u32 = 3901793882;
+    pub const MSG_NAME: &'static str = "CutterReply";
+
+    pub const fn id() -> u32 {
+        3901793882
+    }
+
+    pub fn name() -> &'static str {
+        "CutterReply"
+    }
+
+    pub fn from_bytes(data: &[u8]) -> anyhow::Result<Self> {
+        cbor2::from_reader(data).context("Failed to deserialize from CBOR")
+    }
+
+    pub fn to_bytes(&self) -> anyhow::Result<Vec<u8>> {
+        cbor2::to_vec(self).context("Failed to serialize to CBOR")
+    }
+}
+
+impl Msg for CutterReply {
+    fn id() -> u32 {
+        Self::id()
+    }
+
+    fn name() -> &'static str {
+        Self::name()
+    }
+}
+
+
+
+
+#[derive(Debug, Clone, PartialEq, cbor2::Cbor)]
+pub struct CutterRequest {
+    /// Enable or disable the cutter
+    #[cbor(key = 0)]
+    pub enabled: Option<bool>,
+    /// Speed command for the cutter in RPM
+    #[cbor(key = 1)]
+    pub rpm: Option<i32>,
+}
+
+impl CutterRequest {
+    pub const MSG_ID : u32 = 2133047659;
+    pub const MSG_NAME: &'static str = "CutterRequest";
+
+    pub const fn id() -> u32 {
+        2133047659
+    }
+
+    pub fn name() -> &'static str {
+        "CutterRequest"
+    }
+
+    pub fn from_bytes(data: &[u8]) -> anyhow::Result<Self> {
+        cbor2::from_reader(data).context("Failed to deserialize from CBOR")
+    }
+
+    pub fn to_bytes(&self) -> anyhow::Result<Vec<u8>> {
+        cbor2::to_vec(self).context("Failed to serialize to CBOR")
+    }
+}
+
+impl Msg for CutterRequest {
     fn id() -> u32 {
         Self::id()
     }
@@ -759,15 +914,56 @@ impl Msg for HoverboardEvent {
 
 
 #[derive(Debug, Clone, PartialEq, cbor2::Cbor)]
-pub struct HoverboardRequest {
-    /// For request/reply matching, 0 if not a request/reply
-    #[cbor(key = 0)]
-    pub req_id: Option<u32>,
+pub struct HoverboardReply {
     /// Speed command for the hoverboard
-    #[cbor(key = 1)]
+    #[cbor(key = 0)]
     pub speed: Option<i32>,
     /// Steering command for the hoverboard
-    #[cbor(key = 2)]
+    #[cbor(key = 1)]
+    pub steer: Option<i32>,
+}
+
+impl HoverboardReply {
+    pub const MSG_ID : u32 = 2095960949;
+    pub const MSG_NAME: &'static str = "HoverboardReply";
+
+    pub const fn id() -> u32 {
+        2095960949
+    }
+
+    pub fn name() -> &'static str {
+        "HoverboardReply"
+    }
+
+    pub fn from_bytes(data: &[u8]) -> anyhow::Result<Self> {
+        cbor2::from_reader(data).context("Failed to deserialize from CBOR")
+    }
+
+    pub fn to_bytes(&self) -> anyhow::Result<Vec<u8>> {
+        cbor2::to_vec(self).context("Failed to serialize to CBOR")
+    }
+}
+
+impl Msg for HoverboardReply {
+    fn id() -> u32 {
+        Self::id()
+    }
+
+    fn name() -> &'static str {
+        Self::name()
+    }
+}
+
+
+
+
+#[derive(Debug, Clone, PartialEq, cbor2::Cbor)]
+pub struct HoverboardRequest {
+    /// Speed command for the hoverboard
+    #[cbor(key = 0)]
+    pub speed: Option<i32>,
+    /// Steering command for the hoverboard
+    #[cbor(key = 1)]
     pub steer: Option<i32>,
 }
 

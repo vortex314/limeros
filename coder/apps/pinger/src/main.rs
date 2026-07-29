@@ -9,7 +9,7 @@
 
 mod udp_endpoint;
 
-use std::net::Ipv4Addr;
+use std::{net::Ipv4Addr, time::Duration};
 use std::sync::Arc;
 
 use anyhow::Result;
@@ -19,6 +19,8 @@ use kameo::prelude::*;
 use log::{debug, info, warn};
 
 use udp_endpoint::{ UdpEndpoint, UdpEndpointConfig};
+use tokio::time::interval;
+use tokio_stream::wrappers::IntervalStream;
 
 use crate::udp_endpoint::Subscribe;
 
@@ -103,7 +105,32 @@ impl PingerActor {
         );
         Ok(())
     }
+
+    async fn handle_tick_ping(&mut self) -> Result<()> {
+        let req = PingRequest {
+            req_id: Some(1),
+            timestamp: Some(chrono::Utc::now().timestamp_millis() as u64),
+        };
+        let payload = match req.to_bytes() {
+            Ok(p) => p,
+            Err(e) => {
+                warn!("Failed to encode PingRequest: {}", e);
+                return Ok(());
+            }
+        };
+        let envelope = Envelope {
+            src: Some(PINGER_ID),
+            dst: Some(PINGER_ID),
+            msg_type : Some(PingRequest::MSG_ID),
+            request_id: req.req_id,
+            instance_id: None,
+            payload: Some(payload),
+        };
+        let _ = self.gateway.tell(envelope).await;
+        Ok(())
+    }
 }
+
 
 impl Actor for PingerActor {
     type Args = Self;
@@ -120,6 +147,7 @@ impl Actor for PingerActor {
                 let _ = tick_ref.tell(TickPing).await;
             }
         });
+
         Ok(state)
     }
 }
@@ -174,26 +202,9 @@ impl Message<TickPing> for PingerActor {
     type Reply = ();
 
     async fn handle(&mut self, _msg: TickPing, _ctx: &mut Context<Self, Self::Reply>) {
-        let req = PingRequest {
-            req_id: Some(1),
-            timestamp: Some(chrono::Utc::now().timestamp_millis() as u64),
-        };
-        let payload = match req.to_bytes() {
-            Ok(p) => p,
-            Err(e) => {
-                warn!("Failed to encode PingRequest: {}", e);
-                return;
-            }
-        };
-        let envelope = Envelope {
-            src: Some(PINGER_ID),
-            dst: Some(PINGER_ID),
-            msg_type : Some(PingRequest::MSG_ID),
-            request_id: req.req_id,
-            instance_id: None,
-            payload: Some(payload),
-        };
-        let _ = self.gateway.tell(envelope).await;
+        self.handle_tick_ping().await.unwrap_or_else(|e| {
+            warn!("Failed to send PingRequest: {}", e);
+        });
     }
 }
 

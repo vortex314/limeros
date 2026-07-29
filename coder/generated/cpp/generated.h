@@ -96,6 +96,91 @@ public:
 
 
 
+class CutterEvent : public Msg {
+public:
+
+    static const uint32_t MSG_ID = FNV("CutterEvent");
+    static constexpr const char *MSG_NAME ="CutterEvent";
+
+    virtual uint32_t msg_id() const { return MSG_ID; };
+    virtual const char *msg_name() const { return MSG_NAME; };
+
+    typedef enum FieldId {
+        ENABLED = 0,
+        RPM = 1,
+        CURRENT = 2,
+        VOLTAGE = 3,
+        TEMPERATURE = 4,
+    } FieldId;
+    Option<bool> enabled;// Cutter enabled or disabled
+    Option<int32_t> rpm;// Current speed of the cutter in RPM
+    Option<float> current;// Current drawn by the cutter in Amperes
+    Option<float> voltage;// Voltage supplied to the cutter in Volts
+    Option<float> temperature;// Temperature of the cutter in Celsius
+
+    /// Serialize this message into a CBOR map keyed by field id.
+    int encode(Buffer& buffer) const;
+
+    /// Deserialize a CutterEvent from a CBOR map value.
+    int decode(const Buffer& buffer);
+};
+
+
+
+class CutterReply : public Msg {
+public:
+
+    static const uint32_t MSG_ID = FNV("CutterReply");
+    static constexpr const char *MSG_NAME ="CutterReply";
+
+    virtual uint32_t msg_id() const { return MSG_ID; };
+    virtual const char *msg_name() const { return MSG_NAME; };
+
+    typedef enum FieldId {
+        REQ_ID = 0,
+        ERROR_CODE = 1,
+        MESSAGE = 2,
+        MSG_TYPE = 3,
+    } FieldId;
+    Option<uint32_t> req_id;// For request/reply matching, 0 if not a request/reply
+    Option<uint32_t> error_code;// Error code, 0 if no error
+    Option<std::string> message;// Error message or additional information
+    Option<uint32_t> msg_type;// Message type identifier , the original request
+
+    /// Serialize this message into a CBOR map keyed by field id.
+    int encode(Buffer& buffer) const;
+
+    /// Deserialize a CutterReply from a CBOR map value.
+    int decode(const Buffer& buffer);
+};
+
+
+
+class CutterRequest : public Msg {
+public:
+
+    static const uint32_t MSG_ID = FNV("CutterRequest");
+    static constexpr const char *MSG_NAME ="CutterRequest";
+
+    virtual uint32_t msg_id() const { return MSG_ID; };
+    virtual const char *msg_name() const { return MSG_NAME; };
+
+    typedef enum FieldId {
+        ENABLED = 0,
+        RPM = 1,
+    } FieldId;
+    Option<bool> enabled;// Enable or disable the cutter
+    Option<int32_t> rpm;// Speed command for the cutter in RPM
+
+    /// Serialize this message into a CBOR map keyed by field id.
+    int encode(Buffer& buffer) const;
+
+    /// Deserialize a CutterRequest from a CBOR map value.
+    int decode(const Buffer& buffer);
+};
+
+
+
 class DeviceAliveEvent : public Msg {
 public:
 
@@ -424,6 +509,31 @@ public:
 
 
 
+class HoverboardReply : public Msg {
+public:
+
+    static const uint32_t MSG_ID = FNV("HoverboardReply");
+    static constexpr const char *MSG_NAME ="HoverboardReply";
+
+    virtual uint32_t msg_id() const { return MSG_ID; };
+    virtual const char *msg_name() const { return MSG_NAME; };
+
+    typedef enum FieldId {
+        SPEED = 0,
+        STEER = 1,
+    } FieldId;
+    Option<int32_t> speed;// Speed command for the hoverboard
+    Option<int32_t> steer;// Steering command for the hoverboard
+
+    /// Serialize this message into a CBOR map keyed by field id.
+    int encode(Buffer& buffer) const;
+
+    /// Deserialize a HoverboardReply from a CBOR map value.
+    int decode(const Buffer& buffer);
+};
+
+
+
 class HoverboardRequest : public Msg {
 public:
 
@@ -434,11 +544,9 @@ public:
     virtual const char *msg_name() const { return MSG_NAME; };
 
     typedef enum FieldId {
-        REQ_ID = 0,
-        SPEED = 1,
-        STEER = 2,
+        SPEED = 0,
+        STEER = 1,
     } FieldId;
-    Option<uint32_t> req_id;// For request/reply matching, 0 if not a request/reply
     Option<int32_t> speed;// Speed command for the hoverboard
     Option<int32_t> steer;// Steering command for the hoverboard
 

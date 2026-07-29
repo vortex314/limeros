@@ -1,0 +1,9 @@
+- write a broker in rust using actix and tokio
+- there is an actor for receiving multicast udp to discover endpoints
+- there is an actor for sending and receiving udp messages 
+- there is an actor for sending and receiving messages via serial port based on serial_bridge code, additional ports will lead to more actors
+- messages are  Envelope structure
+- routing is based on dst,src, msg_type
+- src and dst are u32 which can be a udp destination or a serial port 
+- all message types are found in generated.rs
+- the broker is configuration driven from robot.hcl config file

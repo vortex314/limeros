@@ -3,12 +3,15 @@
 
 use std::sync::Arc;
 
+use base64::display;
 use dashmap::DashMap;
 use generated::generated::{EndpointAnnounce, Envelope, id_to_string, opt_id_to_string};
 use kameo::prelude::*;
 use log::{debug, info};
 use std::fmt::Display;
 use std::net::SocketAddr;
+
+use crate::display_envelope;
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
@@ -198,9 +201,10 @@ impl Message<IncomingEnvelope> for Router {
             );
             match addr {
                 EndpointAddress::SerialEndpoint(actor, _port) => {
+                    display_envelope(&msg.envelope, format!("To {}", _port).as_str());
                     let _ = actor
                         .tell(crate::actors::serial::SerialSend {
-                            frame: msg.raw.to_vec(),
+                            frame: msg.raw.clone(),
                         })
                         .await;
                 }

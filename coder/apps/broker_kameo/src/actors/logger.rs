@@ -4,7 +4,7 @@ use generated::generated::*;
 use kameo::prelude::*;
 use kameo::actor::{ActorRef, Spawn};
 use kameo::message::{Context, Message};
-use log::info;
+use log::{debug, info};
 use log::{error, warn};
 use reqwest::Client;
 use serde_json::{Value, json};
@@ -82,7 +82,7 @@ impl LoggerActor {
             return;
         }
 
-        info!(
+        debug!(
             "Flushing [{}]records to OpenObserve {}",
             self.buffer.len(),
             self.config.ingestion_url()
