@@ -1,12 +1,13 @@
 [package]
 name = "brain"
 version = "0.1.0"
-edition = "2024"
+edition = "2021"
 
 [dependencies]
 common = { path = "../../common" }
 generated = { path = "../../generated" }
-kameo = { version = "0.22", default-features = false, features = ["macros"] }
+kameo = { version = "0.22", default-features = false, features = ["macros","console"] }
+kameo_actors ="*"
 anyhow = "1"
 clap = { version = "4", features = ["derive"] }
 cbor2 = { version = "*", features = ["derive"] }
@@ -15,4 +16,8 @@ log = "0.4"
 env_logger = "0.11"
 tokio = { version = "1", features = ["full"] }
 dashmap = "6"
-statig ="*"
+statig ={ version="*", features =["async"]}
+serialport = "4"
+hidapi = "2"
+socket2 = { version = "0.6.5", features = ["all"] }
+

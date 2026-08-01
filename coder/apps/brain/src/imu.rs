@@ -5,16 +5,19 @@ use std::sync::Arc;
 use anyhow::Result;
 use generated::generated::{Envelope, ImuEvent};
 use kameo::prelude::*;
-use log::{info, warn};
+use log::{debug, info, warn};
 
-use crate::udp_endpoint::{Subscribe, UdpEndpoint};
+use crate::{
+    brain::BrainActor,
+    router::{Register, RouterActor},
+};
 
 // ── ImuActor ───────────────────────────────────────────────────────────────
 // digital twin of the IMU sensor, tracks gyroscope and accelerometer data.
 
 pub struct ImuActor {
-    endpoint_id: u32,
-    _gateway: ActorRef<UdpEndpoint>,
+    router: ActorRef<RouterActor>,
+    _brain: ActorRef<BrainActor>,
     pub gyro_x: f32,
     pub gyro_y: f32,
     pub gyro_z: f32,
@@ -25,10 +28,10 @@ pub struct ImuActor {
 }
 
 impl ImuActor {
-    pub fn new(endpoint_id: u32, gateway: ActorRef<UdpEndpoint>) -> Self {
+    pub fn new(router: ActorRef<RouterActor>, brain: ActorRef<BrainActor>) -> Self {
         ImuActor {
-            endpoint_id,
-            _gateway: gateway,
+            router,
+            _brain: brain,
             gyro_x: 0.0,
             gyro_y: 0.0,
             gyro_z: 0.0,
@@ -82,10 +85,10 @@ impl Actor for ImuActor {
     async fn on_start(state: Self::Args, actor_ref: ActorRef<Self>) -> Result<Self, Self::Error> {
         info!("ImuActor started");
         state
-            ._gateway
-            .tell(Subscribe {
-                msg_types: vec![ImuEvent::MSG_ID],
-                recipient: actor_ref.recipient(),
+            .router
+            .tell(Register {
+                actor_ref: actor_ref.recipient(),
+                description: "ImuActor".to_string(),
             })
             .await?;
 
@@ -94,23 +97,15 @@ impl Actor for ImuActor {
 }
 
 impl Message<Arc<Envelope>> for ImuActor {
-    type Reply = Result<()>;
+    type Reply = ();
 
     async fn handle(
         &mut self,
         msg: Arc<Envelope>,
         _ctx: &mut Context<Self, Self::Reply>,
     ) -> Self::Reply {
-        self.check_envelope(&msg)?;
-        match msg.msg_type {
-            Some(ImuEvent::MSG_ID) => self.handle_imu_event(msg).await,
-            _ => {
-                warn!("Received unexpected message type: {:?}", msg.msg_type);
-                Err(anyhow::anyhow!(
-                    "Received unexpected message type: {:?}",
-                    msg.msg_type
-                ))
-            }
-        }
+        if Some(ImuEvent::MSG_ID) == msg.msg_type {
+            self.handle_imu_event(msg).await;
+        };
     }
 }

@@ -8,14 +8,17 @@ use generated::generated::{Envelope, Ps4Event};
 use kameo::prelude::*;
 use log::{info, warn};
 
-use crate::udp_endpoint::{Subscribe, UdpEndpoint};
+use crate::{
+    brain::BrainActor,
+    router::{Register, RouterActor},
+};
 
 // ── Ps4Actor ───────────────────────────────────────────────────────────────
 // digital twin of the PS4 controller, tracks button and axis state.
 
 pub struct Ps4Actor {
-    endpoint_id: u32,
-    _gateway: ActorRef<UdpEndpoint>,
+    router: ActorRef<RouterActor>,
+    _brain: ActorRef<BrainActor>,
     pub button_left: Option<bool>,
     pub button_right: Option<bool>,
     pub button_up: Option<bool>,
@@ -53,10 +56,10 @@ pub struct Ps4Actor {
 }
 
 impl Ps4Actor {
-    pub fn new(endpoint_id: u32, gateway: ActorRef<UdpEndpoint>) -> Self {
+    pub fn new(router: ActorRef<RouterActor>, brain: ActorRef<BrainActor>) -> Self {
         Ps4Actor {
-            endpoint_id,
-            _gateway: gateway,
+            router: router,
+            _brain: brain,
             button_left: None,
             button_right: None,
             button_up: None,
@@ -165,10 +168,10 @@ impl Actor for Ps4Actor {
     async fn on_start(state: Self::Args, actor_ref: ActorRef<Self>) -> Result<Self, Self::Error> {
         info!("Ps4Actor started");
         state
-            ._gateway
-            .tell(Subscribe {
-                msg_types: vec![Ps4Event::MSG_ID],
-                recipient: actor_ref.recipient(),
+            .router
+            .tell(Register {
+                actor_ref: actor_ref.recipient(),
+                description: "Ps4Actor".to_string(),
             })
             .await?;
 
@@ -177,24 +180,15 @@ impl Actor for Ps4Actor {
 }
 
 impl Message<Arc<Envelope>> for Ps4Actor {
-    type Reply = Result<()>;
+    type Reply = ();
 
     async fn handle(
         &mut self,
         msg: Arc<Envelope>,
         _ctx: &mut Context<Self, Self::Reply>,
     ) -> Self::Reply {
-        self.check_envelope(&msg)?;
-        match msg.msg_type {
-            Some(Ps4Event::MSG_ID) => self.handle_ps4_event(msg).await,
-            _ => {
-                warn!("Received unexpected message type: {:?}", msg.msg_type);
-                Err(anyhow::anyhow!(
-                    "Received unexpected message type: {:?}",
-                    msg.msg_type
-                ))
-            }
+        if msg.msg_type == Some(Ps4Event::MSG_ID) {
+            let _ = self.handle_ps4_event(msg).await;
         }
     }
 }
-

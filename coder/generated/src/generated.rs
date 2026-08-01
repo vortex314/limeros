@@ -124,6 +124,15 @@ pub struct BrokerSubscribeRequest {
     pub msg_type: Option<u32>,
 }
 
+impl Default for BrokerSubscribeRequest {
+    fn default() -> Self {
+        BrokerSubscribeRequest {
+            src: None,
+            msg_type: None,
+        }
+    }
+}
+
 impl BrokerSubscribeRequest {
     pub const MSG_ID : u32 = 3190208493;
     pub const MSG_NAME: &'static str = "BrokerSubscribeRequest";
@@ -189,6 +198,22 @@ pub struct CompassEvent {
     pub accel_z: Option<f32>,
 }
 
+impl Default for CompassEvent {
+    fn default() -> Self {
+        CompassEvent {
+            heading: None,
+            pitch: None,
+            roll: None,
+            mag_x: None,
+            mag_y: None,
+            mag_z: None,
+            accel_x: None,
+            accel_y: None,
+            accel_z: None,
+        }
+    }
+}
+
 impl CompassEvent {
     pub const MSG_ID : u32 = 3197332525;
     pub const MSG_NAME: &'static str = "CompassEvent";
@@ -242,6 +267,18 @@ pub struct CutterEvent {
     pub temperature: Option<f32>,
 }
 
+impl Default for CutterEvent {
+    fn default() -> Self {
+        CutterEvent {
+            enabled: None,
+            rpm: None,
+            current: None,
+            voltage: None,
+            temperature: None,
+        }
+    }
+}
+
 impl CutterEvent {
     pub const MSG_ID : u32 = 3974472274;
     pub const MSG_NAME: &'static str = "CutterEvent";
@@ -292,6 +329,17 @@ pub struct CutterReply {
     pub msg_type: Option<u32>,
 }
 
+impl Default for CutterReply {
+    fn default() -> Self {
+        CutterReply {
+            req_id: None,
+            error_code: None,
+            message: None,
+            msg_type: None,
+        }
+    }
+}
+
 impl CutterReply {
     pub const MSG_ID : u32 = 3901793882;
     pub const MSG_NAME: &'static str = "CutterReply";
@@ -334,6 +382,15 @@ pub struct CutterRequest {
     /// Speed command for the cutter in RPM
     #[cbor(key = 1)]
     pub rpm: Option<i32>,
+}
+
+impl Default for CutterRequest {
+    fn default() -> Self {
+        CutterRequest {
+            enabled: None,
+            rpm: None,
+        }
+    }
 }
 
 impl CutterRequest {
@@ -379,6 +436,16 @@ pub struct DeviceAliveEvent {
     /// Timestamp in milliseconds since epoch
     #[cbor(key = 2)]
     pub timestamp: Option<u64>,
+}
+
+impl Default for DeviceAliveEvent {
+    fn default() -> Self {
+        DeviceAliveEvent {
+            device: None,
+            endpoint: None,
+            timestamp: None,
+        }
+    }
 }
 
 impl DeviceAliveEvent {
@@ -440,6 +507,20 @@ pub struct EndpointAnnounce {
     pub subscribes: Option<Vec<u32>>,
 }
 
+impl Default for EndpointAnnounce {
+    fn default() -> Self {
+        EndpointAnnounce {
+            id: None,
+            name: None,
+            description: None,
+            services: None,
+            events: None,
+            replies: None,
+            subscribes: None,
+        }
+    }
+}
+
 impl EndpointAnnounce {
     pub const MSG_ID : u32 = 2371693343;
     pub const MSG_NAME: &'static str = "EndpointAnnounce";
@@ -479,6 +560,14 @@ pub struct EndpointAnnounceReply {
     /// Timestamp in milliseconds since epoch
     #[cbor(key = 0)]
     pub utc: Option<u64>,
+}
+
+impl Default for EndpointAnnounceReply {
+    fn default() -> Self {
+        EndpointAnnounceReply {
+            utc: None,
+        }
+    }
 }
 
 impl EndpointAnnounceReply {
@@ -538,6 +627,19 @@ pub struct Envelope {
     pub payload: Option<Vec<u8>>,
 }
 
+impl Default for Envelope {
+    fn default() -> Self {
+        Envelope {
+            src: None,
+            dst: None,
+            msg_type: None,
+            request_id: None,
+            instance_id: None,
+            payload: None,
+        }
+    }
+}
+
 impl Envelope {
     pub const MSG_ID : u32 = 1228864117;
     pub const MSG_NAME: &'static str = "Envelope";
@@ -586,6 +688,17 @@ pub struct GenericReply {
     /// Message type identifier , the original request
     #[cbor(key = 3)]
     pub msg_type: Option<u32>,
+}
+
+impl Default for GenericReply {
+    fn default() -> Self {
+        GenericReply {
+            req_id: None,
+            error_code: None,
+            message: None,
+            msg_type: None,
+        }
+    }
 }
 
 impl GenericReply {
@@ -647,6 +760,20 @@ pub struct HeatingEvent {
     pub timestamp_ms: Option<u64>,
 }
 
+impl Default for HeatingEvent {
+    fn default() -> Self {
+        HeatingEvent {
+            temperature_c: None,
+            setpoint_c: None,
+            enabled: None,
+            output_pct: None,
+            heater_on: None,
+            fault: None,
+            timestamp_ms: None,
+        }
+    }
+}
+
 impl HeatingEvent {
     pub const MSG_ID : u32 = 461737375;
     pub const MSG_NAME: &'static str = "HeatingEvent";
@@ -701,6 +828,19 @@ pub struct HeatingRequest {
     /// Reset the integral term of the PID controller
     #[cbor(key = 5)]
     pub reset_integral: Option<bool>,
+}
+
+impl Default for HeatingRequest {
+    fn default() -> Self {
+        HeatingRequest {
+            setpoint_c: None,
+            enabled: None,
+            kp: None,
+            ki: None,
+            kd: None,
+            reset_integral: None,
+        }
+    }
 }
 
 impl HeatingRequest {
@@ -879,6 +1019,59 @@ pub struct HoverboardEvent {
     pub temp: Option<i32>,
 }
 
+impl Default for HoverboardEvent {
+    fn default() -> Self {
+        HoverboardEvent {
+            ctrl_mod: None,
+            ctrl_typ: None,
+            cur_mot_max: None,
+            rpm_mot_max: None,
+            fi_weak_ena: None,
+            fi_weak_hi: None,
+            fi_weak_lo: None,
+            fi_weak_max: None,
+            phase_adv_max_deg: None,
+            input1_raw: None,
+            input1_typ: None,
+            input1_min: None,
+            input1_mid: None,
+            input1_max: None,
+            input1_cmd: None,
+            input2_raw: None,
+            input2_typ: None,
+            input2_min: None,
+            input2_mid: None,
+            input2_max: None,
+            input2_cmd: None,
+            aux_input1_raw: None,
+            aux_input1_typ: None,
+            aux_input1_min: None,
+            aux_input1_mid: None,
+            aux_input1_max: None,
+            aux_input1_cmd: None,
+            aux_input2_raw: None,
+            aux_input2_typ: None,
+            aux_input2_min: None,
+            aux_input2_mid: None,
+            aux_input2_max: None,
+            aux_input2_cmd: None,
+            dc_curr: None,
+            rdc_curr: None,
+            ldc_curr: None,
+            cmdl: None,
+            cmdr: None,
+            spd_avg: None,
+            spdl: None,
+            spdr: None,
+            filter_rate: None,
+            spd_coef: None,
+            str_coef: None,
+            batv: None,
+            temp: None,
+        }
+    }
+}
+
 impl HoverboardEvent {
     pub const MSG_ID : u32 = 104988481;
     pub const MSG_NAME: &'static str = "HoverboardEvent";
@@ -923,6 +1116,15 @@ pub struct HoverboardReply {
     pub steer: Option<i32>,
 }
 
+impl Default for HoverboardReply {
+    fn default() -> Self {
+        HoverboardReply {
+            speed: None,
+            steer: None,
+        }
+    }
+}
+
 impl HoverboardReply {
     pub const MSG_ID : u32 = 2095960949;
     pub const MSG_NAME: &'static str = "HoverboardReply";
@@ -965,6 +1167,15 @@ pub struct HoverboardRequest {
     /// Steering command for the hoverboard
     #[cbor(key = 1)]
     pub steer: Option<i32>,
+}
+
+impl Default for HoverboardRequest {
+    fn default() -> Self {
+        HoverboardRequest {
+            speed: None,
+            steer: None,
+        }
+    }
 }
 
 impl HoverboardRequest {
@@ -1023,6 +1234,19 @@ pub struct ImuEvent {
     pub accel_z: Option<f32>,
 }
 
+impl Default for ImuEvent {
+    fn default() -> Self {
+        ImuEvent {
+            gyro_x: None,
+            gyro_y: None,
+            gyro_z: None,
+            accel_x: None,
+            accel_y: None,
+            accel_z: None,
+        }
+    }
+}
+
 impl ImuEvent {
     pub const MSG_ID : u32 = 1802836182;
     pub const MSG_NAME: &'static str = "ImuEvent";
@@ -1079,6 +1303,19 @@ pub struct Max31855Event {
     pub fault_open_tc: Option<bool>,
 }
 
+impl Default for Max31855Event {
+    fn default() -> Self {
+        Max31855Event {
+            thermocouple_temp: None,
+            internal_temp: None,
+            fault: None,
+            fault_short_vcc: None,
+            fault_short_gnd: None,
+            fault_open_tc: None,
+        }
+    }
+}
+
 impl Max31855Event {
     pub const MSG_ID : u32 = 2831607083;
     pub const MSG_NAME: &'static str = "Max31855Event";
@@ -1122,6 +1359,15 @@ pub struct PingReply {
     pub timestamp: Option<u64>,
 }
 
+impl Default for PingReply {
+    fn default() -> Self {
+        PingReply {
+            req_id: None,
+            timestamp: None,
+        }
+    }
+}
+
 impl PingReply {
     pub const MSG_ID : u32 = 1594103907;
     pub const MSG_NAME: &'static str = "PingReply";
@@ -1163,6 +1409,15 @@ pub struct PingRequest {
     /// Timestamp in milliseconds since epoch
     #[cbor(key = 1)]
     pub timestamp: Option<u64>,
+}
+
+impl Default for PingRequest {
+    fn default() -> Self {
+        PingRequest {
+            req_id: None,
+            timestamp: None,
+        }
+    }
 }
 
 impl PingRequest {
@@ -1269,6 +1524,46 @@ pub struct Ps4Event {
     pub temp: Option<i32>,
 }
 
+impl Default for Ps4Event {
+    fn default() -> Self {
+        Ps4Event {
+            button_left: None,
+            button_right: None,
+            button_up: None,
+            button_down: None,
+            button_square: None,
+            button_cross: None,
+            button_circle: None,
+            button_triangle: None,
+            button_left_shoulder: None,
+            button_right_shoulder: None,
+            button_left_trigger: None,
+            button_right_trigger: None,
+            button_left_joystick: None,
+            button_right_joystick: None,
+            button_share: None,
+            button_options: None,
+            button_touchpad: None,
+            button_ps: None,
+            axis_lx: None,
+            axis_ly: None,
+            axis_rx: None,
+            axis_ry: None,
+            gyro_x: None,
+            gyro_y: None,
+            gyro_z: None,
+            accel_x: None,
+            accel_y: None,
+            accel_z: None,
+            connected: None,
+            battery_level: None,
+            bluetooth: None,
+            debug: None,
+            temp: None,
+        }
+    }
+}
+
 impl Ps4Event {
     pub const MSG_ID : u32 = 4282593576;
     pub const MSG_NAME: &'static str = "Ps4Event";
@@ -1324,6 +1619,21 @@ pub struct Ps4Request {
     pub led_flash_off: Option<i32>,
 }
 
+impl Default for Ps4Request {
+    fn default() -> Self {
+        Ps4Request {
+            req_id: None,
+            rumble_small: None,
+            rumble_large: None,
+            led_red: None,
+            led_green: None,
+            led_blue: None,
+            led_flash_on: None,
+            led_flash_off: None,
+        }
+    }
+}
+
 impl Ps4Request {
     pub const MSG_ID : u32 = 1992038561;
     pub const MSG_NAME: &'static str = "Ps4Request";
@@ -1374,6 +1684,19 @@ pub struct SysEvent {
     pub build_date_time: Option<String>,
 }
 
+impl Default for SysEvent {
+    fn default() -> Self {
+        SysEvent {
+            utc: None,
+            uptime: None,
+            free_heap: None,
+            flash_size: None,
+            cpu_board_type: None,
+            build_date_time: None,
+        }
+    }
+}
+
 impl SysEvent {
     pub const MSG_ID : u32 = 924742914;
     pub const MSG_NAME: &'static str = "SysEvent";
@@ -1417,6 +1740,16 @@ pub struct SysReply {
     pub rc: Option<i32>,
     #[cbor(key = 2)]
     pub message: Option<String>,
+}
+
+impl Default for SysReply {
+    fn default() -> Self {
+        SysReply {
+            req_id: None,
+            rc: None,
+            message: None,
+        }
+    }
 }
 
 impl SysReply {
@@ -1466,6 +1799,17 @@ pub struct SysRequest {
     pub console: Option<String>,
 }
 
+impl Default for SysRequest {
+    fn default() -> Self {
+        SysRequest {
+            req_id: None,
+            set_time: None,
+            reboot: None,
+            console: None,
+        }
+    }
+}
+
 impl SysRequest {
     pub const MSG_ID : u32 = 2966412411;
     pub const MSG_NAME: &'static str = "SysRequest";
@@ -1511,6 +1855,16 @@ pub struct UsEvent {
     /// Status code, 0 if no error
     #[cbor(key = 2)]
     pub status: Option<i32>,
+}
+
+impl Default for UsEvent {
+    fn default() -> Self {
+        UsEvent {
+            distance: None,
+            temperature: None,
+            status: None,
+        }
+    }
 }
 
 impl UsEvent {
@@ -1565,6 +1919,21 @@ pub struct WifiEvent {
     pub rssi: Option<i32>,
     #[cbor(key = 7)]
     pub mac: Option<String>,
+}
+
+impl Default for WifiEvent {
+    fn default() -> Self {
+        WifiEvent {
+            ip: None,
+            gateway: None,
+            netmask: None,
+            ssid: None,
+            bssid: None,
+            channel: None,
+            rssi: None,
+            mac: None,
+        }
+    }
 }
 
 impl WifiEvent {

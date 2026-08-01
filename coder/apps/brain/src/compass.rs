@@ -7,14 +7,17 @@ use generated::generated::{CompassEvent, Envelope};
 use kameo::prelude::*;
 use log::{info, warn};
 
-use crate::udp_endpoint::{Subscribe, UdpEndpoint};
+use crate::{
+    brain::BrainActor,
+    router::{Register, RouterActor},
+};
 
 // ── CompassActor ───────────────────────────────────────────────────────────
 // digital twin of the compass sensor, tracks heading/pitch/roll/mag/accel.
 
 pub struct CompassActor {
-    endpoint_id: u32,
-    _gateway: ActorRef<UdpEndpoint>,
+    router: ActorRef<RouterActor>,
+    _brain: ActorRef<BrainActor>,
     pub heading: f32,
     pub pitch: f32,
     pub roll: f32,
@@ -28,10 +31,10 @@ pub struct CompassActor {
 }
 
 impl CompassActor {
-    pub fn new(endpoint_id: u32, gateway: ActorRef<UdpEndpoint>) -> Self {
+    pub fn new(router: ActorRef<RouterActor>, brain: ActorRef<BrainActor>) -> Self {
         CompassActor {
-            endpoint_id,
-            _gateway: gateway,
+            router,
+            _brain: brain,
             heading: 0.0,
             pitch: 0.0,
             roll: 0.0,
@@ -91,10 +94,10 @@ impl Actor for CompassActor {
     async fn on_start(state: Self::Args, actor_ref: ActorRef<Self>) -> Result<Self, Self::Error> {
         info!("CompassActor started");
         state
-            ._gateway
-            .tell(Subscribe {
-                msg_types: vec![CompassEvent::MSG_ID],
-                recipient: actor_ref.recipient(),
+            .router
+            .tell(Register {
+                actor_ref: actor_ref.recipient(),
+                description: format!("CompassActor"),
             })
             .await?;
 
@@ -103,23 +106,15 @@ impl Actor for CompassActor {
 }
 
 impl Message<Arc<Envelope>> for CompassActor {
-    type Reply = Result<()>;
+    type Reply = ();
 
     async fn handle(
         &mut self,
         msg: Arc<Envelope>,
         _ctx: &mut Context<Self, Self::Reply>,
     ) -> Self::Reply {
-        self.check_envelope(&msg)?;
-        match msg.msg_type {
-            Some(CompassEvent::MSG_ID) => self.handle_compass_event(msg).await,
-            _ => {
-                warn!("Received unexpected message type: {:?}", msg.msg_type);
-                Err(anyhow::anyhow!(
-                    "Received unexpected message type: {:?}",
-                    msg.msg_type
-                ))
-            }
+        if Some(CompassEvent::MSG_ID) == msg.msg_type {
+            let _ = self.handle_compass_event(msg).await;
         }
     }
 }

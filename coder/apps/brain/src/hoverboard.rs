@@ -8,7 +8,11 @@ use generated::generated::{Envelope, HoverboardEvent, HoverboardReply, Hoverboar
 use kameo::prelude::*;
 use log::{info, warn};
 
-use crate::{display_envelope, udp_endpoint::{Subscribe, UdpEndpoint}};
+use crate::{
+    brain::{BrainActor, BrainCmd},
+    display_envelope,
+    router::{Register, RouterActor},
+};
 
 // ── Messages ───────────────────────────────────────────────────────────────
 
@@ -19,8 +23,8 @@ struct TickHoverboard;
 // digital twin of Hoverboard drive system, sends periodic HoverboardRequest commands via UdpEndpoint.
 
 pub struct HoverboardActor {
-    endpoint_id: u32,
-    gateway: ActorRef<UdpEndpoint>,
+    router: ActorRef<RouterActor>,
+    brain: ActorRef<BrainActor>,
     speed: i32,
     steer: i32,
     temperature: f32,
@@ -29,10 +33,10 @@ pub struct HoverboardActor {
 }
 
 impl HoverboardActor {
-    pub fn new(endpoint_id: u32, gateway: ActorRef<UdpEndpoint>) -> Self {
+    pub fn new(router: ActorRef<RouterActor>, brain: ActorRef<BrainActor>) -> Self {
         HoverboardActor {
-            endpoint_id,
-            gateway,
+            router,
+            brain,
             speed: 0,
             steer: 0,
             temperature: 0.0,
@@ -90,7 +94,7 @@ impl HoverboardActor {
     }
 
     pub async fn handle_timer_tick(&mut self) {
-         let request = HoverboardRequest {
+        let request = HoverboardRequest {
             speed: Some(self.speed),
             steer: Some(self.steer),
         };
@@ -102,15 +106,13 @@ impl HoverboardActor {
             }
         };
         let envelope = Envelope {
-            src: Some(self.endpoint_id),
             dst: Some(fnv::fnv1a_32("hoverboard")),
             msg_type: Some(HoverboardRequest::MSG_ID),
-            request_id: None,
-            instance_id: None,
             payload: Some(payload),
+            ..Default::default()
         };
         display_envelope(&envelope, "HoverboardActor");
-        let _ = self.gateway.tell(envelope).await;
+        let _ = self.router.tell(Arc::new(envelope)).await;
     }
 
     pub fn check_envelope(&self, envelope: &Arc<Envelope>) -> Result<()> {
@@ -129,10 +131,10 @@ impl Actor for HoverboardActor {
         info!("HoverboardActor started (2Hz command loop)");
         let ar_ref = actor_ref.clone();
         state
-            .gateway
-            .tell(Subscribe {
-                msg_types: vec![HoverboardReply::MSG_ID, HoverboardEvent::MSG_ID],
-                recipient: actor_ref.recipient(),
+            .router
+            .tell(Register {
+                actor_ref: actor_ref.recipient(),
+                description: "HoverboardActor".to_string(),
             })
             .await?;
 
@@ -156,29 +158,41 @@ impl Message<TickHoverboard> for HoverboardActor {
     type Reply = ();
 
     async fn handle(&mut self, _msg: TickHoverboard, _ctx: &mut Context<Self, Self::Reply>) {
-       self.handle_timer_tick().await;
+        self.handle_timer_tick().await;
     }
 }
 
 impl Message<Arc<Envelope>> for HoverboardActor {
-    type Reply = Result<()>;
+    type Reply = ();
 
     async fn handle(
         &mut self,
         msg: Arc<Envelope>,
         _ctx: &mut Context<Self, Self::Reply>,
     ) -> Self::Reply {
-        self.check_envelope(&msg)?;
-        display_envelope(&msg,"HoverboardActor");
-        match msg.msg_type {
-            Some(HoverboardReply::MSG_ID) => self.handle_hoverboard_reply(msg).await,
-            Some(HoverboardEvent::MSG_ID) => self.handle_hoverboard_event(msg).await,
+        let m = msg.clone();
+        if Some(HoverboardReply::MSG_ID) == msg.msg_type || Some(HoverboardEvent::MSG_ID) == msg.msg_type {
+            self.handle_hoverboard_reply(msg).await;
+        }
+        if Some(HoverboardEvent::MSG_ID) == m.msg_type {
+            self.handle_hoverboard_event(m).await;
+        }
+    }
+}
+
+impl Message<BrainCmd> for HoverboardActor {
+    type Reply = ();
+
+    async fn handle(
+        &mut self,
+        msg: BrainCmd,
+        _ctx: &mut Context<Self, Self::Reply>,
+    ) -> Self::Reply {
+        match msg {
+            BrainCmd::SetSpeed(speed) => self.set_speed(speed),
+            BrainCmd::SetSteer(steer) => self.set_steer(steer),
             _ => {
-                warn!("Received unexpected message type: {:?}", msg.msg_type);
-                return Err(anyhow::anyhow!(
-                    "Received unexpected message type: {:?}",
-                    msg.msg_type
-                ));
+                warn!("HoverboardActor received unexpected BrainCmd: {:?}", msg);
             }
         }
     }

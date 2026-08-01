@@ -8,28 +8,28 @@
 //!   ImuActor        — digital twin of IMU sensor (event-only)
 
 mod brain;
+mod codec;
 mod compass;
 mod cutter;
 mod hoverboard;
 mod imu;
+mod multicast;
 mod ps4;
-mod udp_endpoint;
+mod ps4_reader;
+mod router;
+mod serial;
+mod udp;
 
 use std::net::Ipv4Addr;
 
 use clap::Parser;
-use common::fnv1a_32;
-use generated::generated::{Envelope, opt_id_to_string};
+use generated::generated::{opt_id_to_string, Envelope, PS4_ID};
 use kameo::prelude::*;
 use log::info;
 
 use brain::BrainActor;
-use compass::CompassActor;
-use cutter::CutterActor;
-use hoverboard::HoverboardActor;
-use imu::ImuActor;
-use ps4::Ps4Actor;
-use udp_endpoint::{UdpEndpoint, UdpEndpointConfig};
+
+use crate::{serial::SerialActor, udp::UdpActor};
 
 pub fn display_envelope(envelope: &Envelope, context: &str) {
     info!(
@@ -60,44 +60,47 @@ struct Args {
     port: u16,
 }
 
+
 // ── Main ───────────────────────────────────────────────────────────────────
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     common::logger::init();
+    let _console = kameo::console::serve("127.0.0.1:9999").await?;
+
     let args = Args::parse();
     info!("Starting brain '{}'...", args.endpoint);
 
     let group: Ipv4Addr = args.group.parse()?;
 
-    let udp_config = UdpEndpointConfig {
-        name: args.endpoint.clone(),
-        description: Some("Brain UDP endpoint".to_string()),
-        services: vec![],
-        events: vec![],
-        replies: vec![],
-        subscribes: vec![],
-        mc_addr: group,
-        mc_port: args.port,
-    };
-
-    let udp_ref = UdpEndpoint::spawn(UdpEndpoint::new(udp_config));
-
-    let endpoint_id = fnv1a_32(&args.endpoint);
-    let hoverboard_ref = HoverboardActor::spawn(HoverboardActor::new(endpoint_id, udp_ref.clone()));
-    let cutter_ref = CutterActor::spawn(CutterActor::new(endpoint_id, udp_ref.clone()));
-    let compass_ref = CompassActor::spawn(CompassActor::new(endpoint_id, udp_ref.clone()));
-    let imu_ref = ImuActor::spawn(ImuActor::new(endpoint_id, udp_ref.clone()));
-    let ps4_ref = Ps4Actor::spawn(Ps4Actor::new(endpoint_id, udp_ref.clone()));
-
-    let _brain_ref = BrainActor::spawn(BrainActor::new(
+    let router_ref = router::RouterActor::spawn(router::RouterActor::new());
+    let udp_ref = UdpActor::spawn(UdpActor::new(router_ref.clone()));
+    let mc_ref = multicast::MulticastActor::spawn(multicast::MulticastActor::new(
+        router_ref.clone().recipient(),
         udp_ref.clone(),
-        hoverboard_ref,
-        cutter_ref,
-        compass_ref,
-        imu_ref,
-        ps4_ref,
     ));
+    let _brain_ref = BrainActor::spawn(BrainActor::new(router_ref.clone()));
+    let _serial_usb0 = SerialActor::spawn(SerialActor::new("/dev/ttyUSB0", router_ref.clone()));
+    let _serial_usb1 = SerialActor::spawn(SerialActor::new("/dev/ttyUSB1", router_ref.clone()));
+    let _ps4_reader = ps4_reader::Ps4ReaderActor::spawn(ps4_reader::Ps4ReaderActor::new(
+        PS4_ID,
+        router_ref.clone().recipient(),
+    ));
+
+    // Start transports
+    mc_ref
+        .tell(multicast::StartMulticast {
+            group,
+            port: args.port,
+            bind_addr: Ipv4Addr::UNSPECIFIED,
+        })
+        .await?;
+    udp_ref
+        .tell(udp::StartUnicast {
+            port: args.port,
+            bind_addr: Ipv4Addr::UNSPECIFIED,
+        })
+        .await?;
 
     info!("Brain running. Press Ctrl+C to stop.");
     tokio::signal::ctrl_c().await?;

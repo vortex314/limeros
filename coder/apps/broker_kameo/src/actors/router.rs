@@ -77,7 +77,7 @@ pub struct EndpointUpdate {
     pub ep_addr: EndpointAddress,
     pub ep_announce: EndpointAnnounce,
 }
-
+#[derive(Clone)]
 pub struct AddRecipient {
     pub id: u32,
     pub name: String,

@@ -72,6 +72,16 @@ pub struct {{ msg.name }} {
 {%- endfor %}
 }
 
+impl Default for {{ msg.name }} {
+    fn default() -> Self {
+        {{ msg.name }} {
+{%- for field in msg.fields %}
+            {{ field.name }}: None,
+{%- endfor %}
+        }
+    }
+}
+
 impl {{ msg.name }} {
     pub const MSG_ID : u32 = {{ msg.id }};
     pub const MSG_NAME: &'static str = "{{ msg.name }}";

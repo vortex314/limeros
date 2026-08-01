@@ -10,6 +10,7 @@ members = [
     "apps/ps4_bridge",
     "apps/serial_bridge",
     "apps/sniffer",
+    "apps/tts_test",
     "apps/tui_sniffer",
     "generated",
 ]
