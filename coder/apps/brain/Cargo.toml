@@ -8,6 +8,7 @@ common = { path = "../../common" }
 generated = { path = "../../generated" }
 kameo = { version = "0.22", default-features = false, features = ["macros","console"] }
 kameo_actors ="*"
+console-subscriber = "0.5.0"
 anyhow = "1"
 clap = { version = "4", features = ["derive"] }
 cbor2 = { version = "*", features = ["derive"] }

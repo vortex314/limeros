@@ -5,11 +5,11 @@ use std::sync::Arc;
 use anyhow::Result;
 use generated::generated::{Envelope, ImuEvent};
 use kameo::prelude::*;
-use log::{debug, info, warn};
+use log::info;
 
 use crate::{
     brain::BrainActor,
-    router::{Register, RouterActor},
+    router::{Register, RouterActor, RouterMessage},
 };
 
 // ── ImuActor ───────────────────────────────────────────────────────────────
@@ -96,16 +96,16 @@ impl Actor for ImuActor {
     }
 }
 
-impl Message<Arc<Envelope>> for ImuActor {
+impl Message<RouterMessage> for ImuActor {
     type Reply = ();
 
     async fn handle(
         &mut self,
-        msg: Arc<Envelope>,
+        msg: RouterMessage,
         _ctx: &mut Context<Self, Self::Reply>,
     ) -> Self::Reply {
-        if Some(ImuEvent::MSG_ID) == msg.msg_type {
-            self.handle_imu_event(msg).await;
+        if Some(ImuEvent::MSG_ID) == msg.envelope.msg_type {
+            let _ = self.handle_imu_event(msg.envelope.clone()).await;
         };
     }
 }

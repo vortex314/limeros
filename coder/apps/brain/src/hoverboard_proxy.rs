@@ -9,9 +9,8 @@ use kameo::prelude::*;
 use log::{info, warn};
 
 use crate::{
-    brain::{BrainActor, BrainCmd},
-    display_envelope,
-    router::{Register, RouterActor},
+    brain::{BrainActor, BrainCmd, EnvelopeHandlerEvent, EnvelopeHandlerRequest},
+    router::{Register, RouterActor, RouterMessage},
 };
 
 // ── Messages ───────────────────────────────────────────────────────────────
@@ -22,9 +21,14 @@ struct TickHoverboard;
 // ── HoverboardActor ────────────────────────────────────────────────────────
 // digital twin of Hoverboard drive system, sends periodic HoverboardRequest commands via UdpEndpoint.
 
-pub struct HoverboardActor {
-    router: ActorRef<RouterActor>,
+pub struct HoverboardCmd {
+    pub speed: i32,
+    pub steer: i32,
+}
+
+pub struct HoverboardProxy {
     brain: ActorRef<BrainActor>,
+    serial: Option<Recipient<EnvelopeHandlerRequest>>,
     speed: i32,
     steer: i32,
     temperature: f32,
@@ -32,10 +36,10 @@ pub struct HoverboardActor {
     last_event_time: Option<std::time::Instant>,
 }
 
-impl HoverboardActor {
+impl HoverboardProxy {
     pub fn new(router: ActorRef<RouterActor>, brain: ActorRef<BrainActor>) -> Self {
-        HoverboardActor {
-            router,
+        HoverboardProxy {
+            serial: None,
             brain,
             speed: 0,
             steer: 0,
@@ -111,35 +115,30 @@ impl HoverboardActor {
             payload: Some(payload),
             ..Default::default()
         };
-        display_envelope(&envelope, "HoverboardActor");
-        let _ = self.router.tell(Arc::new(envelope)).await;
-    }
-
-    pub fn check_envelope(&self, envelope: &Arc<Envelope>) -> Result<()> {
-        if envelope.src.is_none() || envelope.msg_type.is_none() {
-            return Err(anyhow::anyhow!("Envelope missing required fields"));
+        //      display_envelope(&envelope, "HoverboardActor");
+        let serial = self.serial.clone();
+        if let Some(serial) = serial {
+            info!("HoverboardProxy sending HoverboardRequest: speed={}, steer={}", self.speed, self.steer);
+            let _ = serial
+                .tell(EnvelopeHandlerRequest::SendEnvelope {
+                    endpoint: fnv::fnv1a_32("hoverboard"),
+                    envelope: Arc::new(envelope),
+                })
+                .await;
+        } else {
+            warn!("HoverboardProxy serial recipient not set");
         }
-        Ok(())
     }
 }
 
-impl Actor for HoverboardActor {
+impl Actor for HoverboardProxy {
     type Args = Self;
     type Error = anyhow::Error;
 
     async fn on_start(state: Self::Args, actor_ref: ActorRef<Self>) -> Result<Self, Self::Error> {
         info!("HoverboardActor started (2Hz command loop)");
-        let ar_ref = actor_ref.clone();
-        state
-            .router
-            .tell(Register {
-                actor_ref: actor_ref.recipient(),
-                description: "HoverboardActor".to_string(),
-            })
-            .await?;
-
         // 2Hz timer
-        let tick_ref = ar_ref;
+        let tick_ref = actor_ref.clone();
         tokio::spawn(async move {
             let mut interval = tokio::time::interval(std::time::Duration::from_millis(500));
             loop {
@@ -154,33 +153,38 @@ impl Actor for HoverboardActor {
 
 // ── Handle TickHoverboard ─────────────────────────────────────────────────
 
-impl Message<TickHoverboard> for HoverboardActor {
+impl Message<TickHoverboard> for HoverboardProxy {
     type Reply = ();
 
-    async fn handle(&mut self, _msg: TickHoverboard, _ctx: &mut Context<Self, Self::Reply>) {
+    async fn handle(&mut self, _msg: TickHoverboard, ctx: &mut Context<Self, Self::Reply>) {
         self.handle_timer_tick().await;
     }
 }
 
-impl Message<Arc<Envelope>> for HoverboardActor {
+
+impl Message<EnvelopeHandlerEvent> for HoverboardProxy {
     type Reply = ();
 
     async fn handle(
         &mut self,
-        msg: Arc<Envelope>,
+        msg: EnvelopeHandlerEvent,
         _ctx: &mut Context<Self, Self::Reply>,
     ) -> Self::Reply {
-        let m = msg.clone();
-        if Some(HoverboardReply::MSG_ID) == msg.msg_type || Some(HoverboardEvent::MSG_ID) == msg.msg_type {
-            self.handle_hoverboard_reply(msg).await;
-        }
-        if Some(HoverboardEvent::MSG_ID) == m.msg_type {
-            self.handle_hoverboard_event(m).await;
+        match msg {
+            EnvelopeHandlerEvent::ReceivedEnvelope {
+                recipient: sender,
+                envelope,
+            } => {
+                let _ = self.handle_hoverboard_reply(envelope.clone()).await;
+                if self.serial.is_none() || self.serial.as_ref() != Some(&sender) {
+                    self.serial = Some(sender);
+                }
+            }
         }
     }
 }
 
-impl Message<BrainCmd> for HoverboardActor {
+impl Message<BrainCmd> for HoverboardProxy {
     type Reply = ();
 
     async fn handle(

@@ -7,7 +7,7 @@ use generated::generated::{CutterEvent, CutterReply, CutterRequest, Envelope};
 use kameo::prelude::*;
 use log::{info, warn};
 
-use crate::{brain::{BrainActor, BrainCmd}, router::{Register, RouterActor}};
+use crate::{brain::{BrainActor, BrainCmd}, router::{Register, RouterActor, RouterMessage}};
 
 // ── Messages ───────────────────────────────────────────────────────────────
 
@@ -96,7 +96,7 @@ impl CutterActor {
         Ok(())
     }
 
-    pub async fn handle_timer_tick(&mut self) {
+    pub async fn handle_timer_tick(&mut self, sender: Recipient<RouterMessage>) {
         let request = CutterRequest {
             enabled: Some(self.enabled),
             rpm: Some(self.rpm),
@@ -113,7 +113,13 @@ impl CutterActor {
             payload: Some(payload),
             ..Default::default()
         };
-        let _ = self.router.tell(Arc::new(envelope)).await;
+        let _ = self
+            .router
+            .tell(RouterMessage {
+                envelope: Arc::new(envelope),
+                sender,
+            })
+            .await;
     }
 
     pub fn check_envelope(&self, envelope: &Arc<Envelope>) -> Result<()> {
@@ -158,26 +164,27 @@ impl Actor for CutterActor {
 impl Message<TickCutter> for CutterActor {
     type Reply = ();
 
-    async fn handle(&mut self, _msg: TickCutter, _ctx: &mut Context<Self, Self::Reply>) {
-        self.handle_timer_tick().await;
+    async fn handle(&mut self, _msg: TickCutter, ctx: &mut Context<Self, Self::Reply>) {
+        let sender = ctx.actor_ref().clone().recipient();
+        self.handle_timer_tick(sender).await;
     }
 }
 
-impl Message<Arc<Envelope>> for CutterActor {
+impl Message<RouterMessage> for CutterActor {
     type Reply = ();
 
     async fn handle(
         &mut self,
-        msg: Arc<Envelope>,
+        msg: RouterMessage,
         _ctx: &mut Context<Self, Self::Reply>,
     ) -> Self::Reply {
-        let m = msg.clone();
-        let m1 = msg.clone();
-        if Some(CutterReply::MSG_ID) == msg.msg_type {
-            self.handle_cutter_reply(msg).await;
+        let envelope = msg.envelope;
+        let m = envelope.clone();
+        if Some(CutterReply::MSG_ID) == envelope.msg_type {
+            let _ = self.handle_cutter_reply(envelope).await;
         }
         if Some(CutterEvent::MSG_ID) == m.msg_type {
-            self.handle_cutter_event(m).await;
+            let _ = self.handle_cutter_event(m).await;
         }
     }
 }
@@ -191,9 +198,8 @@ impl Message<BrainCmd> for CutterActor {
         _ctx: &mut Context<Self, Self::Reply>,
     ) -> Self::Reply {
         let _ = match msg {
-            BrainCmd::SetCutter(enabled, rpm) => {
+            BrainCmd::SetCutter(enabled) => {
                 self.enabled = enabled;
-                self.rpm = rpm;
                 Ok(())
             }
             _ => Err(anyhow::anyhow!("CutterActor received unexpected BrainCmd")),

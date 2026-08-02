@@ -17,7 +17,7 @@
 
 use hcl::template::{Element, Template};
 use hcl::{Block, Body, Expression, TemplateExpr, TraversalOperator};
-use log::{debug, info};
+use log::{debug};
 use regex::Regex;
 use std::collections::HashMap;
 use std::fs;

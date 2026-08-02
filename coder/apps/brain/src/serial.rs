@@ -1,24 +1,24 @@
 //! Serial port actor — receives COBS/CRC-framed Envelopes and sends them.
 
-use std::io;
+use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
 
+use anyhow::Result;
 use generated::generated::{EndpointAnnounce, Envelope};
 use kameo::prelude::*;
 use log::{debug, error, info, warn};
-use tokio::sync::Mutex;
-use anyhow::Result;
+use tokio::{io, sync::Mutex};
 
 use crate::{
-    codec::{decode_frame, encode_frame}, router::{RouterActor,Register},
+    brain::{EnvelopeHandlerEvent, EnvelopeHandlerRequest}, codec::{decode_frame, encode_frame}, router::{Register, RouterActor, RouterMessage},
 };
 
-use tokio::sync::mpsc;
+
 
 // ── Messages ───────────────────────────────────────────────────────────────
 
-pub enum SerialEvent {
+pub enum SerialInternalEvent {
     ReceivedFrame(Arc<Vec<u8>>),
 }
 pub struct SerialSend {
@@ -29,40 +29,113 @@ pub struct SerialSend {
 
 pub struct SerialActor {
     port_path: String,
-    endpoint_announce : Option<EndpointAnnounce>,
-    router: ActorRef<RouterActor>,
+    listeners: HashMap<u32, Recipient<EnvelopeHandlerEvent>>,
     serial_port: Arc<Mutex<Option<Box<dyn serialport::SerialPort>>>>,
 }
 
 impl SerialActor {
-    pub fn new(port_path: &str, router: ActorRef<RouterActor>) -> Self {
+    pub fn new(port_path: &str) -> Self {
         SerialActor {
             port_path: port_path.to_string(),
-            endpoint_announce: None,
-            router,
+            listeners: HashMap::new(),
             serial_port: Arc::new(Mutex::new(None)),
         }
     }
+}
 
-    pub async fn handle_endpoint_announce(&mut self, envelope: &Envelope) {
-        if let Ok(ep_announce) =
-            EndpointAnnounce::from_bytes(envelope.payload.as_ref().unwrap_or(&vec![]))
-        {
-            if let Some(src) = envelope.src {
-                if self.endpoint_announce.is_none() || self.endpoint_announce.as_ref().unwrap().id != envelope.src {
-                    info!(
-                        "Serial endpoint '{}' announced src={} name='{}'",
-                        self.port_path,
-                        src,
-                        &ep_announce.name.as_ref().unwrap_or(&"".to_string())
+fn spawn_serial_task(
+    port_path: String,
+    serial_port: Arc<tokio::sync::Mutex<Option<Box<dyn serialport::SerialPort>>>>,
+    frame_target: ActorRef<SerialActor>,
+) -> tokio::task::JoinHandle<()> {
+    tokio::task::spawn_blocking(move || {
+        let retry_delay = Duration::from_secs(5);
+
+        loop {
+            debug!("Serial: attempting to open {port_path} ...");
+
+            match serialport::new(&port_path, 115200)
+                .timeout(Duration::from_millis(50))
+                .open()
+            {
+                Ok(mut port) => {
+                    info!("Serial: connected on {port_path}");
+
+                    {
+                        // .blocking_lock() — the sync-context counterpart to
+                        // .lock().await, made for exactly this situation.
+                        let mut guard = serial_port.blocking_lock();
+                        *guard = Some(port.try_clone().expect("failed to clone serial port"));
+                    }
+
+                    let mut buf: Vec<u8> = Vec::with_capacity(1024);
+                    let mut tmp = [0u8; 256];
+
+                    'reader: loop {
+                        match port.read(&mut tmp) {
+                            Ok(0) => continue,
+                            Ok(n) => {
+                                for &b in &tmp[..n] {
+                                    if b == 0x00 {
+                                        if buf.is_empty() {
+                                            continue;
+                                        }
+                                        match decode_frame(&buf) {
+                                            Ok(raw) => {
+                                                if let Err(e) = frame_target
+                                                    .tell(SerialInternalEvent::ReceivedFrame(
+                                                        Arc::new(raw),
+                                                    ))
+                                                    .blocking_send()
+                                                {
+                                                    warn!(
+                                                        "Serial: failed to deliver frame from {port_path}: {e}"
+                                                    );
+                                                }
+                                            }
+                                            Err(e) => warn!(
+                                                "Serial frame decode error on {port_path}: {e}"
+                                            ),
+                                        }
+                                        buf.clear();
+                                    } else {
+                                        buf.push(b);
+                                        if buf.len() > 4096 {
+                                            warn!("Oversized frame on {port_path}, discarding");
+                                            buf.clear();
+                                        }
+                                    }
+                                }
+                            }
+                            Err(ref e) if e.kind() == io::ErrorKind::TimedOut => continue,
+                            Err(e) => {
+                                error!("Serial read error on {port_path}: {e}");
+                                warn!(
+                                    "Serial: connection lost, retrying in {}s ...",
+                                    retry_delay.as_secs()
+                                );
+                                break 'reader;
+                            }
+                        }
+                    }
+
+                    {
+                        let mut guard = serial_port.blocking_lock();
+                        *guard = None;
+                    }
+                    drop(port);
+                }
+                Err(e) => {
+                    debug!(
+                        "Serial: failed to open {port_path}: {e} — retrying in {}s ...",
+                        retry_delay.as_secs()
                     );
-                    self.endpoint_announce = Some(ep_announce.clone());
                 }
             }
 
-            let _ = self.router.tell(Arc::new(envelope.clone())).await;
+            std::thread::sleep(retry_delay);
         }
-    }
+    })
 }
 
 /// Lifecycle hook: open serial port on start with retry loop.
@@ -70,137 +143,27 @@ impl Actor for SerialActor {
     type Args = Self;
     type Error = anyhow::Error;
 
-    async fn on_start(
-        state: Self::Args,
-        actor_ref: ActorRef<Self>,
-    ) -> Result<Self, Self::Error> {
-        state
-            .router
-            .tell(Register {
-                actor_ref: actor_ref.clone().recipient(),
-                description: format!("SerialActor {}", state.port_path),
-            })
-            .await?;
+    async fn on_start(state: Self::Args, actor_ref: ActorRef<Self>) -> Result<Self, Self::Error> {
         let port_path = state.port_path.clone();
         let own_ref = actor_ref.clone();
         let serial_port = state.serial_port.clone();
 
         // Channel: blocking reader → async forwarder → actor mailbox
-        let (tx, mut rx) = mpsc::unbounded_channel::<Vec<u8>>();
 
-        // Forwarder: receives decoded frames from the blocking reader
-        // and sends them to the actor via tell() — runs on tokio
-        let fwd_ref = own_ref.clone();
-        tokio::spawn(async move {
-            while let Some(raw) = rx.recv().await {
-                let _ = fwd_ref
-                    .tell(SerialEvent::ReceivedFrame(Arc::new(raw)))
-                    .await;
-            }
-        });
+        let _serial_handle = spawn_serial_task(port_path, serial_port, own_ref);
 
-        // Connection/read retry loop on a BLOCKING thread (serial I/O blocks)
-        tokio::task::spawn_blocking(move || {
-            let retry_delay = Duration::from_secs(5);
-            let rt = tokio::runtime::Handle::current();
-
-            loop {
-                info!("Serial: attempting to open {} ...", port_path);
-
-                match serialport::new(&port_path, 115200)
-                    .timeout(Duration::from_millis(50))
-                    .open()
-                {
-                    Ok(mut port) => {
-                        info!("Serial: connected on {}", port_path);
-
-                        // Store the port handle for SerialSend to use
-                        rt.block_on(async {
-                            let mut guard = serial_port.lock().await;
-                            *guard = Some(port.try_clone().expect("Failed to clone serial port"));
-                        });
-
-                        let mut buf: Vec<u8> = Vec::with_capacity(1024);
-                        let mut tmp = [0u8; 256];
-
-                        // Reader loop — break on errors to retry
-                        'reader: loop {
-                            match port.read(&mut tmp) {
-                                Ok(0) => continue,
-                                Ok(n) => {
-                                    for &b in &tmp[..n] {
-                                        if b == 0x00 {
-                                            if buf.is_empty() {
-                                                continue;
-                                            }
-                                            match decode_frame(&buf) {
-                                                Ok(raw) => {
-                                                    let _ = tx.send(raw);
-                                                }
-                                                Err(e) => warn!(
-                                                    "Serial frame decode error on {}: {}",
-                                                    port_path, e
-                                                ),
-                                            }
-                                            buf.clear();
-                                        } else {
-                                            buf.push(b);
-                                            if buf.len() > 4096 {
-                                                warn!(
-                                                    "Oversized frame on {}, discarding",
-                                                    port_path
-                                                );
-                                                buf.clear();
-                                            }
-                                        }
-                                    }
-                                }
-                                Err(ref e) if e.kind() == io::ErrorKind::TimedOut => continue,
-                                Err(e) => {
-                                    error!("Serial read error on {}: {}", port_path, e);
-                                    warn!(
-                                        "Serial: connection lost, retrying in {}s ...",
-                                        retry_delay.as_secs()
-                                    );
-                                    break 'reader;
-                                }
-                            }
-                        }
-
-                        // Clear the shared port so SerialSend knows it's gone
-                        rt.block_on(async {
-                            let mut guard = serial_port.lock().await;
-                            *guard = None;
-                        });
-                        drop(port);
-                    }
-                    Err(e) => {
-                        error!(
-                            "Serial: failed to open {}: {} — retrying in {}s ...",
-                            port_path,
-                            e,
-                            retry_delay.as_secs()
-                        );
-                    }
-                }
-
-                std::thread::sleep(retry_delay);
-            }
-        });
-
-        // Return state immediately — actor is "started"; the retry loop runs detached
         Ok(state)
     }
 }
 
 // ── Handle SerialReceivedFrame ────────────────────────────────────────────
 
-impl Message<SerialEvent> for SerialActor {
+impl Message<SerialInternalEvent> for SerialActor {
     type Reply = ();
 
-    async fn handle(&mut self, event: SerialEvent, _ctx: &mut Context<Self, Self::Reply>) {
+    async fn handle(&mut self, event: SerialInternalEvent, _ctx: &mut Context<Self, Self::Reply>) {
         match event {
-            SerialEvent::ReceivedFrame(raw) => {
+            SerialInternalEvent::ReceivedFrame(raw) => {
                 debug!("Serial: received frame of {} bytes", raw.len());
                 let packet = &raw;
                 let envelope = match Envelope::from_bytes(packet) {
@@ -210,11 +173,19 @@ impl Message<SerialEvent> for SerialActor {
                         return;
                     }
                 };
-                if let Some(EndpointAnnounce::MSG_ID) = envelope.msg_type {
-                    self.handle_endpoint_announce(&envelope).await;
+                if let Some(src) = envelope.src {
+                    if self.listeners.contains_key(&src) {
+                        if let Some(listener) = self.listeners.get(&src) {
+                                let _ = listener.tell(EnvelopeHandlerEvent::ReceivedEnvelope {
+                                    recipient: _ctx.actor_ref().clone().recipient(),
+                                    envelope: envelope.clone(),
+                                })
+                                .await.map_err(|e| {
+                                    warn!("Failed to deliver envelope to listener: {}", e);
+                                });
+                        }
+                    }
                 }
-
-                let _ = self.router.tell(envelope.clone()).await;
             }
         }
     }
@@ -248,32 +219,19 @@ impl Message<SerialSend> for SerialActor {
     }
 }
 
-
-impl Message<Arc<Envelope>> for SerialActor {
+impl Message<EnvelopeHandlerRequest> for SerialActor {
     type Reply = ();
 
-    async fn handle(
-        &mut self,
-        msg: Arc<Envelope>,
-        _ctx: &mut Context<Self, Self::Reply>,
-    ) -> Self::Reply {
-        // The router broadcasts every envelope to all listeners, so only
-        // respond when this serial endpoint is the intended destination.
-        let Some(dst) = msg.dst else {
-            return; // broadcast / not addressed to us — ignore
-        };
-        let Some(ep_announce) = &self.endpoint_announce else {
-            warn!(
-                "Serial {}: no EndpointAnnounce yet, dropping dst={}",
-                self.port_path, dst
-            );
-            return;
-        };
-        if ep_announce.id != Some(dst) {
-            return; // destined for another endpoint — ignore
-        }
-        if let Ok(raw) = msg.to_bytes() {
-            let _ = _ctx.actor_ref().tell(SerialSend { frame: raw }).await;
+    async fn handle(&mut self, msg: EnvelopeHandlerRequest, _ctx: &mut Context<Self, Self::Reply>) {
+        match msg {
+            EnvelopeHandlerRequest::SetListener{endpoint, recipient} => {
+                self.listeners.insert(endpoint, recipient);
+            }
+            EnvelopeHandlerRequest::SendEnvelope{endpoint: _, envelope} => {
+                if let Ok(frame) = envelope.to_bytes() {
+                    let _ = _ctx.actor_ref().tell(SerialSend { frame }).await;
+                }
+            }
         }
     }
 }

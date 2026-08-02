@@ -103,7 +103,7 @@ impl Endpoint {
         let packet = &buf[..len];
         if let Ok(message) = Envelope::from_bytes(packet) {
             if message.msg_type == Some(EndpointAnnounceReply::id()) {
-                if let Ok(reply) =
+                if let Ok(_reply) =
                     EndpointAnnounceReply::from_bytes(message.payload.as_deref().unwrap_or(&[]))
                 {
                     if self.broker_addr.lock().await.is_none() {

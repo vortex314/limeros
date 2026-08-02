@@ -5,11 +5,11 @@ use std::sync::Arc;
 use anyhow::Result;
 use generated::generated::{CompassEvent, Envelope};
 use kameo::prelude::*;
-use log::{info, warn};
+use log::info;
 
 use crate::{
     brain::BrainActor,
-    router::{Register, RouterActor},
+    router::{Register, RouterActor, RouterMessage},
 };
 
 // ── CompassActor ───────────────────────────────────────────────────────────
@@ -105,16 +105,16 @@ impl Actor for CompassActor {
     }
 }
 
-impl Message<Arc<Envelope>> for CompassActor {
+impl Message<RouterMessage> for CompassActor {
     type Reply = ();
 
     async fn handle(
         &mut self,
-        msg: Arc<Envelope>,
+        msg: RouterMessage,
         _ctx: &mut Context<Self, Self::Reply>,
     ) -> Self::Reply {
-        if Some(CompassEvent::MSG_ID) == msg.msg_type {
-            let _ = self.handle_compass_event(msg).await;
+        if Some(CompassEvent::MSG_ID) == msg.envelope.msg_type {
+            let _ = self.handle_compass_event(msg.envelope.clone()).await;
         }
     }
 }
