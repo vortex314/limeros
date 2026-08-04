@@ -12,7 +12,7 @@ use kameo::prelude::*;
 use log::{info, warn};
 use tokio::net::UdpSocket;
 
-use crate::router::RouterMessage;
+use crate::router::RouterActor;
 use crate::udp::{AddUdpTarget, UdpActor};
 
 // ── Messages ───────────────────────────────────────────────────────────────
@@ -34,19 +34,19 @@ pub struct McastReceive {
 
 #[derive(Actor)]
 pub struct MulticastActor {
-    router: Recipient<RouterMessage>,
     udp_actor: ActorRef<UdpActor>,
+    router: ActorRef<crate::router::RouterActor>,
     known_udp_endpoints: DashMap<u32, SocketAddr>,
 }
 
 impl MulticastActor {
     pub fn new(
-        router: Recipient<RouterMessage>,
         udp_actor: ActorRef<UdpActor>,
+        router: ActorRef<crate::router::RouterActor>,
     ) -> Self {
         MulticastActor {
-            router,
             udp_actor,
+            router,
             known_udp_endpoints: DashMap::new(),
         }
     }
@@ -55,7 +55,6 @@ impl MulticastActor {
         &mut self,
         packet: &[u8],
         addr: SocketAddr,
-        sender: Recipient<RouterMessage>,
     ) -> anyhow::Result<()> {
         let env = Envelope::from_bytes(packet)?;
         let msg_type = env
@@ -65,15 +64,15 @@ impl MulticastActor {
         // Build Arc once — Router forwards it by bumping the refcount
         let envelope = Arc::new(env);
 
-        self.router
-            .tell(RouterMessage {
-                envelope: envelope.clone(),
-                sender: sender.clone(),
+        self.udp_actor
+            .tell(McastReceive {
+                raw: packet.to_vec(),
+                addr,
             })
             .await?;
 
         if msg_type == EndpointAnnounce::id() {
-            self.handle_endpoint_announce(&*envelope, addr, sender).await?;
+            self.handle_endpoint_announce(&*envelope, addr).await?;
         }
         Ok(())
     }
@@ -82,7 +81,6 @@ impl MulticastActor {
         &mut self,
         envelope: &Envelope,
         addr: SocketAddr,
-        sender: Recipient<RouterMessage>,
     ) -> anyhow::Result<()> {
         let bytes = envelope
             .payload
@@ -129,24 +127,16 @@ impl MulticastActor {
             request_id: None,
             instance_id: None,
         };
-        self.router
-            .tell(RouterMessage {
-                envelope: Arc::new(env),
-                sender,
+        self.udp_actor
+            .tell(McastReceive {
+                raw: env.to_bytes()?,
+                addr,
             })
             .await?;
         Ok(())
     }
 }
 
-// The multicast actor only injects messages into the router; it does not
-// consume RouterMessage itself. This impl is required so it can produce its
-// own `Recipient<RouterMessage>` for the `sender` field.
-impl Message<RouterMessage> for MulticastActor {
-    type Reply = ();
-
-    async fn handle(&mut self, _msg: RouterMessage, _ctx: &mut Context<Self, Self::Reply>) {}
-}
 
 impl Message<StartMulticast> for MulticastActor {
     type Reply = ();
@@ -199,8 +189,7 @@ impl Message<McastReceive> for MulticastActor {
     type Reply = ();
 
     async fn handle(&mut self, msg: McastReceive, ctx: &mut Context<Self, Self::Reply>) {
-        let sender = ctx.actor_ref().clone().recipient();
-        if let Err(e) = self.handle_packet(&msg.raw, msg.addr, sender).await {
+        if let Err(e) = self.handle_packet(&msg.raw, msg.addr).await {
             warn!("Failed to handle multicast packet: {}", e);
         }
     }

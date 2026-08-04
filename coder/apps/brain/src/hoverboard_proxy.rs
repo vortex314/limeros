@@ -4,13 +4,13 @@ use std::sync::Arc;
 
 use anyhow::Result;
 use common::fnv;
-use generated::generated::{Envelope, HoverboardEvent, HoverboardReply, HoverboardRequest};
+use generated::generated::{EndpointAnnounce, Envelope, HoverboardEvent, HoverboardReply, HoverboardRequest, id_to_string, opt_id_to_string};
 use kameo::prelude::*;
+use kameo_actors::message_bus::Register;
 use log::{info, warn};
 
 use crate::{
-    brain::{BrainActor, BrainCmd, EnvelopeHandlerEvent, EnvelopeHandlerRequest},
-    router::{Register, RouterActor, RouterMessage},
+    brain::{BrainActor, BrainCmd,  ResultLog}, router::{FromDevice, RegisterTwin, RouterActor, ToDevice},
 };
 
 // ── Messages ───────────────────────────────────────────────────────────────
@@ -28,7 +28,7 @@ pub struct HoverboardCmd {
 
 pub struct HoverboardProxy {
     brain: ActorRef<BrainActor>,
-    serial: Option<Recipient<EnvelopeHandlerRequest>>,
+    router: ActorRef<RouterActor>,
     speed: i32,
     steer: i32,
     temperature: f32,
@@ -37,9 +37,9 @@ pub struct HoverboardProxy {
 }
 
 impl HoverboardProxy {
-    pub fn new(router: ActorRef<RouterActor>, brain: ActorRef<BrainActor>) -> Self {
+    pub fn new(brain: ActorRef<BrainActor>, router: ActorRef<RouterActor>) -> Self {
         HoverboardProxy {
-            serial: None,
+            router,
             brain,
             speed: 0,
             steer: 0,
@@ -116,18 +116,10 @@ impl HoverboardProxy {
             ..Default::default()
         };
         //      display_envelope(&envelope, "HoverboardActor");
-        let serial = self.serial.clone();
-        if let Some(serial) = serial {
-            info!("HoverboardProxy sending HoverboardRequest: speed={}, steer={}", self.speed, self.steer);
-            let _ = serial
-                .tell(EnvelopeHandlerRequest::SendEnvelope {
-                    endpoint: fnv::fnv1a_32("hoverboard"),
-                    envelope: Arc::new(envelope),
-                })
-                .await;
-        } else {
-            warn!("HoverboardProxy serial recipient not set");
-        }
+        self.router.tell(ToDevice {
+            id: fnv::fnv1a_32("hoverboard"),
+            envelope: Arc::new(envelope),
+        }).await.log_error("Failed to send ToDevice message to hoverboard");
     }
 }
 
@@ -137,6 +129,10 @@ impl Actor for HoverboardProxy {
 
     async fn on_start(state: Self::Args, actor_ref: ActorRef<Self>) -> Result<Self, Self::Error> {
         info!("HoverboardActor started (2Hz command loop)");
+        state.router.tell(RegisterTwin {
+            id: fnv::fnv1a_32("hoverboard"),
+            recipient: actor_ref.clone().recipient(),
+        }).await.log_error("Failed to register HoverboardProxy with router");
         // 2Hz timer
         let tick_ref = actor_ref.clone();
         tokio::spawn(async move {
@@ -161,24 +157,34 @@ impl Message<TickHoverboard> for HoverboardProxy {
     }
 }
 
-
-impl Message<EnvelopeHandlerEvent> for HoverboardProxy {
+impl Message<FromDevice> for HoverboardProxy {
     type Reply = ();
 
     async fn handle(
         &mut self,
-        msg: EnvelopeHandlerEvent,
+        msg: FromDevice,
         _ctx: &mut Context<Self, Self::Reply>,
     ) -> Self::Reply {
-        match msg {
-            EnvelopeHandlerEvent::ReceivedEnvelope {
-                recipient: sender,
-                envelope,
-            } => {
-                let _ = self.handle_hoverboard_reply(envelope.clone()).await;
-                if self.serial.is_none() || self.serial.as_ref() != Some(&sender) {
-                    self.serial = Some(sender);
+        let envelope = msg.envelope;
+        match envelope.msg_type {
+            Some(HoverboardReply::MSG_ID) => {
+                if let Err(e) = self.handle_hoverboard_reply(envelope).await {
+                    warn!("Failed to handle HoverboardReply: {}", e);
                 }
+            }
+            Some(HoverboardEvent::MSG_ID) => {
+                if let Err(e) = self.handle_hoverboard_event(envelope).await {
+                    warn!("Failed to handle HoverboardEvent: {}", e);
+                }
+            }
+            Some(EndpointAnnounce::MSG_ID) => {
+            }
+            _ => {
+                warn!(
+                    "HoverboardActor received unexpected message type: {} {:?}",
+                    opt_id_to_string(envelope.msg_type),
+                    envelope.msg_type
+                );
             }
         }
     }

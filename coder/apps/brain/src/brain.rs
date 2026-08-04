@@ -5,7 +5,7 @@ use std::sync::Arc;
 use anyhow::Result;
 use generated::generated::Envelope;
 use kameo::prelude::*;
-use log::info;
+use log::{info, warn};
 use statig::blocking::StateMachine;
 use statig::prelude::*;
 
@@ -13,6 +13,7 @@ use crate::compass::CompassActor;
 use crate::cutter::CutterActor;
 use crate::hoverboard_proxy::HoverboardProxy;
 use crate::imu::ImuActor;
+use crate::ps4_proxy::Ps4Proxy;
 use crate::router::RouterActor;
 
 // ── Messages ───────────────────────────────────────────────────────────────
@@ -25,7 +26,7 @@ pub enum EnvelopeHandlerRequest {
 
 #[derive(Debug) ]
 pub enum EnvelopeHandlerEvent {
-    ReceivedEnvelope { recipient: Recipient<EnvelopeHandlerRequest>, envelope: Arc<Envelope> },
+    ReceivedEnvelope { sender: Recipient<EnvelopeHandlerRequest>, envelope: Arc<Envelope> },
 }
 
 // ── Unified event enum ─────────────────────────────────────────────────────
@@ -123,28 +124,20 @@ impl BrainData {
 
 // ── BrainActor — drives the FSM via stored data + current state ID ────────
 pub struct BrainActor {
-    machine: StateMachine<BrainData>,
-  //  hoverboard_ref: Option<ActorRef<HoverboardProxy>>,
-    cutter_ref: Option<ActorRef<CutterActor>>,
-    compass_ref: Option<ActorRef<CompassActor>>,
-    imu_ref: Option<ActorRef<ImuActor>>,
-    //   ps4_ref: Option<ActorRef<Ps4Proxy>>,
+    pub  machine: Option<StateMachine<BrainData>>,
+    pub hoverboard_ref: ActorRef<HoverboardProxy>,
+    pub cutter_ref: ActorRef<CutterActor>,
+    pub compass_ref: ActorRef<CompassActor>,
+    pub imu_ref: ActorRef<ImuActor>,
+    pub ps4_ref: ActorRef<Ps4Proxy>,
 }
 
 impl BrainActor {
-    pub fn new(hb_ref: ActorRef<HoverboardProxy>) -> Self {
-        let x = BrainData.state_machine();
-        BrainActor {
-            machine: x,
-            hoverboard_ref: Some(hb_ref),
-            cutter_ref: None,
-            compass_ref: None,
-            imu_ref: None,
-            //          ps4_ref: None,
-        }
-    }
+
     async fn dispatch(&mut self, event: &BrainEvent) {
-        self.machine.handle(event);
+        if let Some(ref mut machine) = self.machine {
+            machine.handle(event);
+        }
     }
 
     async fn on_link_died(
@@ -154,32 +147,14 @@ impl BrainActor {
         reason: ActorStopReason,
     ) -> Result<()> {
         // e.g. force the FSM to a safe state if the hoverboard twin dies mid-run
+        warn!("Linked actor {:?} died: {:?}", id, reason);
         self.dispatch(&BrainEvent::Failure(Failure::TwinDied(id, reason))).await;
         Ok(())
     }
 
     // FIX #2: Same for init — explicit Send future
     async fn init(&mut self, actor_ref: ActorRef<BrainActor>) {
-        let router = self.router.clone();
-
-   //     let hoverboard_ref =
-   //         HoverboardProxy::spawn(HoverboardProxy::new(router.clone(), actor_ref.clone()));
-        let cutter_ref = CutterActor::spawn(CutterActor::new(router.clone(), actor_ref.clone()));
-        let compass_ref = CompassActor::spawn(CompassActor::new(router.clone(), actor_ref.clone()));
-        let imu_ref = ImuActor::spawn(ImuActor::new(router.clone(), actor_ref.clone()));
-        //         let ps4_ref = Ps4Proxy::spawn(Ps4Proxy::new(actor_ref.recipient()));
-
-        /* actor_ref.link(&hoverboard_ref).await;
-        actor_ref.link(&cutter_ref).await;
-        actor_ref.link(&compass_ref).await;
-        actor_ref.link(&imu_ref).await;
-        actor_ref.link(&ps4_ref).await;*/
-
-   //     self.hoverboard_ref = Some(hoverboard_ref);
-        self.cutter_ref = Some(cutter_ref);
-        self.compass_ref = Some(compass_ref);
-        self.imu_ref = Some(imu_ref);
-        //          self.ps4_ref = Some(ps4_ref);
+        self.machine = Some(BrainData.state_machine());
     }
 }
 
@@ -192,7 +167,6 @@ impl Actor for BrainActor {
         actor_ref: ActorRef<Self>,
     ) -> Result<Self, Self::Error> {
         info!("BrainActor started");
-
         state.init(actor_ref.clone()).await;
         Ok(state)
     }
@@ -206,10 +180,38 @@ impl Message<BrainEvent> for BrainActor {
     async fn handle(
         &mut self,
         msg: BrainEvent,
-        ctx: &mut Context<Self, Self::Reply>,
+        _ctx: &mut Context<Self, Self::Reply>,
     ) -> Self::Reply {
         info!("BrainActor: handle BrainEvent: {:?}", msg);
         self.dispatch(&msg).await;
+    }
+}
+
+/// Extension trait adding fire-and-forget error handling to `Result`.
+pub trait ResultLog<T, E> {
+    /// Consumes the `Result`, logging any error with `context`. Returns nothing.
+    fn log_error(self, context: &str)
+    where
+        E: std::fmt::Display;
+
+    /// Consumes the `Result`, calling `f` with the error if there is one. Returns nothing.
+    fn on_error(self, f: impl FnOnce(E));
+}
+
+impl<T, E> ResultLog<T, E> for Result<T, E> {
+    fn log_error(self, context: &str)
+    where
+        E: std::fmt::Display,
+    {
+        if let Err(e) = self {
+            warn!("{context}: {e}");
+        }
+    }
+
+    fn on_error(self, f: impl FnOnce(E)) {
+        if let Err(e) = self {
+            f(e);
+        }
     }
 }
 
@@ -219,24 +221,18 @@ impl Message<BrainRequest> for BrainActor {
     async fn handle(
         &mut self,
         msg: BrainRequest,
-        ctx: &mut Context<Self, Self::Reply>,
+        _ctx: &mut Context<Self, Self::Reply>,
     ) -> Self::Reply {
         info!("BrainActor: handle BrainRequest: {:?}", msg);
         match msg {
             BrainRequest::SetSpeed(speed) => {
-                if let Some(ref hoverboard_ref) = self.hoverboard_ref {
-                    let _ = hoverboard_ref.tell(BrainCmd::SetSpeed(speed)).await;
-                }
+                self.hoverboard_ref.tell(BrainCmd::SetSpeed(speed)).await.log_error("Failed to send SetSpeed to HoverboardProxy");
             }
             BrainRequest::SetSteer(steer) => {
-                if let Some(ref hoverboard_ref) = self.hoverboard_ref {
-                    let _ = hoverboard_ref.tell(BrainCmd::SetSteer(steer)).await;
-                }
+                self.hoverboard_ref.tell(BrainCmd::SetSteer(steer)).await.log_error("Failed to send SetSteer to HoverboardProxy");
             }
             BrainRequest::SetCutter(enabled) => {
-                if let Some(ref cutter_ref) = self.cutter_ref {
-                    let _ = cutter_ref.tell(BrainCmd::SetCutter(enabled)).await;
-                }
+                self.cutter_ref.tell(BrainCmd::SetCutter(enabled)).await.on_error(|e| log::error!("Failed to send SetCutter to CutterActor: {:?}", e));
             }
             BrainRequest::SetState(state_change) => match state_change {
                 StateChange::StateAutomatic => {

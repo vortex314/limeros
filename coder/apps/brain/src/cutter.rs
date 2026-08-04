@@ -3,11 +3,12 @@
 use std::sync::Arc;
 
 use anyhow::Result;
+use common::fnv;
 use generated::generated::{CutterEvent, CutterReply, CutterRequest, Envelope};
 use kameo::prelude::*;
 use log::{info, warn};
 
-use crate::{brain::{BrainActor, BrainCmd}, router::{Register, RouterActor, RouterMessage}};
+use crate::{brain::{BrainActor, BrainCmd, EnvelopeHandlerEvent, EnvelopeHandlerRequest, ResultLog}, router::{FromDevice, RegisterTwin, RouterActor, }};
 
 // ── Messages ───────────────────────────────────────────────────────────────
 
@@ -18,8 +19,9 @@ struct TickCutter;
 // digital twin of the cutter system, sends periodic CutterRequest commands via UdpEndpoint.
 
 pub struct CutterActor {
-    router: ActorRef<RouterActor>,
     brain: ActorRef<BrainActor>,
+    router: ActorRef<RouterActor>,
+    device : Option<Recipient<EnvelopeHandlerRequest>>,
     enabled: bool,
     rpm: i32,
     current: f32,
@@ -29,10 +31,11 @@ pub struct CutterActor {
 }
 
 impl CutterActor {
-    pub fn new(router: ActorRef<RouterActor>, brain: ActorRef<BrainActor>) -> Self {
+    pub fn new(brain: ActorRef<BrainActor>, router: ActorRef<RouterActor>) -> Self {
         CutterActor {
-            router,
             brain,
+            router,
+            device: None,
             enabled: false,
             rpm: 0,
             current: 0.0,
@@ -96,7 +99,7 @@ impl CutterActor {
         Ok(())
     }
 
-    pub async fn handle_timer_tick(&mut self, sender: Recipient<RouterMessage>) {
+    pub async fn handle_timer_tick(&mut self) {
         let request = CutterRequest {
             enabled: Some(self.enabled),
             rpm: Some(self.rpm),
@@ -113,13 +116,14 @@ impl CutterActor {
             payload: Some(payload),
             ..Default::default()
         };
-        let _ = self
-            .router
-            .tell(RouterMessage {
-                envelope: Arc::new(envelope),
-                sender,
-            })
-            .await;
+        self.device.as_ref().map(async |device| {
+            let _ = device
+                .tell(EnvelopeHandlerRequest::SendEnvelope {
+                    endpoint : fnv::fnv1a_32("cutter"),
+                    envelope: Arc::new(envelope),
+                })
+                .await;
+        });
     }
 
     pub fn check_envelope(&self, envelope: &Arc<Envelope>) -> Result<()> {
@@ -136,17 +140,8 @@ impl Actor for CutterActor {
 
     async fn on_start(state: Self::Args, actor_ref: ActorRef<Self>) -> Result<Self, Self::Error> {
         info!("CutterActor started (2Hz command loop)");
-        let ar_ref = actor_ref.clone();
-        state
-            .router
-            .tell(Register {
-                actor_ref: actor_ref.recipient(),
-                description: format!("CutterActor"),
-            })
-            .await?;
-
         // 2Hz timer
-        let tick_ref = ar_ref;
+        let tick_ref = actor_ref.clone();
         tokio::spawn(async move {
             let mut interval = tokio::time::interval(std::time::Duration::from_millis(500));
             loop {
@@ -154,6 +149,11 @@ impl Actor for CutterActor {
                 let _ = tick_ref.tell(TickCutter).await;
             }
         });
+
+        state.router.tell(RegisterTwin{
+            id: fnv::fnv1a_32("cutter"),
+            recipient: actor_ref.clone().recipient(),
+        }).await.log_error("Failed to register CutterActor with router");
 
         Ok(state)
     }
@@ -165,27 +165,7 @@ impl Message<TickCutter> for CutterActor {
     type Reply = ();
 
     async fn handle(&mut self, _msg: TickCutter, ctx: &mut Context<Self, Self::Reply>) {
-        let sender = ctx.actor_ref().clone().recipient();
-        self.handle_timer_tick(sender).await;
-    }
-}
-
-impl Message<RouterMessage> for CutterActor {
-    type Reply = ();
-
-    async fn handle(
-        &mut self,
-        msg: RouterMessage,
-        _ctx: &mut Context<Self, Self::Reply>,
-    ) -> Self::Reply {
-        let envelope = msg.envelope;
-        let m = envelope.clone();
-        if Some(CutterReply::MSG_ID) == envelope.msg_type {
-            let _ = self.handle_cutter_reply(envelope).await;
-        }
-        if Some(CutterEvent::MSG_ID) == m.msg_type {
-            let _ = self.handle_cutter_event(m).await;
-        }
+        self.handle_timer_tick().await;
     }
 }
 
@@ -204,5 +184,36 @@ impl Message<BrainCmd> for CutterActor {
             }
             _ => Err(anyhow::anyhow!("CutterActor received unexpected BrainCmd")),
         };
+    }
+}
+ 
+
+ impl Message<FromDevice> for CutterActor {
+    type Reply = ();
+
+    async fn handle(
+        &mut self,
+        msg: FromDevice,
+        _ctx: &mut Context<Self, Self::Reply>,
+    ) -> Self::Reply {
+        let envelope = msg.envelope;
+        match envelope.msg_type {
+            Some(CutterReply::MSG_ID) => {
+                if let Err(e) = self.handle_cutter_reply(envelope).await {
+                    warn!("Failed to handle CutterReply: {}", e);
+                }
+            }
+            Some(CutterEvent::MSG_ID) => {
+                if let Err(e) = self.handle_cutter_event(envelope).await {
+                    warn!("Failed to handle CutterEvent: {}", e);
+                }
+            }
+            _ => {
+                warn!(
+                    "CutterActor received unexpected message type: {:?}",
+                    envelope.msg_type
+                );
+            }
+        }
     }
 }

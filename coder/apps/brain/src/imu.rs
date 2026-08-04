@@ -5,19 +5,18 @@ use std::sync::Arc;
 use anyhow::Result;
 use generated::generated::{Envelope, ImuEvent};
 use kameo::prelude::*;
-use log::info;
+use log::{info, warn};
 
 use crate::{
-    brain::BrainActor,
-    router::{Register, RouterActor, RouterMessage},
+    brain::{BrainActor, EnvelopeHandlerEvent, EnvelopeHandlerRequest}, router::{FromDevice, RouterActor},
 };
 
 // ── ImuActor ───────────────────────────────────────────────────────────────
 // digital twin of the IMU sensor, tracks gyroscope and accelerometer data.
-
+#[derive(Actor)]
 pub struct ImuActor {
-    router: ActorRef<RouterActor>,
     _brain: ActorRef<BrainActor>,
+    router: ActorRef<RouterActor>,
     pub gyro_x: f32,
     pub gyro_y: f32,
     pub gyro_z: f32,
@@ -28,7 +27,7 @@ pub struct ImuActor {
 }
 
 impl ImuActor {
-    pub fn new(router: ActorRef<RouterActor>, brain: ActorRef<BrainActor>) -> Self {
+    pub fn new(brain: ActorRef<BrainActor>, router: ActorRef<RouterActor>) -> Self {
         ImuActor {
             router,
             _brain: brain,
@@ -78,34 +77,17 @@ impl ImuActor {
     }
 }
 
-impl Actor for ImuActor {
-    type Args = Self;
-    type Error = anyhow::Error;
-
-    async fn on_start(state: Self::Args, actor_ref: ActorRef<Self>) -> Result<Self, Self::Error> {
-        info!("ImuActor started");
-        state
-            .router
-            .tell(Register {
-                actor_ref: actor_ref.recipient(),
-                description: "ImuActor".to_string(),
-            })
-            .await?;
-
-        Ok(state)
-    }
-}
-
-impl Message<RouterMessage> for ImuActor {
+impl Message<FromDevice> for ImuActor {
     type Reply = ();
 
-    async fn handle(
-        &mut self,
-        msg: RouterMessage,
-        _ctx: &mut Context<Self, Self::Reply>,
-    ) -> Self::Reply {
-        if Some(ImuEvent::MSG_ID) == msg.envelope.msg_type {
-            let _ = self.handle_imu_event(msg.envelope.clone()).await;
-        };
+    async fn handle(&mut self, msg: FromDevice, _ctx: &mut Context<Self, Self::Reply>) {
+        if let Err(e) = self.check_envelope(&msg.envelope) {
+            warn!("Invalid envelope received by ImuActor: {}", e);
+            return;
+        }
+
+        if let Err(e) = self.handle_imu_event(msg.envelope).await {
+            warn!("Failed to handle ImuEvent: {}", e);
+        }
     }
 }

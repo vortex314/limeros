@@ -11,10 +11,10 @@ use log::{debug, error, info, warn};
 use tokio::{io, sync::Mutex};
 
 use crate::{
-    brain::{EnvelopeHandlerEvent, EnvelopeHandlerRequest}, codec::{decode_frame, encode_frame}, router::{Register, RouterActor, RouterMessage},
+    brain::ResultLog,
+    codec::{decode_frame, encode_frame},
+    router::{FromDevice, RegisterDevice, RouterActor, ToDevice},
 };
-
-
 
 // ── Messages ───────────────────────────────────────────────────────────────
 
@@ -29,16 +29,18 @@ pub struct SerialSend {
 
 pub struct SerialActor {
     port_path: String,
-    listeners: HashMap<u32, Recipient<EnvelopeHandlerEvent>>,
     serial_port: Arc<Mutex<Option<Box<dyn serialport::SerialPort>>>>,
+    router: ActorRef<crate::router::RouterActor>,
+    registered_device: Option<u32>,
 }
 
 impl SerialActor {
-    pub fn new(port_path: &str) -> Self {
+    pub fn new(port_path: &str, router: ActorRef<RouterActor>) -> Self {
         SerialActor {
             port_path: port_path.to_string(),
-            listeners: HashMap::new(),
             serial_port: Arc::new(Mutex::new(None)),
+            router,
+            registered_device: None,
         }
     }
 }
@@ -101,7 +103,17 @@ fn spawn_serial_task(
                                     } else {
                                         buf.push(b);
                                         if buf.len() > 4096 {
-                                            warn!("Oversized frame on {port_path}, discarding");
+                                            info!("Serial {} {}", port_path, String::from_utf8_lossy(&buf).to_string());
+                                            // split per newline and send to log, but don't send to router
+                                            /*let log_lines: Vec<String> = buf
+                                                .split(|&x| x == b'\n')
+                                                .map(|line| {
+                                                    String::from_utf8_lossy(line).to_string()
+                                                })
+                                                .collect();
+                                            for line in log_lines {
+                                                warn!("Serial log from {port_path}: {}", line);
+                                            }*/
                                             buf.clear();
                                         }
                                     }
@@ -174,17 +186,23 @@ impl Message<SerialInternalEvent> for SerialActor {
                     }
                 };
                 if let Some(src) = envelope.src {
-                    if self.listeners.contains_key(&src) {
-                        if let Some(listener) = self.listeners.get(&src) {
-                                let _ = listener.tell(EnvelopeHandlerEvent::ReceivedEnvelope {
-                                    recipient: _ctx.actor_ref().clone().recipient(),
-                                    envelope: envelope.clone(),
-                                })
-                                .await.map_err(|e| {
-                                    warn!("Failed to deliver envelope to listener: {}", e);
-                                });
-                        }
+                    if self.registered_device != Some(src) {
+                        self.registered_device = Some(src);
+                        self.router
+                            .tell(RegisterDevice {
+                                id: src,
+                                recipient: _ctx.actor_ref().clone().recipient(),
+                            })
+                            .await
+                            .log_error("Failed to register device with router");
                     }
+                    self.router
+                        .tell(FromDevice {
+                            id: src,
+                            envelope: envelope.clone(),
+                        })
+                        .await
+                        .log_error("Failed to send FromDevice message to router");
                 }
             }
         }
@@ -197,7 +215,7 @@ impl Message<SerialSend> for SerialActor {
     type Reply = ();
 
     async fn handle(&mut self, msg: SerialSend, _ctx: &mut Context<Self, Self::Reply>) {
-        info!(
+        debug!(
             "Serial {}: sending frame of {} bytes",
             self.port_path,
             msg.frame.len()
@@ -219,19 +237,22 @@ impl Message<SerialSend> for SerialActor {
     }
 }
 
-impl Message<EnvelopeHandlerRequest> for SerialActor {
+impl Message<ToDevice> for SerialActor {
     type Reply = ();
 
-    async fn handle(&mut self, msg: EnvelopeHandlerRequest, _ctx: &mut Context<Self, Self::Reply>) {
-        match msg {
-            EnvelopeHandlerRequest::SetListener{endpoint, recipient} => {
-                self.listeners.insert(endpoint, recipient);
+    async fn handle(
+        &mut self,
+        msg: ToDevice,
+        _ctx: &mut Context<Self, Self::Reply>,
+    ) -> Self::Reply {
+        let envelope = msg.envelope;
+        let raw = match envelope.to_bytes() {
+            Ok(r) => r,
+            Err(e) => {
+                warn!("Failed to serialize envelope for serial send: {}", e);
+                return;
             }
-            EnvelopeHandlerRequest::SendEnvelope{endpoint: _, envelope} => {
-                if let Ok(frame) = envelope.to_bytes() {
-                    let _ = _ctx.actor_ref().tell(SerialSend { frame }).await;
-                }
-            }
-        }
+        };
+        let _ = self.handle(SerialSend { frame: raw }, _ctx).await;
     }
 }

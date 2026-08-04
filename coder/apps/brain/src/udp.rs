@@ -1,5 +1,6 @@
 //! UDP unicast actor — receives and sends unicast UDP Envelopes.
 
+use anyhow::Result;
 use generated::generated::{EndpointAnnounce, Envelope};
 use kameo::prelude::*;
 use log::{info, warn};
@@ -7,9 +8,10 @@ use std::collections::HashMap;
 use std::net::{Ipv4Addr, SocketAddr};
 use std::sync::Arc;
 use tokio::net::UdpSocket;
-use anyhow::Result;
 
-use crate::router::{Register, RouterActor, RouterMessage};
+use crate::brain::{EnvelopeHandlerEvent, EnvelopeHandlerRequest, ResultLog};
+use crate::multicast::McastReceive;
+use crate::router::{FromDevice, RouterActor, ToDevice};
 
 // ── Messages ───────────────────────────────────────────────────────────────
 pub struct AddUdpTarget {
@@ -31,17 +33,17 @@ pub struct UdpSend {
 // ── UDP actor ──────────────────────────────────────────────────────────────
 
 pub struct UdpActor {
-    router: ActorRef<RouterActor>,
     socket: Option<Arc<UdpSocket>>,
     targets: HashMap<u32, SocketAddr>,
+    router : ActorRef<RouterActor>,
 }
 
 impl UdpActor {
     pub fn new(router: ActorRef<RouterActor>) -> Self {
         UdpActor {
-            router,
             socket: None,
             targets: HashMap::new(),
+            router,
         }
     }
 }
@@ -51,13 +53,6 @@ impl Actor for UdpActor {
     type Error = anyhow::Error;
 
     async fn on_start(state: Self::Args, actor_ref: ActorRef<Self>) -> Result<Self, Self::Error> {
-        state
-            .router
-            .tell(Register {
-                actor_ref: actor_ref.recipient(),
-                description: "UdpActor".to_string(),
-            })
-            .await?;
         Ok(state)
     }
 }
@@ -66,9 +61,6 @@ impl Message<StartUnicast> for UdpActor {
     type Reply = ();
 
     async fn handle(&mut self, msg: StartUnicast, ctx: &mut Context<Self, Self::Reply>) {
-
-        let router_clone = self.router.clone();
-        let sender = ctx.actor_ref().clone().recipient();
         let bind = SocketAddr::new(msg.bind_addr.into(), msg.port);
 
         // Spawn the bind as a detached task so we can await it
@@ -86,6 +78,8 @@ impl Message<StartUnicast> for UdpActor {
         info!("Unicast actor listening on {}", bind);
 
         let read_socket = socket.clone();
+        let my_ref = ctx.actor_ref().clone();
+        let router_ref = self.router.clone();
 
         tokio::spawn(async move {
             let mut buf = vec![0u8; 64 * 1024];
@@ -95,10 +89,11 @@ impl Message<StartUnicast> for UdpActor {
                         let packet = buf[..len].to_vec();
                         match Envelope::from_bytes(&packet) {
                             Ok(envelope) => {
-                                let _ = router_clone
-                                    .tell(RouterMessage {
+                                let _ = router_ref
+                                    .clone()
+                                    .tell(FromDevice {
+                                        id: envelope.src.unwrap_or(0),
                                         envelope: Arc::new(envelope),
-                                        sender: sender.clone(),
                                     })
                                     .await;
                             }
@@ -134,40 +129,6 @@ impl Message<UdpSend> for UdpActor {
     }
 }
 
-impl Message<RouterMessage> for UdpActor {
-    type Reply = ();
-
-    async fn handle(
-        &mut self,
-        msg: RouterMessage,
-        _ctx: &mut Context<Self, Self::Reply>,
-    ) -> Self::Reply {
-        // The router broadcasts every envelope to all listeners, so only
-        // send when the envelope has a destination we know about.
-        let Some(dst) = msg.envelope.dst else {
-            return; // broadcast / not addressed — ignore
-        };
-        let Some(&target) = self.targets.get(&dst) else {
-            return;
-        };
-        let Some(ref socket) = self.socket else {
-            warn!("UDP socket not initialized, dropping dst={}", dst);
-            return;
-        };
-        match msg.envelope.to_bytes() {
-            Ok(raw) => {
-                if let Err(e) = socket.try_send_to(&raw, target) {
-                    warn!("Failed to send UDP packet to {}: {}", dst, e);
-                }
-            }
-            Err(e) => {
-                warn!("Failed to serialize envelope for UDP send to {}: {}", dst, e);
-            }
-        }
-    }
-}
-
-
 impl Message<AddUdpTarget> for UdpActor {
     type Reply = ();
 
@@ -177,6 +138,62 @@ impl Message<AddUdpTarget> for UdpActor {
             info!("Added UDP target: id={}, addr={}", id, msg.addr);
         } else {
             warn!("AddUdpTarget received without an endpoint id");
+        }
+    }
+}
+
+impl Message<McastReceive> for UdpActor {
+    type Reply = ();
+
+    async fn handle(&mut self, msg: McastReceive, ctx: &mut Context<Self, Self::Reply>) {
+        let addr = msg.addr;
+        let packet = msg.raw;
+        match Envelope::from_bytes(&packet) {
+            Ok(envelope) => {
+                if let Some(src) = envelope.src {
+                    self.router.tell( FromDevice {
+                        id: src,
+                        envelope: Arc::new(envelope.clone()),
+                    }).await.log_error("Failed to send FromDevice message to router");
+                }
+            }
+            Err(e) => {
+                warn!(
+                    "Failed to decode multicast packet[{}] from {}: {}",
+                    packet.len(),
+                    addr,
+                    e
+                );
+            }
+        }
+    }
+}
+
+impl Message<ToDevice> for UdpActor {
+    type Reply = ();
+
+    async fn handle(
+        &mut self,
+        msg: ToDevice,
+        _ctx: &mut Context<Self, Self::Reply>,
+    ) -> Self::Reply {
+        if let Some(&target) = self.targets.get(&msg.id) {
+            let raw = match msg.envelope.to_bytes() {
+                Ok(r) => r,
+                Err(e) => {
+                    warn!("Failed to serialize envelope for UDP send to {}: {}", msg.id, e);
+                    return;
+                }
+            };
+            if let Some(ref socket) = self.socket {
+                if let Err(e) = socket.try_send_to(&raw, target) {
+                    warn!("Failed to send UDP packet to {}: {}", msg.id, e);
+                }
+            } else {
+                warn!("UDP socket not initialized, dropping dst={}", msg.id);
+            }
+        } else {
+            warn!("No UDP target found for id {}", msg.id);
         }
     }
 }

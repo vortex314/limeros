@@ -3,21 +3,20 @@
 use std::sync::Arc;
 
 use anyhow::Result;
+use common::fnv;
 use generated::generated::{CompassEvent, Envelope};
 use kameo::prelude::*;
-use log::info;
+use log::{info, warn};
 
 use crate::{
-    brain::BrainActor,
-    router::{Register, RouterActor, RouterMessage},
+    brain::{BrainActor, EnvelopeHandlerEvent, EnvelopeHandlerRequest, ResultLog}, router::{FromDevice, RegisterTwin, RouterActor, },
 };
 
 // ── CompassActor ───────────────────────────────────────────────────────────
 // digital twin of the compass sensor, tracks heading/pitch/roll/mag/accel.
-
 pub struct CompassActor {
+    brain: ActorRef<BrainActor>,
     router: ActorRef<RouterActor>,
-    _brain: ActorRef<BrainActor>,
     pub heading: f32,
     pub pitch: f32,
     pub roll: f32,
@@ -31,10 +30,10 @@ pub struct CompassActor {
 }
 
 impl CompassActor {
-    pub fn new(router: ActorRef<RouterActor>, brain: ActorRef<BrainActor>) -> Self {
+    pub fn new(brain: ActorRef<BrainActor>, router: ActorRef<RouterActor>) -> Self {
         CompassActor {
+            brain,
             router,
-            _brain: brain,
             heading: 0.0,
             pitch: 0.0,
             roll: 0.0,
@@ -79,42 +78,32 @@ impl CompassActor {
         Ok(())
     }
 
-    pub fn check_envelope(&self, envelope: &Arc<Envelope>) -> Result<()> {
-        if envelope.src.is_none() || envelope.msg_type.is_none() {
-            return Err(anyhow::anyhow!("Envelope missing required fields"));
-        }
-        Ok(())
-    }
 }
 
 impl Actor for CompassActor {
     type Args = Self;
     type Error = anyhow::Error;
 
-    async fn on_start(state: Self::Args, actor_ref: ActorRef<Self>) -> Result<Self, Self::Error> {
+    async fn on_start(
+        mut state: Self::Args,
+        actor_ref: ActorRef<Self>,
+    ) -> Result<Self, Self::Error> {
         info!("CompassActor started");
-        state
-            .router
-            .tell(Register {
-                actor_ref: actor_ref.recipient(),
-                description: format!("CompassActor"),
-            })
-            .await?;
-
+        // Register with the router to receive CompassEvent messages
+        state.router.tell(RegisterTwin {
+            id: fnv::fnv1a_32("compass"),
+            recipient: actor_ref.clone().recipient(),
+        }).await.log_error("Failed to register CompassActor with router");
         Ok(state)
     }
 }
 
-impl Message<RouterMessage> for CompassActor {
+impl Message<FromDevice> for CompassActor {
     type Reply = ();
 
-    async fn handle(
-        &mut self,
-        msg: RouterMessage,
-        _ctx: &mut Context<Self, Self::Reply>,
-    ) -> Self::Reply {
-        if Some(CompassEvent::MSG_ID) == msg.envelope.msg_type {
-            let _ = self.handle_compass_event(msg.envelope.clone()).await;
+    async fn handle(&mut self, msg: FromDevice, _ctx: &mut Context<Self, Self::Reply>) {
+        if let Err(e) = self.handle_compass_event(msg.envelope).await {
+            warn!("Failed to handle compass event: {}", e);
         }
     }
 }

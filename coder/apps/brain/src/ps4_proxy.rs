@@ -62,7 +62,7 @@ impl Message<Ps4Event> for Ps4Proxy {
             let _ = self.listener.tell(BrainRequest::SetSteer(self.driver_steer)).await;
         }
         if msg.axis_ly.is_some() {
-            self.drive_speed = (msg.axis_ly.unwrap_or(0) * 400) / 128;
+            self.drive_speed = -(msg.axis_ly.unwrap_or(0) * 400) / 128;
             debug!("Ps4Proxy: axis_ly changed, sending BrainRequest::SetSpeed({})", self.drive_speed);
             let _ = self.listener.tell(BrainRequest::SetSpeed(self.drive_speed)).await;
         }

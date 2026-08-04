@@ -30,7 +30,10 @@ use log::info;
 
 use brain::BrainActor;
 
-use crate::{hoverboard_proxy::HoverboardProxy, serial::SerialActor, udp::UdpActor};
+use crate::{
+    brain::BrainData, compass::CompassActor, cutter::CutterActor,
+    hoverboard_proxy::HoverboardProxy, imu::ImuActor, serial::SerialActor, udp::UdpActor,
+};
 
 pub fn display_envelope(envelope: &Envelope, context: &str) {
     info!(
@@ -75,36 +78,37 @@ async fn main() -> anyhow::Result<()> {
     let group: Ipv4Addr = args.group.parse()?;
 
     let router_ref = router::RouterActor::spawn(router::RouterActor::new());
+    let brain_prepared = BrainActor::prepare();
+
+    let hb_ref = HoverboardProxy::spawn(HoverboardProxy::new(brain_prepared.actor_ref().clone(),router_ref.clone()));
+    let cutter_ref = CutterActor::spawn(CutterActor::new(brain_prepared.actor_ref().clone(),router_ref.clone()));
+    let compass_ref = CompassActor::spawn(CompassActor::new(brain_prepared.actor_ref().clone(),router_ref.clone()));
+    let imu_ref = ImuActor::spawn(ImuActor::new(brain_prepared.actor_ref().clone(),router_ref.clone()));
+    let serial_usb0 = SerialActor::spawn(SerialActor::new("/dev/ttyUSB0", router_ref.clone()));
+    let serial_usb1 = SerialActor::spawn(SerialActor::new("/dev/ttyUSB1", router_ref.clone()));
     let udp_ref = UdpActor::spawn(UdpActor::new(router_ref.clone()));
     let mc_ref = multicast::MulticastActor::spawn(multicast::MulticastActor::new(
-        router_ref.clone().recipient(),
         udp_ref.clone(),
-    ));
-    let hb_ref = HoverboardProxy::prepare().actor_ref();
-    let _brain_ref = BrainActor::spawn(BrainActor::new(hb_ref.clone()));
-    let _serial_usb0 = SerialActor::spawn(SerialActor::new("/dev/ttyUSB0"));
-    let _serial_usb1 = SerialActor::spawn(SerialActor::new("/dev/ttyUSB1"));
-    let _hoverboard_proxy = hb_ref.spawn(HoverboardProxy::new(
         router_ref.clone(),
-        _brain_ref.clone(),
     ));
-    _serial_usb0
-        .tell(brain::EnvelopeHandlerRequest::SetListener {
-            endpoint: fnv::fnv1a_32("hoverboard"),
-            recipient: _hoverboard_proxy.clone().recipient(),
-        })
-        .await?;
-    _serial_usb1
-        .tell(brain::EnvelopeHandlerRequest::SetListener {
-            endpoint: fnv::fnv1a_32("hoverboard"),
-            recipient: _hoverboard_proxy.clone().recipient(),
-        })
-        .await?;
 
-    let _ps4_proxy =
-        ps4_proxy::Ps4Proxy::spawn(ps4_proxy::Ps4Proxy::new(_brain_ref.clone().recipient()));
-    let _ps4_reader =
-        ps4_reader::Ps4Bridge::spawn(ps4_reader::Ps4Bridge::new(_ps4_proxy.clone().recipient()));
+    let ps4_proxy = ps4_proxy::Ps4Proxy::spawn(ps4_proxy::Ps4Proxy::new(
+        brain_prepared.actor_ref().clone().recipient(),
+    ));
+    let ps4_reader =
+        ps4_reader::Ps4Bridge::spawn(ps4_reader::Ps4Bridge::new(ps4_proxy.clone().recipient()));
+
+    let brain_ref = brain_prepared.actor_ref().clone();
+    brain_prepared.spawn(BrainActor {
+        machine: None,
+        hoverboard_ref: hb_ref.clone(),
+        cutter_ref: cutter_ref.clone(),
+        compass_ref: compass_ref.clone(),
+        imu_ref: imu_ref.clone(),
+        ps4_ref: ps4_proxy.clone(),
+    });
+
+
 
     // Start transports
     mc_ref
@@ -120,6 +124,17 @@ async fn main() -> anyhow::Result<()> {
             bind_addr: Ipv4Addr::UNSPECIFIED,
         })
         .await?;
+
+    brain_ref.link(&hb_ref).await;
+    brain_ref.link(&cutter_ref).await;
+    brain_ref.link(&compass_ref).await;
+    brain_ref.link(&imu_ref).await;
+    brain_ref.link(&ps4_proxy).await;
+    brain_ref.link(&ps4_reader).await;
+    brain_ref.link(&udp_ref).await;
+    brain_ref.link(&mc_ref).await;
+    brain_ref.link(&serial_usb0).await;
+    brain_ref.link(&serial_usb1).await; 
 
     info!("Brain running. Press Ctrl+C to stop.");
     tokio::signal::ctrl_c().await?;
