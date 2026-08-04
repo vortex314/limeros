@@ -201,9 +201,13 @@ void McActor::on_message(const ActorMessage &msg)
 static Buffer msg_buffer(1000);
 void McActor::send_event(const Msg &msg)
 {
-    if (msg.encode(msg_buffer) != 0 || !_broker_addr)
+    if (msg.encode(msg_buffer) != 0 )
     {
         ERROR("Failed to encode message of type %s", msg.msg_name());
+        return;
+    }
+    if (  !_broker_addr) {
+        ERROR("No broker yet for %s", msg.msg_name());
         return;
     }
     Envelope envelope;

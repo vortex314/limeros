@@ -1,0 +1,22 @@
+<?xml version="1.0"?>
+<mavlink>
+    <include>common.xml</include>
+    <version>3</version>
+    <dialect>200</dialect> <!-- Custom Dialect ID -->
+
+    <enums>
+        <enum name="CUSTOM_SENSOR_STATUS">
+            <entry value="0" name="CUSTOM_SENSOR_OK" description="Sensor operational"/>
+            <entry value="1" name="CUSTOM_SENSOR_ERROR" description="Sensor fault detected"/>
+        </enum>
+    </enums>
+
+    <messages>
+        <!-- Custom Message IDs are typically allocated in the 40000+ range -->
+        <message id="40001" name="HOVERBOARD_REQUEST">
+            <description>Set hoverboard drive speed and steer</description>
+            <field type="int32_t" name="speed" units="m/s">Speed command for the hoverboard</field>
+            <field type="int32_t" name="steer" units="m/s">Steering command for the hoverboard</field>
+        </message>
+    </messages>
+</mavlink>

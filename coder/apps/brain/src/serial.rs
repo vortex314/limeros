@@ -103,14 +103,15 @@ fn spawn_serial_task(
                                     } else {
                                         buf.push(b);
                                         if buf.len() > 4096 {
-                                            info!("Serial {} {}", port_path, String::from_utf8_lossy(&buf).to_string());
+                                           // info!("Serial {} {}", port_path, String::from_utf8_lossy(&buf).to_string());
                                             // split per newline and send to log, but don't send to router
                                             /*let log_lines: Vec<String> = buf
                                                 .split(|&x| x == b'\n')
                                                 .map(|line| {
                                                     String::from_utf8_lossy(line).to_string()
                                                 })
-                                                .collect();
+                                                                              break 'reader;
+  .collect();
                                             for line in log_lines {
                                                 warn!("Serial log from {port_path}: {}", line);
                                             }*/
