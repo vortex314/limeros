@@ -1,4 +1,4 @@
-use generated::generated::{id_to_string, Envelope};
+use generated::generated::{Envelope, id_to_string, opt_id_to_string};
 use kameo::prelude::*;
 use log::{info, warn};
 use std::{collections::HashMap, sync::Arc};
@@ -93,9 +93,11 @@ impl Message<FromDevice> for RouterActor {
             }
         } else {
             warn!(
-                "RouterActor: No recipients found for FromDevice with id {} ({})",
+                "RouterActor: No recipients found for FromDevice with id {} ({}) from {} ({:?})",
                 id_to_string(msg.id),
-                msg.id
+                msg.id,
+                opt_id_to_string(msg.envelope.src),
+                msg.envelope.src
             );
         }
     }

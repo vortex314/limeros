@@ -8,6 +8,7 @@ use anyhow::Result;
 use generated::generated::{EndpointAnnounce, Envelope};
 use kameo::prelude::*;
 use log::{debug, error, info, warn};
+use statig::awaitable::State;
 use tokio::{io, sync::Mutex};
 
 use crate::{
@@ -32,6 +33,7 @@ pub struct SerialActor {
     serial_port: Arc<Mutex<Option<Box<dyn serialport::SerialPort>>>>,
     router: ActorRef<crate::router::RouterActor>,
     registered_device: Option<u32>,
+    serial_handle: Option<tokio::task::JoinHandle<()>>,
 }
 
 impl SerialActor {
@@ -41,6 +43,7 @@ impl SerialActor {
             serial_port: Arc::new(Mutex::new(None)),
             router,
             registered_device: None,
+            serial_handle: None,
         }
     }
 }
@@ -54,7 +57,7 @@ fn spawn_serial_task(
         let retry_delay = Duration::from_secs(5);
 
         loop {
-            debug!("Serial: attempting to open {port_path} ...");
+            info!("Serial: attempting to open {port_path} ...");
 
             match serialport::new(&port_path, 115200)
                 .timeout(Duration::from_millis(50))
@@ -163,9 +166,22 @@ impl Actor for SerialActor {
 
         // Channel: blocking reader → async forwarder → actor mailbox
 
-        let _serial_handle = spawn_serial_task(port_path, serial_port, own_ref);
+        let serial_handle = Some(spawn_serial_task(port_path, serial_port, own_ref));
+        let state = SerialActor {
+            serial_handle,
+            ..state
+        };
 
         Ok(state)
+    }
+
+    async fn on_stop(&mut self, _actor_ref: WeakActorRef<Self>, reason: ActorStopReason) -> Result<(), Self::Error> {
+        info!("Serial: stopping serial actor for {} because {:?}", self.port_path, reason);
+        if let Some(handle) = self.serial_handle.take() {
+            info!("Serial: stopping serial task for {} because {:?}", self.port_path, reason);
+            handle.abort();
+        }
+        Ok(())
     }
 }
 
