@@ -31,8 +31,7 @@ use log::info;
 use brain::BrainActor;
 
 use crate::{
-    brain::BrainData, compass::CompassActor, cutter::CutterActor,
-    hoverboard_proxy::HoverboardProxy, imu::ImuActor, serial::SerialActor, udp::UdpActor,
+    brain::{BrainData, ResultLog}, compass::CompassActor, cutter::CutterActor, hoverboard_proxy::HoverboardProxy, imu::ImuActor, serial::SerialActor, udp::UdpActor,
 };
 
 pub fn display_envelope(envelope: &Envelope, context: &str) {
@@ -139,5 +138,18 @@ async fn main() -> anyhow::Result<()> {
     info!("Brain running. Press Ctrl+C to stop.");
     tokio::signal::ctrl_c().await?;
     info!("Shutting down.");
+    // Stop actors
+    brain_ref.stop_gracefully().await.log_error("stop 1");
+    hb_ref.stop_gracefully().await.log_error("stop 1");
+    cutter_ref.stop_gracefully().await.log_error("stop 1");
+    compass_ref.stop_gracefully().await.log_error("stop 1");
+    imu_ref.stop_gracefully().await.log_error("stop 1");
+    ps4_proxy.stop_gracefully().await.log_error("stop 1");
+    ps4_reader.stop_gracefully().await.log_error("stop 1");
+    udp_ref.stop_gracefully().await.log_error("stop 1");
+    mc_ref.stop_gracefully().await.log_error("stop 1");
+    serial_usb0.stop_gracefully().await.log_error("stop 1");
+    serial_usb1.stop_gracefully().await.log_error("stop 1");
+    info!("Shutdown complete.");
     Ok(())
 }

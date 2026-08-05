@@ -247,11 +247,12 @@ fn parse_input_report(buf: &[u8], bluetooth: bool) -> Ps4Event {
 }
 pub struct Ps4Bridge {
     listener: Recipient<Ps4Event>,
+    handle: Option<tokio::task::JoinHandle<()>>,
 }
 
 impl Ps4Bridge {
     pub fn new(listener: Recipient<Ps4Event>) -> Self {
-        Ps4Bridge { listener }
+        Ps4Bridge { listener, handle: None }
     }
 
     fn find_controller(api: &HidApi) -> Result<(u16, u16)> {
@@ -356,8 +357,21 @@ impl Actor for Ps4Bridge {
         // No longer fails on_start if the controller isn't plugged in yet —
         // discovery, opening, and reconnection all happen inside the retry
         // loop now, same as the serial actor.
-        Self::spawn_receive_loop(state.listener.clone());
+        let handle = Self::spawn_receive_loop(state.listener.clone());
+        let state = Ps4Bridge {
+            listener: state.listener,
+            handle: Some(handle),
+        };
+
         Ok(state)
+    }
+
+    async fn on_stop(&mut self, _actor_ref: WeakActorRef<Self>, reason: ActorStopReason) -> Result<(), Self::Error> {
+        info!("Ps4Bridge stopping — HID discovery/read loop will be terminated because {:?}", reason);
+        if let Some(handle) = self.handle.take() {
+            handle.abort();
+        }
+        Ok(())
     }
 }
 
