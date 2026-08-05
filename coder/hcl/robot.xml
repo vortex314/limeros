@@ -1,22 +1,324 @@
 <?xml version="1.0"?>
 <mavlink>
-    <include>common.xml</include>
     <version>3</version>
     <dialect>200</dialect> <!-- Custom Dialect ID -->
 
     <enums>
         <enum name="CUSTOM_SENSOR_STATUS">
-            <entry value="0" name="CUSTOM_SENSOR_OK" description="Sensor operational"/>
-            <entry value="1" name="CUSTOM_SENSOR_ERROR" description="Sensor fault detected"/>
+            <entry value="0" name="CUSTOM_SENSOR_OK">
+                <description>Sensor operational</description>
+            </entry>
+            <entry value="1" name="CUSTOM_SENSOR_ERROR">
+                <description>Sensor fault detected</description>
+            </entry>
+        </enum>
+        <enum name="AUX_INPUT2_TYPE">
+            <entry value="0" name="AUX_INPUT2_TYPE_DISABLED">
+                <description>Disabled</description>
+            </entry>
+            <entry value="1" name="AUX_INPUT2_TYPE_NORMAL_POT">
+                <description>Normal Pot</description>
+            </entry>
+            <entry value="2" name="AUX_INPUT2_TYPE_MIDDLE_RESTING_POT">
+                <description>Middle Resting Pot</description>
+            </entry>
+            <entry value="3" name="AUX_INPUT2_TYPE_AUTO_DETECT">
+                <description>Auto-detect</description>
+            </entry>
         </enum>
     </enums>
 
     <messages>
         <!-- Custom Message IDs are typically allocated in the 40000+ range -->
         <message id="40001" name="HOVERBOARD_REQUEST">
-            <description>Set hoverboard drive speed and steer</description>
+            <description>Request command for hoverboard drive</description>
             <field type="int32_t" name="speed" units="m/s">Speed command for the hoverboard</field>
-            <field type="int32_t" name="steer" units="m/s">Steering command for the hoverboard</field>
+            <field type="int32_t" name="steer" units="deg">Steering command for the hoverboard</field>
+        </message>
+
+        <message id="40002" name="HOVERBOARD_REPLY">
+            <description>Reply for hoverboard drive</description>
+            <field type="int32_t" name="speed" units="m/s">Speed command for the hoverboard</field>
+            <field type="int32_t" name="steer" units="deg">Steering command for the hoverboard</field>
+        </message>
+
+        <message id="40003" name="GENERIC_REPLY">
+            <description>Reply for hoverboard request</description>
+            <field type="uint32_t" name="req_id">For request/reply matching, 0 if not a request/reply</field>
+            <field type="uint32_t" name="error_code">Error code, 0 if no error</field>
+            <field type="char[100]" name="message">Error message or additional information</field>
+            <field type="uint32_t" name="msg_type">Message type identifier, the original request</field>
+        </message>
+
+        <message id="40004" name="HOVERBOARD_EVENT">
+            <description>Telemetry emitted by the hoverboard</description>
+            <field type="int16_t" name="ctrl_mod">Control mode 1:Voltage 2:Speed 3:Torque</field>
+            <field type="int16_t" name="ctrl_typ">Control type 0:Commutation 1:Sinusoidal 2:FOC</field>
+            <field type="int16_t" name="cur_mot_max" units="A">Max phase current</field>
+            <field type="int16_t" name="rpm_mot_max" units="rpm">Max motor RPM</field>
+            <field type="int16_t" name="fi_weak_ena">Enable field weakening 0:OFF 1:ON</field>
+            <field type="int16_t" name="fi_weak_hi" units="rpm">Field weakening high RPM</field>
+            <field type="int16_t" name="fi_weak_lo" units="rpm">Field weakening low RPM</field>
+            <field type="int16_t" name="fi_weak_max" units="A">Field weakening max current (FOC only)</field>
+            <field type="int16_t" name="phase_adv_max_deg" units="deg">Max phase advance angle (SIN only)</field>
+            <field type="int16_t" name="input1_raw">Input1 raw value</field>
+            <field type="int16_t" name="input1_typ">Input1 type 0:Disabled, 1:Normal Pot, 2:Middle Resting Pot, 3:Auto-detect</field>
+            <field type="int16_t" name="input1_min">Input1 minimum value</field>
+            <field type="int16_t" name="input1_mid">Input1 middle value</field>
+            <field type="int16_t" name="input1_max">Input1 maximum value</field>
+            <field type="int16_t" name="input1_cmd">Input1 command value</field>
+            <field type="int16_t" name="input2_raw">Input2 raw value</field>
+            <field type="int16_t" name="input2_typ">Input2 type 0:Disabled, 1:Normal Pot, 2:Middle Resting Pot, 3:Auto-detect</field>
+            <field type="int16_t" name="input2_min">Input2 minimum value</field>
+            <field type="int16_t" name="input2_mid">Input2 middle value</field>
+            <field type="int16_t" name="input2_max">Input2 maximum value</field>
+            <field type="int16_t" name="input2_cmd">Input2 command value</field>
+            <field type="int16_t" name="aux_input1_raw">Aux input1 raw value</field>
+            <field type="int16_t" name="aux_input1_typ">Aux input1 type 0:Disabled, 1:Normal Pot, 2:Middle Resting Pot, 3:Auto-detect</field>
+            <field type="int16_t" name="aux_input1_min">Aux input1 minimum value</field>
+            <field type="int16_t" name="aux_input1_mid">Aux input1 middle value</field>
+            <field type="int16_t" name="aux_input1_max">Aux input1 maximum value</field>
+            <field type="int16_t" name="aux_input1_cmd">Aux input1 command value</field>
+            <field type="int16_t" name="aux_input2_raw">Aux input2 raw value</field>
+            <field type="uint8_t" name="aux_input2_typ" enum="AUX_INPUT2_TYPE">Aux input2 type</field>
+            <field type="int16_t" name="aux_input2_min">Aux input2 minimum value</field>
+            <field type="int16_t" name="aux_input2_mid">Aux input2 middle value</field>
+            <field type="int16_t" name="aux_input2_max">Aux input2 maximum value</field>
+            <field type="int16_t" name="aux_input2_cmd">Aux input2 command value</field>
+            <field type="int16_t" name="dc_curr" units="cA">Total DC link current A *100</field>
+            <field type="int16_t" name="rdc_curr" units="cA">Right DC link current A *100</field>
+            <field type="int16_t" name="ldc_curr" units="cA">Left DC link current A *100</field>
+            <field type="int16_t" name="cmdl" units="rpm">Left motor command RPM</field>
+            <field type="int16_t" name="cmdr" units="rpm">Right motor command RPM</field>
+            <field type="int16_t" name="spd_avg" units="rpm">Motor measured average RPM</field>
+            <field type="int16_t" name="spdl" units="rpm">Left motor measured RPM</field>
+            <field type="int16_t" name="spdr" units="rpm">Right motor measured RPM</field>
+            <field type="int16_t" name="filter_rate" units="cHz">Rate *10</field>
+            <field type="int16_t" name="spd_coef">Speed coefficient *10</field>
+            <field type="int16_t" name="str_coef">Steer coefficient *10</field>
+            <field type="int16_t" name="batv" units="cV">Calibrated battery voltage *100</field>
+            <field type="int16_t" name="temp" units="cdegC">Calibrated temperature C *10</field>
+        </message>
+
+        <message id="40005" name="CUTTER_REQUEST">
+            <description>Request command for cutter</description>
+            <field type="uint8_t" name="enabled">Enable or disable the cutter</field>
+            <field type="int32_t" name="rpm" units="rpm">Speed command for the cutter in RPM</field>
+        </message>
+
+        <message id="40006" name="CUTTER_REPLY">
+            <description>Reply for cutter request</description>
+            <field type="uint32_t" name="req_id">For request/reply matching, 0 if not a request/reply</field>
+            <field type="uint32_t" name="error_code">Error code, 0 if no error</field>
+            <field type="char[100]" name="message">Error message or additional information</field>
+            <field type="uint32_t" name="msg_type">Message type identifier, the original request</field>
+        </message>
+
+        <message id="40007" name="CUTTER_EVENT">
+            <description>Telemetry emitted by the cutter</description>
+            <field type="uint8_t" name="enabled">Cutter enabled or disabled</field>
+            <field type="int32_t" name="rpm" units="rpm">Current speed of the cutter in RPM</field>
+            <field type="float" name="current" units="A">Current drawn by the cutter in Amperes</field>
+            <field type="float" name="voltage" units="V">Voltage supplied to the cutter in Volts</field>
+            <field type="float" name="temperature" units="degC">Temperature of the cutter in Celsius</field>
+        </message>
+
+        <message id="40008" name="COMPASS_EVENT">
+            <description>Compass event message</description>
+            <field type="float" name="heading" units="deg">Heading in degrees</field>
+            <field type="float" name="pitch" units="deg">Pitch in degrees</field>
+            <field type="float" name="roll" units="deg">Roll in degrees</field>
+            <field type="float" name="mag_x" units="T">Magnetometer X axis in uT</field>
+            <field type="float" name="mag_y" units="T">Magnetometer Y axis in uT</field>
+            <field type="float" name="mag_z" units="T">Magnetometer Z axis in uT</field>
+            <field type="float" name="accel_x" units="m_s2">Accelerometer X axis in m/s^2</field>
+            <field type="float" name="accel_y" units="m_s2">Accelerometer Y axis in m/s^2</field>
+            <field type="float" name="accel_z" units="m_s2">Accelerometer Z axis in m/s^2</field>
+        </message>
+
+        <message id="40009" name="IMU_EVENT">
+            <description>IMU event message</description>
+            <field type="float" name="gyro_x" units="deg_s">Gyroscope X axis in deg/s</field>
+            <field type="float" name="gyro_y" units="deg_s">Gyroscope Y axis in deg/s</field>
+            <field type="float" name="gyro_z" units="deg_s">Gyroscope Z axis in deg/s</field>
+            <field type="float" name="accel_x" units="m_s2">Accelerometer X axis in m/s^2</field>
+            <field type="float" name="accel_y" units="m_s2">Accelerometer Y axis in m/s^2</field>
+            <field type="float" name="accel_z" units="m_s2">Accelerometer Z axis in m/s^2</field>
+        </message>
+
+        <message id="40010" name="US_EVENT">
+            <description>Ultrasonic sensor event message</description>
+            <field type="float" name="distance" units="m">Distance in meters</field>
+            <field type="float" name="temperature" units="degC">Temperature in Celsius</field>
+            <field type="int32_t" name="status">Status code, 0 if no error</field>
+        </message>
+
+        <message id="40011" name="PS4_EVENT">
+            <description>PS4 controller state event</description>
+            <field type="uint8_t" name="button_left">Left button pressed</field>
+            <field type="uint8_t" name="button_right">Right button pressed</field>
+            <field type="uint8_t" name="button_up">Up button pressed</field>
+            <field type="uint8_t" name="button_down">Down button pressed</field>
+            <field type="uint8_t" name="button_square">Square button pressed</field>
+            <field type="uint8_t" name="button_cross">Cross button pressed</field>
+            <field type="uint8_t" name="button_circle">Circle button pressed</field>
+            <field type="uint8_t" name="button_triangle">Triangle button pressed</field>
+            <field type="uint8_t" name="button_left_shoulder">Left shoulder button pressed</field>
+            <field type="uint8_t" name="button_right_shoulder">Right shoulder button pressed</field>
+            <field type="uint8_t" name="button_left_trigger">Left trigger pressed</field>
+            <field type="uint8_t" name="button_right_trigger">Right trigger pressed</field>
+            <field type="uint8_t" name="button_left_joystick">Left joystick button pressed</field>
+            <field type="uint8_t" name="button_right_joystick">Right joystick button pressed</field>
+            <field type="uint8_t" name="button_share">Share button pressed</field>
+            <field type="uint8_t" name="button_options">Options button pressed</field>
+            <field type="uint8_t" name="button_touchpad">Touchpad button pressed</field>
+            <field type="uint8_t" name="button_ps">PS button pressed</field>
+            <field type="int32_t" name="axis_lx">Left stick X axis</field>
+            <field type="int32_t" name="axis_ly">Left stick Y axis</field>
+            <field type="int32_t" name="axis_rx">Right stick X axis</field>
+            <field type="int32_t" name="axis_ry">Right stick Y axis</field>
+            <field type="int32_t" name="gyro_x" units="deg_s">Gyroscope X axis</field>
+            <field type="int32_t" name="gyro_y" units="deg_s">Gyroscope Y axis</field>
+            <field type="int32_t" name="gyro_z" units="deg_s">Gyroscope Z axis</field>
+            <field type="int32_t" name="accel_x" units="m_s2">Accelerometer X axis</field>
+            <field type="int32_t" name="accel_y" units="m_s2">Accelerometer Y axis</field>
+            <field type="int32_t" name="accel_z" units="m_s2">Accelerometer Z axis</field>
+            <field type="uint8_t" name="connected">Controller connected</field>
+            <field type="int32_t" name="battery_level" units="%">Battery level</field>
+            <field type="uint8_t" name="bluetooth">Connected over Bluetooth</field>
+            <field type="char[100]" name="debug">Debug string</field>
+            <field type="int32_t" name="temp" units="degC">Temperature</field>
+        </message>
+
+        <message id="40012" name="PS4_REQUEST">
+            <description>PS4 controller output command</description>
+            <field type="uint32_t" name="req_id">For request/reply matching, 0 if not a request/reply</field>
+            <field type="int32_t" name="rumble_small">Small rumble intensity</field>
+            <field type="int32_t" name="rumble_large">Large rumble intensity</field>
+            <field type="int32_t" name="led_red">LED red channel</field>
+            <field type="int32_t" name="led_green">LED green channel</field>
+            <field type="int32_t" name="led_blue">LED blue channel</field>
+            <field type="int32_t" name="led_flash_on">LED flash on duration</field>
+            <field type="int32_t" name="led_flash_off">LED flash off duration</field>
+        </message>
+
+        <message id="40013" name="SYS_REQUEST">
+            <description>System request message</description>
+            <field type="uint32_t" name="req_id">For request/reply matching, 0 if not a request/reply</field>
+            <field type="uint64_t" name="set_time" units="us">Set system time</field>
+            <field type="uint8_t" name="reboot">Reboot the device</field>
+            <field type="char[100]" name="console">Console command string</field>
+        </message>
+
+        <message id="40014" name="SYS_REPLY">
+            <description>System reply message</description>
+            <field type="uint32_t" name="req_id">For request/reply matching, 0 if not a request/reply</field>
+            <field type="int32_t" name="rc">Return code</field>
+            <field type="char[100]" name="message">Result message</field>
+        </message>
+
+        <message id="40015" name="SYS_EVENT">
+            <description>System event message</description>
+            <field type="uint64_t" name="utc" units="us">UTC timestamp</field>
+            <field type="uint64_t" name="uptime" units="ms">Uptime</field>
+            <field type="uint64_t" name="free_heap" units="bytes">Free heap</field>
+            <field type="uint64_t" name="flash_size" units="bytes">Flash size</field>
+            <field type="char[50]" name="cpu_board_type">CPU board type</field>
+            <field type="char[50]" name="build_date_time">Build date and time</field>
+        </message>
+
+        <message id="40016" name="PING_REQUEST">
+            <description>Ping request message</description>
+            <field type="uint32_t" name="req_id">For request/reply matching, 0 if not a request/reply</field>
+            <field type="uint64_t" name="timestamp" units="ms">Timestamp in milliseconds since epoch</field>
+        </message>
+
+        <message id="40017" name="PING_REPLY">
+            <description>Ping reply message</description>
+            <field type="uint32_t" name="req_id">For request/reply matching, 0 if not a request/reply</field>
+            <field type="uint64_t" name="timestamp" units="ms">Timestamp in milliseconds since epoch</field>
+        </message>
+
+        <message id="40018" name="BROKER_SUBSCRIBE_REQUEST">
+            <description>Subscribe to a message type from a source endpoint</description>
+            <field type="uint32_t" name="src">Source endpoint ID; 0 to subscribe to all sources</field>
+            <field type="uint32_t" name="msg_type">Message type ID; 0 to subscribe to all message types</field>
+        </message>
+
+        <message id="40019" name="WIFI_EVENT">
+            <description>Wifi event message</description>
+            <field type="char[50]" name="ip">IP address</field>
+            <field type="char[50]" name="gateway">Gateway address</field>
+            <field type="char[50]" name="netmask">Netmask</field>
+            <field type="char[50]" name="ssid">SSID</field>
+            <field type="char[50]" name="bssid">BSSID</field>
+            <field type="int32_t" name="channel">WiFi channel</field>
+            <field type="int32_t" name="rssi" units="dBm">Received signal strength</field>
+            <field type="char[50]" name="mac">MAC address</field>
+        </message>
+
+        <message id="40020" name="DEVICE_ALIVE_EVENT">
+            <description>Device alive event message</description>
+            <field type="char[50]" name="device">Device name</field>
+            <field type="char[50]" name="endpoint">Endpoint name</field>
+            <field type="uint64_t" name="timestamp" units="ms">Timestamp in milliseconds since epoch</field>
+        </message>
+
+        <message id="40021" name="MAX31855_EVENT">
+            <description>Max31855 thermocouple event message</description>
+            <field type="float" name="thermocouple_temp" units="degC">Thermocouple temperature in Celsius</field>
+            <field type="float" name="internal_temp" units="degC">Internal temperature in Celsius</field>
+            <field type="uint8_t" name="fault">Fault detected</field>
+            <field type="uint8_t" name="fault_short_vcc">Short to VCC detected</field>
+            <field type="uint8_t" name="fault_short_gnd">Short to GND detected</field>
+            <field type="uint8_t" name="fault_open_tc">Open thermocouple detected</field>
+        </message>
+
+        <message id="40022" name="HEATING_EVENT">
+            <description>Heating event message</description>
+            <field type="float" name="temperature_c" units="degC">Current temperature in Celsius</field>
+            <field type="float" name="setpoint_c" units="degC">Setpoint temperature in Celsius</field>
+            <field type="uint8_t" name="enabled">Heating enabled or disabled</field>
+            <field type="float" name="output_pct" units="%">Output percentage of the heating element</field>
+            <field type="uint8_t" name="heater_on">Heater is currently on or off</field>
+            <field type="uint8_t" name="fault">Fault detected in the heating system</field>
+            <field type="uint64_t" name="timestamp_ms" units="ms">Timestamp in milliseconds since epoch</field>
+        </message>
+
+        <message id="40023" name="HEATING_REQUEST">
+            <description>Heating request message</description>
+            <field type="float" name="setpoint_c" units="degC">Setpoint temperature in Celsius</field>
+            <field type="uint8_t" name="enabled">Enable or disable heating</field>
+            <field type="float" name="kp">Proportional gain for PID controller</field>
+            <field type="float" name="ki">Integral gain for PID controller</field>
+            <field type="float" name="kd">Derivative gain for PID controller</field>
+            <field type="uint8_t" name="reset_integral">Reset the integral term of the PID controller</field>
+        </message>
+
+        <message id="40024" name="ENVELOPE">
+            <description>Envelope message for encapsulating other messages</description>
+            <field type="uint32_t" name="src">Source endpoint name</field>
+            <field type="uint32_t" name="dst">Destination endpoint name</field>
+            <field type="uint32_t" name="msg_type">Message type name</field>
+            <field type="uint32_t" name="request_id">Request ID for matching request/reply</field>
+            <field type="uint32_t" name="instance_id">Instance ID for matching request/reply</field>
+            <field type="uint8_t[255]" name="payload">Serialized payload of the message</field>
+        </message>
+
+        <message id="40025" name="ENDPOINT_ANNOUNCE">
+            <description>Endpoint announce message for service discovery</description>
+            <field type="uint32_t" name="id">Unique identifier for the announcing endpoint</field>
+            <field type="char[50]" name="name">Name of the announcing endpoint</field>
+            <field type="char[100]" name="description">Description of the announcing endpoint</field>
+            <field type="uint32_t[16]" name="services">List of services provided by the endpoint</field>
+            <field type="uint32_t[16]" name="events">List of events emitted by the endpoint</field>
+            <field type="uint32_t[16]" name="replies">List of replies supported by the endpoint</field>
+            <field type="uint32_t[16]" name="subscribes">List of subscriptions for the endpoint</field>
+        </message>
+
+        <message id="40026" name="ENDPOINT_ANNOUNCE_REPLY">
+            <description>Endpoint announce reply message for service discovery</description>
+            <field type="uint64_t" name="utc" units="us">Timestamp in milliseconds since epoch</field>
         </message>
     </messages>
 </mavlink>

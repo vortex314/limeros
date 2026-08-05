@@ -279,6 +279,25 @@
             "presentation": {
                 "clear": true // <-- this line
             }
+        },
+        {
+            "label": "Mavlink codegen",
+            "type": "shell",
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "command": "bash",
+            "args": [
+                "./hcl/generate_mavlink.sh",
+                "c"
+            ],
+            "group": {
+                "kind": "build",
+                "isDefault": false
+            },
+            "presentation": {
+                "clear": true
+            }
         }
     ]
 }

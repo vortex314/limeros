@@ -15,3 +15,7 @@
 
 **/node_modules
 **/.embuild
+
+# MAVLink codegen virtualenv
+**/.venv-mavlink/
+
