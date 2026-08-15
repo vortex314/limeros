@@ -279,14 +279,14 @@ public:
         SRC = 0,
         DST = 1,
         MSG_TYPE = 2,
-        REQUEST_ID = 3,
+        SEQUENCE = 3,
         INSTANCE_ID = 4,
         PAYLOAD = 5,
     } FieldId;
     Option<uint32_t> src;// Source endpoint name
     Option<uint32_t> dst;// Destination endpoint name
     Option<uint32_t> msg_type;// Message type name
-    Option<uint32_t> request_id;// Request ID for matching request/reply
+    Option<uint32_t> sequence;// Request ID for matching request/reply
     Option<uint32_t> instance_id;// Instance ID for matching request/reply
     Option<std::vector<uint8_t>> payload;// Serialized payload of the message
 

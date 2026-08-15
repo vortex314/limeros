@@ -617,7 +617,7 @@ pub struct Envelope {
     pub msg_type: Option<u32>,
     /// Request ID for matching request/reply
     #[cbor(key = 3)]
-    pub request_id: Option<u32>,
+    pub sequence: Option<u32>,
     /// Instance ID for matching request/reply
     #[cbor(key = 4)]
     pub instance_id: Option<u32>,
@@ -633,7 +633,7 @@ impl Default for Envelope {
             src: None,
             dst: None,
             msg_type: None,
-            request_id: None,
+            sequence: None,
             instance_id: None,
             payload: None,
         }

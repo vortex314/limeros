@@ -18,7 +18,9 @@ mod ps4_proxy;
 mod ps4_reader;
 mod router;
 mod serial;
+mod uart_mux;
 mod udp;
+mod protocol;
 
 use std::net::Ipv4Addr;
 
@@ -31,7 +33,14 @@ use log::info;
 use brain::BrainActor;
 
 use crate::{
-    brain::{BrainData, ResultLog}, compass::CompassActor, cutter::CutterActor, hoverboard_proxy::HoverboardProxy, imu::ImuActor, serial::SerialActor, udp::UdpActor,
+    brain::{BrainData, ResultLog},
+    compass::CompassActor,
+    cutter::CutterActor,
+    hoverboard_proxy::HoverboardProxy,
+    imu::ImuActor,
+    serial::SerialActor,
+    uart_mux::{UartMuxActor, UartMuxConfig},
+    udp::UdpActor,
 };
 
 pub fn display_envelope(envelope: &Envelope, context: &str) {
@@ -64,6 +73,10 @@ struct Args {
 }
 
 // ── Main ───────────────────────────────────────────────────────────────────
+/// USB vendor ID of the `lm4f-uartd` 8-port UART multiplexer.
+pub const UART_MUX_VID: u16 = 0xc03e;
+/// USB product ID of the `lm4f-uartd` 8-port UART multiplexer.
+pub const UART_MUX_PID: u16 = 0xb007;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -78,26 +91,43 @@ async fn main() -> anyhow::Result<()> {
 
     let router_ref = router::RouterActor::spawn(router::RouterActor::new());
     let brain_prepared = BrainActor::prepare();
+    let brain_ref = brain_prepared.actor_ref().clone();
 
-    let hb_ref = HoverboardProxy::spawn(HoverboardProxy::new(brain_prepared.actor_ref().clone(),router_ref.clone()));
-    let cutter_ref = CutterActor::spawn(CutterActor::new(brain_prepared.actor_ref().clone(),router_ref.clone()));
-    let compass_ref = CompassActor::spawn(CompassActor::new(brain_prepared.actor_ref().clone(),router_ref.clone()));
-    let imu_ref = ImuActor::spawn(ImuActor::new(brain_prepared.actor_ref().clone(),router_ref.clone()));
+    let hb_ref = HoverboardProxy::spawn(HoverboardProxy::new(
+        brain_ref.clone(),
+        router_ref.clone(),
+    ));
+    let cutter_ref = CutterActor::spawn(CutterActor::new(
+        brain_ref.clone(),
+        router_ref.clone(),
+    ));
+    let compass_ref = CompassActor::spawn(CompassActor::new(
+        brain_ref.clone(),
+        router_ref.clone(),
+    ));
+    let imu_ref = ImuActor::spawn(ImuActor::new(
+        brain_ref.clone(),
+        router_ref.clone(),
+    ));
     let serial_usb0 = SerialActor::spawn(SerialActor::new("/dev/ttyUSB0", router_ref.clone()));
     let serial_usb1 = SerialActor::spawn(SerialActor::new("/dev/ttyUSB1", router_ref.clone()));
     let udp_ref = UdpActor::spawn(UdpActor::new(router_ref.clone()));
+    let uart_mux = UartMuxActor::spawn(UartMuxActor::new(router_ref.clone(), UartMuxConfig {
+        vid: UART_MUX_VID,
+        pid: UART_MUX_PID,
+        baud: 115200,
+    }));
     let mc_ref = multicast::MulticastActor::spawn(multicast::MulticastActor::new(
         udp_ref.clone(),
         router_ref.clone(),
     ));
 
     let ps4_proxy = ps4_proxy::Ps4Proxy::spawn(ps4_proxy::Ps4Proxy::new(
-        brain_prepared.actor_ref().clone().recipient(),
+        brain_ref.clone().recipient(),
     ));
     let ps4_reader =
         ps4_reader::Ps4Bridge::spawn(ps4_reader::Ps4Bridge::new(ps4_proxy.clone().recipient()));
 
-    let brain_ref = brain_prepared.actor_ref().clone();
     brain_prepared.spawn(BrainActor {
         machine: None,
         hoverboard_ref: hb_ref.clone(),
@@ -106,8 +136,6 @@ async fn main() -> anyhow::Result<()> {
         imu_ref: imu_ref.clone(),
         ps4_ref: ps4_proxy.clone(),
     });
-
-
 
     // Start transports
     mc_ref
@@ -133,7 +161,8 @@ async fn main() -> anyhow::Result<()> {
     brain_ref.link(&udp_ref).await;
     brain_ref.link(&mc_ref).await;
     brain_ref.link(&serial_usb0).await;
-    brain_ref.link(&serial_usb1).await; 
+    brain_ref.link(&serial_usb1).await;
+    brain_ref.link(&uart_mux).await;
 
     info!("Brain running. Press Ctrl+C to stop.");
     tokio::signal::ctrl_c().await?;

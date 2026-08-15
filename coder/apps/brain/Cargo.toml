@@ -21,4 +21,5 @@ statig ={ version="*", features =["async"]}
 serialport = "4"
 hidapi = "2"
 socket2 = { version = "0.6.5", features = ["all"] }
+tokio-serial="*"
 

@@ -50,7 +50,7 @@ impl Endpoint {
                 src: Some(self.id),
                 dst: None,
                 msg_type: Some(EndpointAnnounce::id()),
-                request_id: None,
+                sequence: None,
                 instance_id: None,
                 payload: Some(announce_payload),
             };
@@ -89,7 +89,7 @@ impl Endpoint {
             src: Some(self.id),
             dst: None,
             msg_type: Some(EndpointAnnounce::id()),
-            request_id: None,
+            sequence: None,
             instance_id: None,
             payload: Some(payload),
         };

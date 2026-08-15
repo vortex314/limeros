@@ -1,4 +1,4 @@
-use generated::generated::{Envelope, id_to_string, opt_id_to_string};
+use generated::generated::{id_to_string, opt_id_to_string, Envelope};
 use kameo::prelude::*;
 use log::{info, warn};
 use std::{collections::HashMap, sync::Arc};
@@ -40,7 +40,6 @@ pub struct UnRegisterTwin {
 pub struct RouterActor {
     to_device_list: HashMap<u32, Recipient<ToDevice>>,
     from_device_list: HashMap<u32, Vec<Recipient<FromDevice>>>,
-
 }
 
 impl RouterActor {
@@ -69,9 +68,8 @@ impl Message<ToDevice> for RouterActor {
                 .await;
         } else {
             warn!(
-                "RouterActor: No recipient found for ToDevice with id {} {}",
-                id_to_string(msg.id),
-                msg.id
+                "RouterActor: No recipient found for ToDevice with id '{}'",
+                id_to_string(msg.id)
             );
         }
     }
@@ -89,7 +87,8 @@ impl Message<FromDevice> for RouterActor {
             for recipient in recipients {
                 let _ = recipient
                     .tell(msg.clone())
-                    .await.log_error("Failed to send FromDevice message to recipient");
+                    .await
+                    .log_error("Failed to send FromDevice message to recipient");
             }
         } else {
             warn!(
@@ -112,7 +111,11 @@ impl Message<RegisterDevice> for RouterActor {
         _ctx: &mut Context<Self, Self::Reply>,
     ) -> Self::Reply {
         self.to_device_list.insert(msg.id, msg.recipient);
-        info!("Registered device with id {} ({})", id_to_string(msg.id), msg.id);
+        info!(
+            "Registered device with id {} ({})",
+            id_to_string(msg.id),
+            msg.id
+        );
     }
 }
 

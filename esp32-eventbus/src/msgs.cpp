@@ -1188,7 +1188,7 @@ int Envelope::encode(Buffer& buffer) const {
     if (src.is_some()) { fieldCount++; }
     if (dst.is_some()) { fieldCount++; }
     if (msg_type.is_some()) { fieldCount++; }
-    if (request_id.is_some()) { fieldCount++; }
+    if (sequence.is_some()) { fieldCount++; }
     if (instance_id.is_some()) { fieldCount++; }
     if (payload.is_some()) { fieldCount++; }
 
@@ -1209,9 +1209,9 @@ int Envelope::encode(Buffer& buffer) const {
         cbor_check(cbor_encode_uint(&mapEncoder, FieldId::MSG_TYPE));
         cbor_check(cbor_encode_uint(&mapEncoder, value));
     };
-    if ( request_id) {
-        const auto& value = *request_id;
-        cbor_check(cbor_encode_uint(&mapEncoder, FieldId::REQUEST_ID));
+    if ( sequence) {
+        const auto& value = *sequence;
+        cbor_check(cbor_encode_uint(&mapEncoder, FieldId::SEQUENCE));
         cbor_check(cbor_encode_uint(&mapEncoder, value));
     };
     if ( instance_id) {
@@ -1291,15 +1291,15 @@ int Envelope::decode(const Buffer& buffer) {
                     msg_type = ((uint32_t)val);
                 }
                 break;
-            case Envelope::FieldId::REQUEST_ID:
+            case Envelope::FieldId::SEQUENCE:
                 if (cbor_value_is_unsigned_integer(&mapValue)) {
                     uint64_t val;
                     cbor_value_get_uint64(&mapValue, &val);
-                    request_id = ((uint32_t)val);
+                    sequence = ((uint32_t)val);
                 } else if (cbor_value_is_negative_integer(&mapValue)) {
                     int64_t val;
                     cbor_value_get_int64(&mapValue, &val);
-                    request_id = ((uint32_t)val);
+                    sequence = ((uint32_t)val);
                 }
                 break;
             case Envelope::FieldId::INSTANCE_ID:

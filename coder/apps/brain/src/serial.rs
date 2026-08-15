@@ -13,7 +13,7 @@ use tokio::{io, sync::Mutex};
 
 use crate::{
     brain::ResultLog,
-    codec::{decode_frame, encode_frame},
+    codec::{decode_cobs_frame, encode_frame},
     router::{FromDevice, RegisterDevice, RouterActor, ToDevice},
 };
 
@@ -85,7 +85,7 @@ fn spawn_serial_task(
                                         if buf.is_empty() {
                                             continue;
                                         }
-                                        match decode_frame(&buf) {
+                                        match decode_cobs_frame(&buf) {
                                             Ok(raw) => {
                                                 if let Err(e) = frame_target
                                                     .tell(SerialInternalEvent::ReceivedFrame(

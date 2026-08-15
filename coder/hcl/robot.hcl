@@ -350,7 +350,7 @@ robot "ronald" {
     field "src" { id = 0 type = "uint32" description = "Source endpoint name" }
     field "dst" { id = 1 type = "uint32" description = "Destination endpoint name" }
     field "msg_type" { id = 2 type = "uint32" description = "Message type name" }
-    field "request_id" { id = 3 type = "uint32" description = "Request ID for matching request/reply" }
+    field "sequence" { id = 3 type = "uint32" description = "Request ID for matching request/reply" }
     field "instance_id" { id = 4 type = "uint32" description = "Instance ID for matching request/reply" }
     field "payload" { id = 5 type = "bytes" description = "Serialized payload of the message" }
   }

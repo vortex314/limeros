@@ -85,7 +85,7 @@ pub fn encode_frame(buffer: &[u8]) -> anyhow::Result<Vec<u8>> {
 }
 
 /// Decode a framed serial packet into an Envelope.
-pub fn decode_frame(raw: &[u8]) -> anyhow::Result<Vec<u8>> {
+pub fn decode_cobs_frame(raw: &[u8]) -> anyhow::Result<Vec<u8>> {
     let decoded = cobs_decode(raw)?;
     if decoded.len() < 2 {
         anyhow::bail!("Frame too short for CRC: {} byte(s)", decoded.len());

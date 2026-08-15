@@ -1,0 +1,58 @@
+// Auto-generated from robot.hcl — do not edit by hand.
+// Source file — method implementations for generated messages.
+// Messages are encoded as CBOR maps keyed by field id.
+// Uses TinyCBOR for CBOR encoding/decoding.
+#include "msgs.h"
+#include "cbor_codec.h"
+
+
+// ── Name lookup tables ─────────────────────────────────────────────────────
+
+std::unordered_map<uint32_t, const char*> id_to_name = {
+{%- for msg in messages %}
+    { {{ msg.id }}, "{{ msg.name }}" },
+{%- endfor %}
+{%- for ep in endpoints %}
+    { {{ ep.id }}, "{{ ep.name }}" },
+{%- endfor %}
+};
+
+const char *id_to_string(uint32_t msg_id)
+{
+  auto it = id_to_name.find(msg_id);
+  if (it != id_to_name.end())
+  {
+    return it->second;
+  }
+  return std::to_string(msg_id).c_str();
+}
+
+// ── Message encode/decode implementations ──────────────────────────────────
+
+{% for msg in messages %}
+
+int {{ msg.name }}::encode(Buffer& buffer) const {
+    buffer.clear();
+    CborEncoder encoder(buffer.data(), buffer.size());
+    encoder
+    .beginArray({{ msg.fields | length }})
+{%- for field in msg.fields %}
+    .write({{ field.name }})
+{%- endfor -%}
+    ;
+    return encoder.erc();
+}
+
+int {{ msg.name }}::decode(const Buffer& buffer) {
+    CborDecoder decoder(buffer.data(), buffer.size());
+   decoder
+    .beginArray({{ msg.fields | length }})
+{%- for field in msg.fields %}
+    .read({{ field.name }})
+{%- endfor -%}
+    ;
+       
+    return decoder.erc();
+}
+
+{% endfor %}

@@ -111,7 +111,13 @@
                 "../../hoverboard-firmware-hack-FOC/Inc/limero/msgs.h",
                 "-g",
                 "cpp_source.tera",
-                "../../hoverboard-firmware-hack-FOC/Src/limero/msgs.cpp"
+                "../../hoverboard-firmware-hack-FOC/Src/limero/msgs.cpp",
+                "-g",
+                "arduino_header.tera",
+                "../arduino_device/include/msgs.h",
+                "-g",
+                "arduino_source.tera",
+                "../arduino_device/src/msgs.cpp"
             ],
             "group": {
                 "kind": "build",

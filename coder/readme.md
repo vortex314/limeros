@@ -151,3 +151,27 @@ Msg has_SysInfo()-> bool
 ```
 - subscribe to "dst/esp1/*" on "esp1" device / eventbus - dst/src / DEVICE / COMPONENT / MSG_TYPE / FORMAT
 - Home assistant only permits subsription to message type
+
+# MAVLINK trial 
+## MAVLINK PRO
+- good concepts and features
+- via serial, udp and tcp
+- one central schema repo and source for c++ and rust
+- simple structure
+- fixed buffer
+- sequence number
+- heartbeat
+- different routers available with learning mode
+- many tools for control remotely
+- general parameter settings
+- versioning
+- simple system and component id
+- crc and framing 
+## MAVLINK CON
+- Some missing features
+- no destination or target field, it's in the payload with the result that routing is very difficult
+- no optional fields
+- no intermediate representation possible for debug
+- easily break backward compatibility
+- fixed buffer , no flexible length for strings
+- the standard messages are complex to fit in specific use cases
