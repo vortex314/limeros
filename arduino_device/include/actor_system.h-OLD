@@ -1,0 +1,316 @@
+#pragma once
+#include <Arduino.h>
+#include <string.h> // for strncpy / memcpy
+#include <queue>
+#include <optional>
+#include <messages.h>
+
+// ===================== Configuration =====================
+#ifndef MAX_ACTORS
+#define MAX_ACTORS 8
+#endif
+
+#ifndef MAX_MESSAGES
+#define MAX_MESSAGES 16
+#endif
+
+// constexpr for FNV hashing of strings at compile time
+constexpr uint32_t fnv1a_32(const char *str, size_t len, uint32_t hash = 0x811c9dc5)
+{
+    return (len == 0) ? hash : fnv1a_32(str + 1, len - 1, (hash ^ static_cast<uint32_t>(*str)) * 0x01000193);
+}
+
+#define FNV1A32(str) (fnv1a_32(str, sizeof(str) - 1))
+
+class InnerMsg
+{
+    uint32_t _msg_type;
+
+public:
+    static constexpr const char *MSG_STR = "InnerMsg";
+    static constexpr uint32_t MSG_ID = FNV1A32(MSG_STR);
+    virtual uint32_t msg_type() { return MSG_ID; }
+};
+
+class TimerMsg : public InnerMsg
+{
+public:
+    static constexpr const char *MSG_STR = "TimerMsg";
+    static constexpr uint32_t MSG_ID = FNV1A32(MSG_STR);
+
+    int timer_id;
+    TimerMsg(int id) : timer_id(id) {}
+    uint32_t msg_type() override { return MSG_ID; }
+};
+
+#include <optional.h>
+
+
+class ActorMsg
+{
+public:
+    uint8_t sender;
+    uint8_t receiver;
+    template <typename M>
+    Optional<M*> payload_get()
+    {
+        if (msg_type == M::MSG_ID)
+        {
+            return Optional<M*>(static_cast<M *>(msg));
+        }
+        return Optional<M*>();
+    }
+
+    template <typename M>
+    void payload_set(M *m)
+    {
+        msg_type = M::MSG_ID;
+        msg = m;
+    }
+    template <typename U>
+    void handle(std::function<void(const U* )> func) const {
+        if (msg_type == U::MSG_ID) {
+            func(static_cast<U *>(msg));
+        }
+    }
+
+private:
+    uint32_t msg_type;
+    InnerMsg *msg;
+};
+
+
+struct ActorMessage
+{
+    public:
+    uint8_t sender;
+    uint8_t receiver;
+    private:
+    uint32_t msg_type;
+    union {
+        TimerMsg timer_msg;
+        InnerMsg inner_msg;
+    };
+    template <typename U>
+    void handle(std::function<void(const U* )> func) const {
+        if (msg_type == U::MSG_ID) {
+            func(&timer_msg);
+        }
+    }
+};
+
+void fn()
+{
+    std::queue<ActorMsg> q;
+
+    auto tm = new TimerMsg(42);
+    Serial.println(tm->msg_type()); // prints 1
+    auto v = static_cast<InnerMsg *>(tm);
+    Serial.println(v->msg_type());        // prints 1
+    static_cast<TimerMsg *>(v)->timer_id; // prints 42
+    ActorMsg am;
+    am.payload_set( tm);
+    q.push(am);
+    auto am2 = q.front();
+    q.pop();
+
+    am2.handle<TimerMsg>([](const TimerMsg* tm) {
+        Serial.println(tm->timer_id); // prints 42
+    });
+
+    Optional<TimerMsg*> opt = am.payload_get<TimerMsg>();
+    am.handle<TimerMsg>([](const TimerMsg* tm) {
+        Serial.println(tm->timer_id); // prints 42
+    });
+    opt.handle_if([](const TimerMsg* tm) {
+        Serial.println(tm->timer_id); // prints 42
+    });
+    if (opt)
+    {
+        Serial.println((*opt)->timer_id); // prints 42
+    }
+    delete tm;
+}
+
+#include <messages.h>
+
+// ===================== Message =====================
+struct Message
+{
+    MsgType type = MsgType::None;
+    uint8_t sender = 0;   // 0 = system / anonymous
+    uint8_t receiver = 0; // 0 = invalid
+
+    MessagePayload payload;
+    Message() {}
+};
+
+// ===================== Helper creators =====================
+inline Message makeToggle(uint8_t from, uint8_t to)
+{
+    Message m;
+    m.type = MsgType::Toggle;
+    m.sender = from;
+    m.receiver = to;
+    return m;
+}
+
+inline Message makeSetInterval(uint8_t from, uint8_t to, uint16_t ms)
+{
+    Message m;
+    m.type = MsgType::SetInterval;
+    m.sender = from;
+    m.receiver = to;
+    m.setInterval.ms = ms;
+    return m;
+}
+
+inline Message makeLog(uint8_t from, uint8_t to, const char *txt)
+{
+    Message m;
+    m.type = MsgType::Log;
+    m.sender = from;
+    m.receiver = to;
+    strncpy(m.log.text, txt, sizeof(m.log.text) - 1);
+    m.log.text[sizeof(m.log.text) - 1] = '\0';
+    return m;
+}
+
+inline Message makeSensorData(uint8_t from, uint8_t to, float value, uint8_t id)
+{
+    Message m;
+    m.type = MsgType::SensorData;
+    m.sender = from;
+    m.receiver = to;
+    m.sensor.value = value;
+    m.sensor.id = id;
+    return m;
+}
+
+// ===================== Actor base class =====================
+class Actor
+{
+public:
+    uint8_t id = 0;
+
+    virtual void setup() {}                       // called once after registration
+    virtual void receive(const Message &msg) = 0; // mandatory
+    virtual void update() {}                      // optional (timers, polling…)
+
+    virtual ~Actor() {}
+};
+
+// ===================== Actor System =====================
+class ActorSystem
+{
+public:
+    // Register an actor → returns its ID (1 … MAX_ACTORS), or 0 on failure
+    uint8_t registerActor(Actor *actor)
+    {
+        if (!actor || numActors >= MAX_ACTORS)
+            return 0;
+
+        actor->id = ++numActors;
+        actors[actor->id] = actor;
+        actor->setup();
+        return actor->id;
+    }
+
+    // Send a ready-made message
+    bool send(const Message &msg)
+    {
+        if (queueCount >= MAX_MESSAGES)
+            return false;
+        if (msg.receiver == 0 || msg.receiver > numActors)
+            return false;
+
+        queue[queueTail] = msg;
+        queueTail = (queueTail + 1) % MAX_MESSAGES;
+        queueCount++;
+        return true;
+    }
+
+    // Convenience wrappers
+    bool sendToggle(uint8_t to, uint8_t from = 0)
+    {
+        return send(makeToggle(from, to));
+    }
+
+    bool sendSetInterval(uint8_t to, uint16_t ms, uint8_t from = 0)
+    {
+        return send(makeSetInterval(from, to, ms));
+    }
+
+    bool sendLog(uint8_t to, const char *text, uint8_t from = 0)
+    {
+        return send(makeLog(from, to, text));
+    }
+
+    // Broadcast to every registered actor
+    void broadcast(const Message &msg)
+    {
+        for (uint8_t i = 1; i <= numActors; ++i)
+        {
+            Message copy = msg;
+            copy.receiver = i;
+            send(copy);
+        }
+    }
+
+    // Process exactly one message
+    void processOne()
+    {
+        if (queueCount == 0)
+            return;
+
+        Message msg = queue[queueHead];
+        queueHead = (queueHead + 1) % MAX_MESSAGES;
+        queueCount--;
+
+        if (msg.receiver >= 1 && msg.receiver <= numActors)
+        {
+            actors[msg.receiver]->receive(msg);
+        }
+    }
+
+    // Drain the whole queue
+    void processAll()
+    {
+        while (queueCount > 0)
+        {
+            processOne();
+        }
+    }
+
+    // Call update() on every actor
+    void updateAll()
+    {
+        for (uint8_t i = 1; i <= numActors; ++i)
+        {
+            if (actors[i])
+                actors[i]->update();
+        }
+    }
+
+    // Typical main-loop helper
+    void run()
+    {
+        processAll();
+        updateAll();
+    }
+
+    // Diagnostics
+    uint8_t actorCount() const { return numActors; }
+    uint8_t queueSize() const { return queueCount; }
+
+private:
+    Actor *actors[MAX_ACTORS + 1] = {}; // index 1 … MAX_ACTORS
+    Message queue[MAX_MESSAGES];
+    uint8_t queueHead = 0;
+    uint8_t queueTail = 0;
+    uint8_t queueCount = 0;
+    uint8_t numActors = 0;
+};
+
+// Global instance
+extern ActorSystem actor_system;
