@@ -40,23 +40,14 @@ public:
     virtual uint32_t msg_id() const { return MSG_ID; };
     virtual const char *msg_name() const { return MSG_NAME; };
 
-    typedef enum FieldId {
-{%- for field in msg.fields %}
-        {{ field.name | upper }} = {{ field.id }},
-{%- endfor %}
-    } FieldId;
-
 {%- for field in msg.fields %}
     Option<{{ field.cpp_type }}> {{ field.name }};     {%- if field.description -%}
             // {{ field.description }}
 {%- endif -%}
 {%- endfor %}
 
-    /// Serialize this message into a CBOR map keyed by field id.
     int encode(Buffer& buffer) const;
-
-    /// Deserialize a {{ msg.name }} from a CBOR map value.
-    int decode(const Buffer& buffer);
+    int decode(Buffer& buffer);
 };
 
 {% endfor %}

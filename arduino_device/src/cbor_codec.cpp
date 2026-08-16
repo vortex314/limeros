@@ -2,8 +2,10 @@
 
 #include <string.h>
 
-CborEncoder::CborEncoder(uint8_t *buffer, size_t capacity)
-    : buf(buffer), cap(capacity), len(0), _last_error(0) {}
+CborEncoder::CborEncoder(Buffer &buffer)
+    : _buffer(buffer), _last_error(0) {
+      _buffer.clear();
+    }
 
 bool CborEncoder::ok() const
 {
@@ -17,12 +19,12 @@ int CborEncoder::error() const
 
 size_t CborEncoder::size() const
 {
-  return len;
+  return _buffer.size();
 }
 
 const uint8_t *CborEncoder::data() const
 {
-  return buf;
+  return _buffer.data();
 }
 
 CborEncoder &CborEncoder::beginMap(uint32_t count)
@@ -141,12 +143,11 @@ bool CborEncoder::putByte(uint8_t b)
 {
   if (_last_error != 0)
     return false;
-  if (len >= cap)
+  if (!_buffer.write(b))
   {
     _last_error = 1;
     return false;
   }
-  buf[len++] = b;
   return true;
 }
 
@@ -154,15 +155,10 @@ bool CborEncoder::putBytes(const uint8_t *p, size_t n)
 {
   if (_last_error != 0)
     return false;
-  if (n > cap - len)
+  if (!_buffer.write(p, n))
   {
     _last_error = 1;
     return false;
-  }
-  if (n > 0)
-  {
-    memcpy(buf + len, p, n);
-    len += n;
   }
   return true;
 }
@@ -216,15 +212,14 @@ bool CborEncoder::writeHead(uint8_t major, uint32_t value)
   return putByte((uint8_t)(mt | 26)) && putU32(value);
 }
 
-static bool cborSkipItem(const uint8_t *data, size_t len, size_t &pos, int depth);
+static bool cborSkipItem(Buffer& data, size_t &pos, int depth);
 
-static bool cborReadHeader(const uint8_t *data,
-                           size_t len,
+static bool cborReadHeader(Buffer& data,
                            size_t &pos,
                            uint8_t &major,
                            uint32_t &value)
 {
-  if (pos >= len)
+  if (pos >= data.size())
   {
     return false;
   }
@@ -241,7 +236,7 @@ static bool cborReadHeader(const uint8_t *data,
 
   if (ai == 24)
   {
-    if (pos + 1 > len)
+    if (pos + 1 > data.size())
     {
       return false;
     }
@@ -253,7 +248,7 @@ static bool cborReadHeader(const uint8_t *data,
 
   if (ai == 25)
   {
-    if (pos + 2 > len)
+    if (pos + 2 > data.size())
     {
       return false;
     }
@@ -266,7 +261,7 @@ static bool cborReadHeader(const uint8_t *data,
 
   if (ai == 26)
   {
-    if (pos + 4 > len)
+    if (pos + 4 > data.size())
     {
       return false;
     }
@@ -281,7 +276,7 @@ static bool cborReadHeader(const uint8_t *data,
 
   if (ai == 27)
   {
-    if (pos + 8 > len)
+    if (pos + 8 > data.size())
     {
       return false;
     }
@@ -308,8 +303,7 @@ static bool cborReadHeader(const uint8_t *data,
 
 static bool cborSkipContent(uint8_t major,
                             uint32_t value,
-                            const uint8_t *data,
-                            size_t len,
+                            Buffer& data,
                             size_t &pos,
                             int depth)
 {
@@ -327,7 +321,7 @@ static bool cborSkipContent(uint8_t major,
 
   case 2: // byte string
   case 3: // text string
-    if (value > len - pos)
+    if (value > data.size() - pos)
     {
       return false;
     }
@@ -336,14 +330,14 @@ static bool cborSkipContent(uint8_t major,
     return true;
 
   case 4: // array
-    if (value > len - pos)
+    if (value > data.size() - pos)
     {
       return false;
     }
 
     for (uint32_t i = 0; i < value; ++i)
     {
-      if (!cborSkipItem(data, len, pos, depth + 1))
+      if (!cborSkipItem(data, pos, depth + 1))
       {
         return false;
       }
@@ -352,19 +346,19 @@ static bool cborSkipContent(uint8_t major,
     return true;
 
   case 5: // map
-    if (value > (len - pos) / 2)
+    if (value > (data.size() - pos) / 2)
     {
       return false;
     }
 
     for (uint32_t i = 0; i < value; ++i)
     {
-      if (!cborSkipItem(data, len, pos, depth + 1))
+      if (!cborSkipItem(data, pos, depth + 1))
       {
         return false;
       }
 
-      if (!cborSkipItem(data, len, pos, depth + 1))
+      if (!cborSkipItem(data, pos, depth + 1))
       {
         return false;
       }
@@ -373,31 +367,29 @@ static bool cborSkipContent(uint8_t major,
     return true;
 
   case 6: // tag
-    return cborSkipItem(data, len, pos, depth + 1);
+    return cborSkipItem(data, pos, depth + 1);
 
   default:
     return false;
   }
 }
 
-static bool cborSkipItem(const uint8_t *data,
-                         size_t len,
+static bool cborSkipItem(Buffer& data,
                          size_t &pos,
                          int depth)
 {
   uint8_t major;
   uint32_t value;
 
-  if (!cborReadHeader(data, len, pos, major, value))
+  if (!cborReadHeader(data, pos, major, value))
   {
     return false;
   }
 
-  return cborSkipContent(major, value, data, len, pos, depth);
+  return cborSkipContent(major, value, data, pos, depth);
 }
 
-bool cborFindBool(const uint8_t *data,
-                  size_t len,
+bool cborFindBool(Buffer& data,
                   const char *key,
                   bool &out)
 {
@@ -405,7 +397,7 @@ bool cborFindBool(const uint8_t *data,
   uint8_t major;
   uint32_t count;
 
-  if (!cborReadHeader(data, len, pos, major, count))
+  if (!cborReadHeader(data, pos, major, count))
   {
     return false;
   }
@@ -415,7 +407,7 @@ bool cborFindBool(const uint8_t *data,
     return false;
   }
 
-  if (count > len)
+  if (count > data.size() - pos)
   {
     return false;
   }
@@ -427,7 +419,7 @@ bool cborFindBool(const uint8_t *data,
     uint8_t keyMajor;
     uint32_t keyInfo;
 
-    if (!cborReadHeader(data, len, pos, keyMajor, keyInfo))
+    if (!cborReadHeader(data, pos, keyMajor, keyInfo))
     {
       return false;
     }
@@ -436,13 +428,13 @@ bool cborFindBool(const uint8_t *data,
 
     if (keyMajor == 3)
     {
-      if (keyInfo > len - pos)
+      if (keyInfo > data.size() - pos)
       {
         return false;
       }
 
       if (keyInfo == (uint32_t)keyLen &&
-          memcmp(data + pos, key, keyLen) == 0)
+          memcmp(data.data() + pos, key, keyLen) == 0)
       {
         match = true;
       }
@@ -451,7 +443,7 @@ bool cborFindBool(const uint8_t *data,
     }
     else
     {
-      if (!cborSkipContent(keyMajor, keyInfo, data, len, pos, 1))
+      if (!cborSkipContent(keyMajor, keyInfo, data, pos, 1))
       {
         return false;
       }
@@ -460,7 +452,7 @@ bool cborFindBool(const uint8_t *data,
     uint8_t vMajor;
     uint32_t vInfo;
 
-    if (!cborReadHeader(data, len, pos, vMajor, vInfo))
+    if (!cborReadHeader(data,  pos, vMajor, vInfo))
     {
       return false;
     }
@@ -489,7 +481,7 @@ bool cborFindBool(const uint8_t *data,
       }
     }
 
-    if (!cborSkipContent(vMajor, vInfo, data, len, pos, 1))
+    if (!cborSkipContent(vMajor, vInfo, data, pos, 1))
     {
       return false;
     }
@@ -502,8 +494,7 @@ bool cborFindBool(const uint8_t *data,
 // CborDecoder
 // ---------------------------------------------------------------------------
 
-CborDecoder::CborDecoder(const uint8_t *buffer, size_t length)
-    : buf(buffer), len(length), pos(0), _last_error(0) {}
+
 
 bool CborDecoder::ok() const
 {
@@ -515,10 +506,6 @@ int CborDecoder::error() const
   return _last_error;
 }
 
-size_t CborDecoder::offset() const
-{
-  return pos;
-}
 
 CborDecoder &CborDecoder::beginArray(uint32_t count)
 {
@@ -620,12 +607,12 @@ CborDecoder &CborDecoder::read(char *out, size_t maxLen)
   uint32_t n = 0;
   if (!readHeader(major, n))
     return *this;
-  if (major != 3 || n >= maxLen || pos + n > len)
+  if (major != 3 || n >= maxLen || pos + n > buf.size())
   {
     _last_error = 1;
     return *this;
   }
-  memcpy(out, buf + pos, n);
+  memcpy(out, buf.data() + pos, n);
   pos += n;
   out[n] = '\0';
   return *this;
@@ -635,12 +622,12 @@ CborDecoder &CborDecoder::read(bool &out)
 {
   if (_last_error != 0)
     return *this;
-  if (pos >= len)
+  if (pos >= buf.size())
   {
     _last_error = 1;
     return *this;
   }
-  uint8_t b = buf[pos];
+  uint8_t b = buf.data()[pos];
   if (b == 0xF4)
   {
     out = false;
@@ -661,7 +648,7 @@ CborDecoder &CborDecoder::readNull()
 {
   if (_last_error != 0)
     return *this;
-  if (pos >= len || buf[pos] != 0xF6)
+  if (pos >= buf.size() || buf.data()[pos] != 0xF6)
   {
     _last_error = 1;
     return *this;
@@ -678,13 +665,13 @@ CborDecoder &CborDecoder::read(uint8_t *out, size_t cap, size_t &outLen)
   uint32_t n = 0;
   if (!readHeader(major, n))
     return *this;
-  if (major != 2 || n > cap || pos + n > len)
+  if (major != 2 || n > cap || pos + n > buf.size())
   {
     _last_error = 1;
     return *this;
   }
   if (n > 0)
-    memcpy(out, buf + pos, n);
+    memcpy(out, buf.data() + pos, n);
   pos += n;
   outLen = n;
   return *this;
@@ -698,12 +685,12 @@ CborDecoder &CborDecoder::read(std::vector<uint8_t> &out)
   uint32_t n = 0;
   if (!readHeader(major, n))
     return *this;
-  if (major != 2 || pos + n > len)
+  if (major != 2 || pos + n > buf.size())
   {
     _last_error = 1;
     return *this;
   }
-  out.assign(buf + pos, buf + pos + n);
+  out.assign(buf.data() + pos, buf.data() + pos + n);
   pos += n;
   return *this;
 }
@@ -716,12 +703,12 @@ CborDecoder &CborDecoder::read(std::string &out)
   uint32_t n = 0;
   if (!readHeader(major, n))
     return *this;
-  if (major != 3 || pos + n > len)
+  if (major != 3 || pos + n > buf.size())
   {
     _last_error = 1;
     return *this;
   }
-  out.assign((const char *)(buf + pos), n);
+  out.assign((const char *)(buf.data() + pos), n);
   pos += n;
   return *this;
 }
@@ -756,7 +743,7 @@ bool CborDecoder::readHeader(uint8_t &major, uint32_t &value)
 {
   if (_last_error != 0)
     return false;
-  if (!cborReadHeader(buf, len, pos, major, value))
+  if (!cborReadHeader(buf, pos, major, value))
   {
     _last_error = 1;
     return false;

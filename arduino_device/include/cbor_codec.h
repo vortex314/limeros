@@ -11,7 +11,7 @@
 #include <type_traits>
 #include <vector>
 
-#include "msg.h"
+#include "buffer.h"
 
 // ---------------------------------------------------------------------------
 // CborEncoder - fluent CBOR writer.
@@ -23,9 +23,7 @@
 class CborEncoder
 {
 private:
-  uint8_t *buf;
-  size_t cap;
-  size_t len;
+  Buffer& _buffer;
   int _last_error;
 
   bool putByte(uint8_t b);
@@ -36,13 +34,13 @@ private:
   bool writeHead(uint8_t major, uint32_t value);
 
 public:
-  explicit CborEncoder(uint8_t *buffer, size_t capacity);
+  CborEncoder(Buffer &buffer);
 
   bool ok() const;
   int error() const;
   size_t size() const;
   const uint8_t *data() const;
-  int erc() const { return _last_error; }
+  int err() const { return _last_error; }
 
   // Containers.
   CborEncoder &beginMap(uint32_t count);
@@ -83,12 +81,12 @@ public:
 class CborDecoder
 {
 public:
-  explicit CborDecoder(const uint8_t *buffer, size_t length);
+  explicit CborDecoder(Buffer& buffer) : buf(buffer), _last_error(0) {};
 
   bool ok() const;
   int error() const;
   size_t offset() const;
-  int erc() const { return _last_error; }
+  int err() const { return _last_error; }
 
   // Containers. count is the expected number of elements; it is validated
   // against the count actually encoded in the CBOR stream.
@@ -114,12 +112,12 @@ public:
   {
     if (_last_error != 0)
       return *this;
-    if (pos >= len)
+    if (pos >= buf.size())
     {
-      _last_error = 1; // no space left in buffer
+      _last_error = 1; // no data left in buffer
       return *this;
     }
-    if (buf[pos] == 0xF6) // null
+    if (buf.data()[pos] == 0xF6) // null
     {
       ++pos;
       out.reset();
@@ -134,10 +132,8 @@ public:
 
 private:
   bool readHeader(uint8_t &major, uint32_t &value);
-
-  const uint8_t *buf;
-  size_t len;
   size_t pos;
+  Buffer& buf;
   int _last_error;
 };
 
@@ -146,12 +142,4 @@ bool cborFindBool(const uint8_t *data,
                   const char *key,
                   bool &out);
 
-// Simple usage example (not used by the firmware).
-inline void testCborEncoder()
-{
-  uint8_t buffer[256];
-  CborEncoder enc(buffer, sizeof(buffer));
-  enc.beginMap(2).write("key1").write((uint32_t)42).write("key2").write(true);
-  (void)enc.ok();
-}
 #endif // CBOR_CODEC_H

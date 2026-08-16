@@ -24,7 +24,7 @@ const char *id_to_string(uint32_t msg_id)
   {
     return it->second;
   }
-  return std::to_string(msg_id).c_str();
+  return "Unknown";
 }
 
 // ── Message encode/decode implementations ──────────────────────────────────
@@ -32,27 +32,21 @@ const char *id_to_string(uint32_t msg_id)
 {% for msg in messages %}
 
 int {{ msg.name }}::encode(Buffer& buffer) const {
-    buffer.clear();
-    CborEncoder encoder(buffer.data(), buffer.size());
-    encoder
+    return CborEncoder(buffer)
     .beginArray({{ msg.fields | length }})
 {%- for field in msg.fields %}
     .write({{ field.name }})
 {%- endfor -%}
-    ;
-    return encoder.erc();
+    .err();
 }
 
-int {{ msg.name }}::decode(const Buffer& buffer) {
-    CborDecoder decoder(buffer.data(), buffer.size());
-   decoder
+int {{ msg.name }}::decode(Buffer& buffer) {
+    return CborDecoder(buffer)
     .beginArray({{ msg.fields | length }})
 {%- for field in msg.fields %}
     .read({{ field.name }})
-{%- endfor -%}
-    ;
-       
-    return decoder.erc();
+{%- endfor %}
+    .err();
 }
 
 {% endfor %}

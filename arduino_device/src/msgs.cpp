@@ -4,7 +4,6 @@
 // Uses TinyCBOR for CBOR encoding/decoding.
 #include "msgs.h"
 #include "cbor_codec.h"
-#include <bits/basic_string.h>
 
 
 // ── Name lookup tables ─────────────────────────────────────────────────────
@@ -55,7 +54,7 @@ const char *id_to_string(uint32_t msg_id)
   {
     return it->second;
   }
-  return "unknown";
+  return "Unknown";
 }
 
 // ── Message encode/decode implementations ──────────────────────────────────
@@ -63,31 +62,24 @@ const char *id_to_string(uint32_t msg_id)
 
 
 int BrokerSubscribeRequest::encode(Buffer& buffer) const {
-    buffer.clear();
-    CborEncoder encoder(buffer.data(), buffer.size());
-    encoder
+    return CborEncoder(buffer)
     .beginArray(2)
     .write(src)
-    .write(msg_type);
-    return encoder.erc();
+    .write(msg_type).err();
 }
 
-int BrokerSubscribeRequest::decode(const Buffer& buffer) {
-    CborDecoder decoder(buffer.data(), buffer.size());
-   decoder
+int BrokerSubscribeRequest::decode(Buffer& buffer) {
+    return CborDecoder(buffer)
     .beginArray(2)
     .read(src)
-    .read(msg_type);
-       
-    return decoder.erc();
+    .read(msg_type)
+    .err();
 }
 
 
 
 int CompassEvent::encode(Buffer& buffer) const {
-    buffer.clear();
-    CborEncoder encoder(buffer.data(), buffer.size());
-    encoder
+    return CborEncoder(buffer)
     .beginArray(9)
     .write(heading)
     .write(pitch)
@@ -97,13 +89,11 @@ int CompassEvent::encode(Buffer& buffer) const {
     .write(mag_z)
     .write(accel_x)
     .write(accel_y)
-    .write(accel_z);
-    return encoder.erc();
+    .write(accel_z).err();
 }
 
-int CompassEvent::decode(const Buffer& buffer) {
-    CborDecoder decoder(buffer.data(), buffer.size());
-   decoder
+int CompassEvent::decode(Buffer& buffer) {
+    return CborDecoder(buffer)
     .beginArray(9)
     .read(heading)
     .read(pitch)
@@ -113,117 +103,94 @@ int CompassEvent::decode(const Buffer& buffer) {
     .read(mag_z)
     .read(accel_x)
     .read(accel_y)
-    .read(accel_z);
-       
-    return decoder.erc();
+    .read(accel_z)
+    .err();
 }
 
 
 
 int CutterEvent::encode(Buffer& buffer) const {
-    buffer.clear();
-    CborEncoder encoder(buffer.data(), buffer.size());
-    encoder
+    return CborEncoder(buffer)
     .beginArray(5)
     .write(enabled)
     .write(rpm)
     .write(current)
     .write(voltage)
-    .write(temperature);
-    return encoder.erc();
+    .write(temperature).err();
 }
 
-int CutterEvent::decode(const Buffer& buffer) {
-    CborDecoder decoder(buffer.data(), buffer.size());
-   decoder
+int CutterEvent::decode(Buffer& buffer) {
+    return CborDecoder(buffer)
     .beginArray(5)
     .read(enabled)
     .read(rpm)
     .read(current)
     .read(voltage)
-    .read(temperature);
-       
-    return decoder.erc();
+    .read(temperature)
+    .err();
 }
 
 
 
 int CutterReply::encode(Buffer& buffer) const {
-    buffer.clear();
-    CborEncoder encoder(buffer.data(), buffer.size());
-    encoder
+    return CborEncoder(buffer)
     .beginArray(4)
     .write(req_id)
     .write(error_code)
     .write(message)
-    .write(msg_type);
-    return encoder.erc();
+    .write(msg_type).err();
 }
 
-int CutterReply::decode(const Buffer& buffer) {
-    CborDecoder decoder(buffer.data(), buffer.size());
-   decoder
+int CutterReply::decode(Buffer& buffer) {
+    return CborDecoder(buffer)
     .beginArray(4)
     .read(req_id)
     .read(error_code)
     .read(message)
-    .read(msg_type);
-       
-    return decoder.erc();
+    .read(msg_type)
+    .err();
 }
 
 
 
 int CutterRequest::encode(Buffer& buffer) const {
-    buffer.clear();
-    CborEncoder encoder(buffer.data(), buffer.size());
-    encoder
+    return CborEncoder(buffer)
     .beginArray(2)
     .write(enabled)
-    .write(rpm);
-    return encoder.erc();
+    .write(rpm).err();
 }
 
-int CutterRequest::decode(const Buffer& buffer) {
-    CborDecoder decoder(buffer.data(), buffer.size());
-   decoder
+int CutterRequest::decode(Buffer& buffer) {
+    return CborDecoder(buffer)
     .beginArray(2)
     .read(enabled)
-    .read(rpm);
-       
-    return decoder.erc();
+    .read(rpm)
+    .err();
 }
 
 
 
 int DeviceAliveEvent::encode(Buffer& buffer) const {
-    buffer.clear();
-    CborEncoder encoder(buffer.data(), buffer.size());
-    encoder
+    return CborEncoder(buffer)
     .beginArray(3)
     .write(device)
     .write(endpoint)
-    .write(timestamp);
-    return encoder.erc();
+    .write(timestamp).err();
 }
 
-int DeviceAliveEvent::decode(const Buffer& buffer) {
-    CborDecoder decoder(buffer.data(), buffer.size());
-   decoder
+int DeviceAliveEvent::decode(Buffer& buffer) {
+    return CborDecoder(buffer)
     .beginArray(3)
     .read(device)
     .read(endpoint)
-    .read(timestamp);
-       
-    return decoder.erc();
+    .read(timestamp)
+    .err();
 }
 
 
 
 int EndpointAnnounce::encode(Buffer& buffer) const {
-    buffer.clear();
-    CborEncoder encoder(buffer.data(), buffer.capacity());
-    encoder
+    return CborEncoder(buffer)
     .beginArray(7)
     .write(id)
     .write(name)
@@ -231,14 +198,11 @@ int EndpointAnnounce::encode(Buffer& buffer) const {
     .write(services)
     .write(events)
     .write(replies)
-    .write(subscribes);
-    buffer.resize(encoder.size());
-    return encoder.erc();
+    .write(subscribes).err();
 }
 
-int EndpointAnnounce::decode(const Buffer& buffer) {
-    CborDecoder decoder(buffer.data(), buffer.size());
-   decoder
+int EndpointAnnounce::decode(Buffer& buffer) {
+    return CborDecoder(buffer)
     .beginArray(7)
     .read(id)
     .read(name)
@@ -246,93 +210,75 @@ int EndpointAnnounce::decode(const Buffer& buffer) {
     .read(services)
     .read(events)
     .read(replies)
-    .read(subscribes);
-       
-    return decoder.erc();
+    .read(subscribes)
+    .err();
 }
 
 
 
 int EndpointAnnounceReply::encode(Buffer& buffer) const {
-    buffer.clear();
-    CborEncoder encoder(buffer.data(), buffer.size());
-    encoder
+    return CborEncoder(buffer)
     .beginArray(1)
-    .write(utc);
-    return encoder.erc();
+    .write(utc).err();
 }
 
-int EndpointAnnounceReply::decode(const Buffer& buffer) {
-    CborDecoder decoder(buffer.data(), buffer.size());
-   decoder
+int EndpointAnnounceReply::decode(Buffer& buffer) {
+    return CborDecoder(buffer)
     .beginArray(1)
-    .read(utc);
-       
-    return decoder.erc();
+    .read(utc)
+    .err();
 }
 
 
 
 int Envelope::encode(Buffer& buffer) const {
-    buffer.clear();
-    CborEncoder encoder(buffer.data(), buffer.size());
-    encoder
+    return CborEncoder(buffer)
     .beginArray(6)
     .write(src)
     .write(dst)
     .write(msg_type)
     .write(sequence)
     .write(instance_id)
-    .write(payload);
-    return encoder.erc();
+    .write(payload).err();
 }
 
-int Envelope::decode(const Buffer& buffer) {
-    CborDecoder decoder(buffer.data(), buffer.size());
-   decoder
+int Envelope::decode(Buffer& buffer) {
+    return CborDecoder(buffer)
     .beginArray(6)
     .read(src)
     .read(dst)
     .read(msg_type)
     .read(sequence)
     .read(instance_id)
-    .read(payload);
-       
-    return decoder.erc();
+    .read(payload)
+    .err();
 }
 
 
 
 int GenericReply::encode(Buffer& buffer) const {
-    buffer.clear();
-    CborEncoder encoder(buffer.data(), buffer.size());
-    encoder
+    return CborEncoder(buffer)
     .beginArray(4)
     .write(req_id)
     .write(error_code)
     .write(message)
-    .write(msg_type);
-    return encoder.erc();
+    .write(msg_type).err();
 }
 
-int GenericReply::decode(const Buffer& buffer) {
-    CborDecoder decoder(buffer.data(), buffer.size());
-   decoder
+int GenericReply::decode(Buffer& buffer) {
+    return CborDecoder(buffer)
     .beginArray(4)
     .read(req_id)
     .read(error_code)
     .read(message)
-    .read(msg_type);
-       
-    return decoder.erc();
+    .read(msg_type)
+    .err();
 }
 
 
 
 int HeatingEvent::encode(Buffer& buffer) const {
-    buffer.clear();
-    CborEncoder encoder(buffer.data(), buffer.size());
-    encoder
+    return CborEncoder(buffer)
     .beginArray(7)
     .write(temperature_c)
     .write(setpoint_c)
@@ -340,13 +286,11 @@ int HeatingEvent::encode(Buffer& buffer) const {
     .write(output_pct)
     .write(heater_on)
     .write(fault)
-    .write(timestamp_ms);
-    return encoder.erc();
+    .write(timestamp_ms).err();
 }
 
-int HeatingEvent::decode(const Buffer& buffer) {
-    CborDecoder decoder(buffer.data(), buffer.size());
-   decoder
+int HeatingEvent::decode(Buffer& buffer) {
+    return CborDecoder(buffer)
     .beginArray(7)
     .read(temperature_c)
     .read(setpoint_c)
@@ -354,47 +298,39 @@ int HeatingEvent::decode(const Buffer& buffer) {
     .read(output_pct)
     .read(heater_on)
     .read(fault)
-    .read(timestamp_ms);
-       
-    return decoder.erc();
+    .read(timestamp_ms)
+    .err();
 }
 
 
 
 int HeatingRequest::encode(Buffer& buffer) const {
-    buffer.clear();
-    CborEncoder encoder(buffer.data(), buffer.size());
-    encoder
+    return CborEncoder(buffer)
     .beginArray(6)
     .write(setpoint_c)
     .write(enabled)
     .write(kp)
     .write(ki)
     .write(kd)
-    .write(reset_integral);
-    return encoder.erc();
+    .write(reset_integral).err();
 }
 
-int HeatingRequest::decode(const Buffer& buffer) {
-    CborDecoder decoder(buffer.data(), buffer.size());
-   decoder
+int HeatingRequest::decode(Buffer& buffer) {
+    return CborDecoder(buffer)
     .beginArray(6)
     .read(setpoint_c)
     .read(enabled)
     .read(kp)
     .read(ki)
     .read(kd)
-    .read(reset_integral);
-       
-    return decoder.erc();
+    .read(reset_integral)
+    .err();
 }
 
 
 
 int HoverboardEvent::encode(Buffer& buffer) const {
-    buffer.clear();
-    CborEncoder encoder(buffer.data(), buffer.size());
-    encoder
+    return CborEncoder(buffer)
     .beginArray(46)
     .write(ctrl_mod)
     .write(ctrl_typ)
@@ -441,13 +377,11 @@ int HoverboardEvent::encode(Buffer& buffer) const {
     .write(spd_coef)
     .write(str_coef)
     .write(batv)
-    .write(temp);
-    return encoder.erc();
+    .write(temp).err();
 }
 
-int HoverboardEvent::decode(const Buffer& buffer) {
-    CborDecoder decoder(buffer.data(), buffer.size());
-   decoder
+int HoverboardEvent::decode(Buffer& buffer) {
+    return CborDecoder(buffer)
     .beginArray(46)
     .read(ctrl_mod)
     .read(ctrl_typ)
@@ -494,165 +428,132 @@ int HoverboardEvent::decode(const Buffer& buffer) {
     .read(spd_coef)
     .read(str_coef)
     .read(batv)
-    .read(temp);
-       
-    return decoder.erc();
+    .read(temp)
+    .err();
 }
 
 
 
 int HoverboardReply::encode(Buffer& buffer) const {
-    buffer.clear();
-    CborEncoder encoder(buffer.data(), buffer.size());
-    encoder
+    return CborEncoder(buffer)
     .beginArray(2)
     .write(speed)
-    .write(steer);
-    return encoder.erc();
+    .write(steer).err();
 }
 
-int HoverboardReply::decode(const Buffer& buffer) {
-    CborDecoder decoder(buffer.data(), buffer.size());
-   decoder
+int HoverboardReply::decode(Buffer& buffer) {
+    return CborDecoder(buffer)
     .beginArray(2)
     .read(speed)
-    .read(steer);
-       
-    return decoder.erc();
+    .read(steer)
+    .err();
 }
 
 
 
 int HoverboardRequest::encode(Buffer& buffer) const {
-    buffer.clear();
-    CborEncoder encoder(buffer.data(), buffer.size());
-    encoder
+    return CborEncoder(buffer)
     .beginArray(2)
     .write(speed)
-    .write(steer);
-    return encoder.erc();
+    .write(steer).err();
 }
 
-int HoverboardRequest::decode(const Buffer& buffer) {
-    CborDecoder decoder(buffer.data(), buffer.size());
-   decoder
+int HoverboardRequest::decode(Buffer& buffer) {
+    return CborDecoder(buffer)
     .beginArray(2)
     .read(speed)
-    .read(steer);
-       
-    return decoder.erc();
+    .read(steer)
+    .err();
 }
 
 
 
 int ImuEvent::encode(Buffer& buffer) const {
-    buffer.clear();
-    CborEncoder encoder(buffer.data(), buffer.size());
-    encoder
+    return CborEncoder(buffer)
     .beginArray(6)
     .write(gyro_x)
     .write(gyro_y)
     .write(gyro_z)
     .write(accel_x)
     .write(accel_y)
-    .write(accel_z);
-    return encoder.erc();
+    .write(accel_z).err();
 }
 
-int ImuEvent::decode(const Buffer& buffer) {
-    CborDecoder decoder(buffer.data(), buffer.size());
-   decoder
+int ImuEvent::decode(Buffer& buffer) {
+    return CborDecoder(buffer)
     .beginArray(6)
     .read(gyro_x)
     .read(gyro_y)
     .read(gyro_z)
     .read(accel_x)
     .read(accel_y)
-    .read(accel_z);
-       
-    return decoder.erc();
+    .read(accel_z)
+    .err();
 }
 
 
 
 int Max31855Event::encode(Buffer& buffer) const {
-    buffer.clear();
-    CborEncoder encoder(buffer.data(), buffer.size());
-    encoder
+    return CborEncoder(buffer)
     .beginArray(6)
     .write(thermocouple_temp)
     .write(internal_temp)
     .write(fault)
     .write(fault_short_vcc)
     .write(fault_short_gnd)
-    .write(fault_open_tc);
-    return encoder.erc();
+    .write(fault_open_tc).err();
 }
 
-int Max31855Event::decode(const Buffer& buffer) {
-    CborDecoder decoder(buffer.data(), buffer.size());
-   decoder
+int Max31855Event::decode(Buffer& buffer) {
+    return CborDecoder(buffer)
     .beginArray(6)
     .read(thermocouple_temp)
     .read(internal_temp)
     .read(fault)
     .read(fault_short_vcc)
     .read(fault_short_gnd)
-    .read(fault_open_tc);
-       
-    return decoder.erc();
+    .read(fault_open_tc)
+    .err();
 }
 
 
 
 int PingReply::encode(Buffer& buffer) const {
-    buffer.clear();
-    CborEncoder encoder(buffer.data(), buffer.size());
-    encoder
+    return CborEncoder(buffer)
     .beginArray(2)
     .write(req_id)
-    .write(timestamp);
-    return encoder.erc();
+    .write(timestamp).err();
 }
 
-int PingReply::decode(const Buffer& buffer) {
-    CborDecoder decoder(buffer.data(), buffer.size());
-   decoder
+int PingReply::decode(Buffer& buffer) {
+    return CborDecoder(buffer)
     .beginArray(2)
     .read(req_id)
-    .read(timestamp);
-       
-    return decoder.erc();
+    .read(timestamp)
+    .err();
 }
 
 
 
 int PingRequest::encode(Buffer& buffer) const {
-    buffer.clear();
-    CborEncoder encoder(buffer.data(), buffer.size());
-    encoder
+    return CborEncoder(buffer)
     .beginArray(2)
     .write(req_id)
-    .write(timestamp);
-    return encoder.erc();
+    .write(timestamp).err();
 }
 
-int PingRequest::decode(const Buffer& buffer) {
-    CborDecoder decoder(buffer.data(), buffer.size());
-   decoder
+int PingRequest::decode(Buffer& buffer) {
+    return CborDecoder(buffer)
     .beginArray(2)
     .read(req_id)
-    .read(timestamp);
-       
-    return decoder.erc();
+    .read(timestamp)
+    .err();
 }
 
 
 
 int Ps4Event::encode(Buffer& buffer) const {
-    buffer.clear();
-    CborEncoder encoder(buffer.data(), buffer.size());
-    encoder
+    return CborEncoder(buffer)
     .beginArray(33)
     .write(button_left)
     .write(button_right)
@@ -686,13 +587,11 @@ int Ps4Event::encode(Buffer& buffer) const {
     .write(battery_level)
     .write(bluetooth)
     .write(debug)
-    .write(temp);
-    return encoder.erc();
+    .write(temp).err();
 }
 
-int Ps4Event::decode(const Buffer& buffer) {
-    CborDecoder decoder(buffer.data(), buffer.size());
-   decoder
+int Ps4Event::decode(Buffer& buffer) {
+    return CborDecoder(buffer)
     .beginArray(33)
     .read(button_left)
     .read(button_right)
@@ -726,17 +625,14 @@ int Ps4Event::decode(const Buffer& buffer) {
     .read(battery_level)
     .read(bluetooth)
     .read(debug)
-    .read(temp);
-       
-    return decoder.erc();
+    .read(temp)
+    .err();
 }
 
 
 
 int Ps4Request::encode(Buffer& buffer) const {
-    buffer.clear();
-    CborEncoder encoder(buffer.data(), buffer.size());
-    encoder
+    return CborEncoder(buffer)
     .beginArray(8)
     .write(req_id)
     .write(rumble_small)
@@ -745,13 +641,11 @@ int Ps4Request::encode(Buffer& buffer) const {
     .write(led_green)
     .write(led_blue)
     .write(led_flash_on)
-    .write(led_flash_off);
-    return encoder.erc();
+    .write(led_flash_off).err();
 }
 
-int Ps4Request::decode(const Buffer& buffer) {
-    CborDecoder decoder(buffer.data(), buffer.size());
-   decoder
+int Ps4Request::decode(Buffer& buffer) {
+    return CborDecoder(buffer)
     .beginArray(8)
     .read(req_id)
     .read(rumble_small)
@@ -760,121 +654,98 @@ int Ps4Request::decode(const Buffer& buffer) {
     .read(led_green)
     .read(led_blue)
     .read(led_flash_on)
-    .read(led_flash_off);
-       
-    return decoder.erc();
+    .read(led_flash_off)
+    .err();
 }
 
 
 
 int SysEvent::encode(Buffer& buffer) const {
-    buffer.clear();
-    CborEncoder encoder(buffer.data(), buffer.size());
-    encoder
+    return CborEncoder(buffer)
     .beginArray(6)
     .write(utc)
     .write(uptime)
     .write(free_heap)
     .write(flash_size)
     .write(cpu_board_type)
-    .write(build_date_time);
-    return encoder.erc();
+    .write(build_date_time).err();
 }
 
-int SysEvent::decode(const Buffer& buffer) {
-    CborDecoder decoder(buffer.data(), buffer.size());
-   decoder
+int SysEvent::decode(Buffer& buffer) {
+    return CborDecoder(buffer)
     .beginArray(6)
     .read(utc)
     .read(uptime)
     .read(free_heap)
     .read(flash_size)
     .read(cpu_board_type)
-    .read(build_date_time);
-       
-    return decoder.erc();
+    .read(build_date_time)
+    .err();
 }
 
 
 
 int SysReply::encode(Buffer& buffer) const {
-    buffer.clear();
-    CborEncoder encoder(buffer.data(), buffer.size());
-    encoder
+    return CborEncoder(buffer)
     .beginArray(3)
     .write(req_id)
     .write(rc)
-    .write(message);
-    return encoder.erc();
+    .write(message).err();
 }
 
-int SysReply::decode(const Buffer& buffer) {
-    CborDecoder decoder(buffer.data(), buffer.size());
-   decoder
+int SysReply::decode(Buffer& buffer) {
+    return CborDecoder(buffer)
     .beginArray(3)
     .read(req_id)
     .read(rc)
-    .read(message);
-       
-    return decoder.erc();
+    .read(message)
+    .err();
 }
 
 
 
 int SysRequest::encode(Buffer& buffer) const {
-    buffer.clear();
-    CborEncoder encoder(buffer.data(), buffer.size());
-    encoder
+    return CborEncoder(buffer)
     .beginArray(4)
     .write(req_id)
     .write(set_time)
     .write(reboot)
-    .write(console);
-    return encoder.erc();
+    .write(console).err();
 }
 
-int SysRequest::decode(const Buffer& buffer) {
-    CborDecoder decoder(buffer.data(), buffer.size());
-   decoder
+int SysRequest::decode(Buffer& buffer) {
+    return CborDecoder(buffer)
     .beginArray(4)
     .read(req_id)
     .read(set_time)
     .read(reboot)
-    .read(console);
-       
-    return decoder.erc();
+    .read(console)
+    .err();
 }
 
 
 
 int UsEvent::encode(Buffer& buffer) const {
-    buffer.clear();
-    CborEncoder encoder(buffer.data(), buffer.size());
-    encoder
+    return CborEncoder(buffer)
     .beginArray(3)
     .write(distance)
     .write(temperature)
-    .write(status);
-    return encoder.erc();
+    .write(status).err();
 }
 
-int UsEvent::decode(const Buffer& buffer) {
-    CborDecoder decoder(buffer.data(), buffer.size());
-   decoder
+int UsEvent::decode(Buffer& buffer) {
+    return CborDecoder(buffer)
     .beginArray(3)
     .read(distance)
     .read(temperature)
-    .read(status);
-       
-    return decoder.erc();
+    .read(status)
+    .err();
 }
 
 
 
 int WifiEvent::encode(Buffer& buffer) const {
-    buffer.clear();
-    CborEncoder encoder(buffer.data(), buffer.size());
-    encoder
+    return CborEncoder(buffer)
     .beginArray(8)
     .write(ip)
     .write(gateway)
@@ -883,13 +754,11 @@ int WifiEvent::encode(Buffer& buffer) const {
     .write(bssid)
     .write(channel)
     .write(rssi)
-    .write(mac);
-    return encoder.erc();
+    .write(mac).err();
 }
 
-int WifiEvent::decode(const Buffer& buffer) {
-    CborDecoder decoder(buffer.data(), buffer.size());
-   decoder
+int WifiEvent::decode(Buffer& buffer) {
+    return CborDecoder(buffer)
     .beginArray(8)
     .read(ip)
     .read(gateway)
@@ -898,9 +767,8 @@ int WifiEvent::decode(const Buffer& buffer) {
     .read(bssid)
     .read(channel)
     .read(rssi)
-    .read(mac);
-       
-    return decoder.erc();
+    .read(mac)
+    .err();
 }
 
 

@@ -17,13 +17,11 @@ Log &Log::logf(const char *format, ...)
     bool expected = false;
     if (_busy.compare_exchange_weak(expected, true))
     {
-        char buffer[128];
         va_list args;
         va_start(args, format);
-        vsnprintf(buffer, sizeof(buffer), format, args);
-        Serial.println(buffer);
+        vprintf(format, args);
         va_end(args);
-   //     printf("%s\n", buffer);
+        printf("\n");
         expected = true;
         _busy.compare_exchange_weak(expected, false);
     }
@@ -42,12 +40,13 @@ Log &Log::tfl(const char *lvl, const char *file, const uint32_t line)
         uint32_t min = sec / 60;
         uint32_t hr = min / 60;
         uint32_t ms = msec % 1000;
-        printf("%s %2.2d:%2.2d:%2.2d.%3.3d | %15.15s:%4u | ", lvl,
-               (int)hr % 24,
-               (int)min % 60,
-               (int)sec % 60,
-               (int)ms,
-               file, (unsigned int)line);
+        int8_t buf[32];
+        printf( "%s %2.2d:%2.2d:%2.2d.%3.3d | %15.15s:%4u | ", lvl,
+                 (int)hr % 24,
+                 (int)min % 60,
+                 (int)sec % 60,
+                 (int)ms,
+                 file, (unsigned int)line);
         /*   struct tm* tm_info;
 struct timeval tv;
 
@@ -59,4 +58,11 @@ printf("%s.%03d\n", buffer, tv.tv_usec/1000);*/
         _busy.compare_exchange_weak(expected, false);
     }
     return *this;
+}
+
+extern "C" void _write(int fd, char *ptr, int len)
+{
+    (void)fd;
+    Serial.write((const unsigned char *)ptr, len);
+    Serial.flush();
 }

@@ -28,7 +28,7 @@ void SerialActor::receive(const ActorMessage &msg)
 
     msg.handle<TimerMsg>([this](const TimerMsg &m)
                          {
-                             INFO("SerialActor::receive: TimerMsg received, sending EndpointAnnounce message");
+                             INFO("TimerMsg received, sending EndpointAnnounce message");
                              Buffer buffer(256);
                              Envelope env;
                              env.src = FNV1A32("Imu");
@@ -41,19 +41,19 @@ void SerialActor::receive(const ActorMessage &msg)
                              announce.events = std::vector<uint32_t>{FNV1A32("IMUEvent")};
                              announce.replies = std::vector<uint32_t>{FNV1A32("IMUReply")};
                              announce.subscribes = std::vector<uint32_t>{FNV1A32("IMUSubscribe")};
-                             INFO("SerialActor::receive: Sending EndpointAnnounce message");
+                             INFO("Sending EndpointAnnounce message");
                              if (announce.encode(buffer))
                              {
-                                WARN("SerialActor::receive: Failed to encode EndpointAnnounce message");
+                                WARN("Failed to encode EndpointAnnounce message");
                                  return;
                              }
                              env.payload = std::vector<uint8_t>(buffer.data(), buffer.data() + buffer.size());
                              if (env.encode(buffer))
                              {
-                                WARN("SerialActor::receive: Failed to encode Envelope message");
+                                WARN("Failed to encode Envelope message");
                                  return;
                              }
-                             INFO("SerialActor::receive: Sending Envelope message with payload size %zu", buffer.size());
+                             INFO("Sending Envelope message with payload size %zu", buffer.size());
                              cobs_encode(buffer.data(), buffer.size(), buffer.data(), buffer.size());
                              Serial1.write(buffer.data(), buffer.size());
                              // convert to cbor
