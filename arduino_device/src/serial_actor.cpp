@@ -31,17 +31,13 @@ void SerialActor::receive(const ActorMessage &msg)
                              INFO("TimerMsg received, sending EndpointAnnounce message");
                              Buffer buffer(256);
                              Envelope env;
-                             env.src = FNV1A32("Imu");
+                             env.src = FNV("Imu");
                              env.msg_type = EndpointAnnounce::MSG_ID;
                              EndpointAnnounce announce;
                              announce.id = 1;
-                             announce.name = std::string("IMU Sensor");
-                             announce.description = std::string("Inertial Measurement Unit");
-                             announce.services = std::vector<uint32_t>{FNV1A32("IMUService")};
-                             announce.events = std::vector<uint32_t>{FNV1A32("IMUEvent")};
-                             announce.replies = std::vector<uint32_t>{FNV1A32("IMUReply")};
-                             announce.subscribes = std::vector<uint32_t>{FNV1A32("IMUSubscribe")};
-                             INFO("Sending EndpointAnnounce message");
+                             announce.name = "IMU Sensor";
+                             announce.description = "Inertial Measurement Unit";
+                             announce.events = std::vector<uint32_t>{ImuEvent::MSG_ID};
                              if (announce.encode(buffer))
                              {
                                 WARN("Failed to encode EndpointAnnounce message");
@@ -53,8 +49,17 @@ void SerialActor::receive(const ActorMessage &msg)
                                 WARN("Failed to encode Envelope message");
                                  return;
                              }
-                             INFO("Sending Envelope message with payload size %zu", buffer.size());
-                             cobs_encode(buffer.data(), buffer.size(), buffer.data(), buffer.size());
+                             INFO("Sending Envelope message with payload size %lu", buffer.size());
+                             if (buffer.add_crc())
+                             {
+                                 WARN("Failed to add CRC to buffer");
+                                 return;
+                             }
+                             if (buffer.cobs_encode_inplace())
+                             {
+                                 WARN("Failed to COBS encode buffer");
+                                 return;
+                             }
                              Serial1.write(buffer.data(), buffer.size());
                              // convert to cbor
                              // cobs encode it

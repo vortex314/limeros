@@ -13,6 +13,14 @@
 
 #include "buffer.h"
 
+  typedef enum {
+    Ok = 0,
+    BufferFullError = 1,
+    InvalidArraySizeError = 2,
+    InvalidMapSizeError = 3,
+    InvalidTypeError = 4,
+  } CborError;
+  const char* cbor_error_to_string(CborError err);
 // ---------------------------------------------------------------------------
 // CborEncoder - fluent CBOR writer.
 //
@@ -58,6 +66,8 @@ public:
   CborEncoder &write(const uint8_t *p, size_t n);
   CborEncoder &write(const std::vector<uint8_t> &v);
   CborEncoder &write(const std::vector<uint32_t> &v);
+
+
 
   // Writes the value if present, otherwise a CBOR null.
   template <typename T>

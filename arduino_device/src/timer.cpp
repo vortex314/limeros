@@ -1,4 +1,5 @@
 #include "timer.h"
+#include "messages.h"
 
 
 bool Timer::is_expired() const
@@ -42,6 +43,6 @@ void Timer::update()
             _running = false;
         }
 
-        actor_system.send(_owner, _owner, new TimerMsg{_id});
+        actor_system.send(_owner, _owner, new TimerMsg(_id));
     }
 }

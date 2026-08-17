@@ -143,9 +143,9 @@ bool CborEncoder::putByte(uint8_t b)
 {
   if (_last_error != 0)
     return false;
-  if (!_buffer.write(b))
+  if (_buffer.write(b))
   {
-    _last_error = 1;
+    _last_error = BufferFullError;
     return false;
   }
   return true;
@@ -155,9 +155,9 @@ bool CborEncoder::putBytes(const uint8_t *p, size_t n)
 {
   if (_last_error != 0)
     return false;
-  if (!_buffer.write(p, n))
+  if (_buffer.write(p, n))
   {
-    _last_error = 1;
+    _last_error = BufferFullError;
     return false;
   }
   return true;
@@ -498,7 +498,7 @@ bool cborFindBool(Buffer& data,
 
 bool CborDecoder::ok() const
 {
-  return _last_error == 0;
+  return _last_error == CborError::Ok;
 }
 
 int CborDecoder::error() const
@@ -516,7 +516,7 @@ CborDecoder &CborDecoder::beginArray(uint32_t count)
   if (!readHeader(major, actual))
     return *this;
   if (major != 4 || actual != count)
-    _last_error = 1;
+    _last_error = CborError::InvalidArraySizeError;
   return *this;
 }
 
@@ -529,7 +529,7 @@ CborDecoder &CborDecoder::beginMap(uint32_t count)
   if (!readHeader(major, actual))
     return *this;
   if (major != 5 || actual != count)
-    _last_error = 1;
+    _last_error = CborError::InvalidMapSizeError;
   return *this;
 }
 
@@ -541,7 +541,7 @@ CborDecoder &CborDecoder::read(uint32_t &out)
     return *this;
   if (major != 0)
   {
-    _last_error = 1;
+    _last_error = CborError::InvalidTypeError;
     return *this;
   }
   out = value;
@@ -558,7 +558,7 @@ CborDecoder &CborDecoder::read(int32_t &out)
     return *this;
   if (major != 0)
   {
-    _last_error = 1;
+    _last_error = CborError::InvalidTypeError;
     return *this;
   }
   out = (int32_t)value;
@@ -575,7 +575,7 @@ CborDecoder &CborDecoder::read(uint64_t &out)
     return *this;
   if (major != 0)
   {
-    _last_error = 1;
+    _last_error = CborError::InvalidTypeError;
     return *this;
   }
   out = value;
@@ -592,7 +592,7 @@ CborDecoder &CborDecoder::read(float &out)
     return *this;
   if (major != 7)
   {
-    _last_error = 1;
+    _last_error = CborError::InvalidTypeError;
     return *this;
   }
   memcpy(&out, &value, sizeof(out));
@@ -609,7 +609,7 @@ CborDecoder &CborDecoder::read(char *out, size_t maxLen)
     return *this;
   if (major != 3 || n >= maxLen || pos + n > buf.size())
   {
-    _last_error = 1;
+    _last_error = CborError::InvalidTypeError;
     return *this;
   }
   memcpy(out, buf.data() + pos, n);
@@ -624,7 +624,7 @@ CborDecoder &CborDecoder::read(bool &out)
     return *this;
   if (pos >= buf.size())
   {
-    _last_error = 1;
+    _last_error = CborError::InvalidTypeError;
     return *this;
   }
   uint8_t b = buf.data()[pos];
@@ -640,7 +640,7 @@ CborDecoder &CborDecoder::read(bool &out)
     ++pos;
     return *this;
   }
-  _last_error = 1;
+  _last_error = CborError::InvalidTypeError;
   return *this;
 }
 
@@ -650,7 +650,7 @@ CborDecoder &CborDecoder::readNull()
     return *this;
   if (pos >= buf.size() || buf.data()[pos] != 0xF6)
   {
-    _last_error = 1;
+    _last_error = CborError::InvalidTypeError;
     return *this;
   }
   ++pos;
@@ -667,7 +667,7 @@ CborDecoder &CborDecoder::read(uint8_t *out, size_t cap, size_t &outLen)
     return *this;
   if (major != 2 || n > cap || pos + n > buf.size())
   {
-    _last_error = 1;
+    _last_error = CborError::InvalidTypeError;
     return *this;
   }
   if (n > 0)
@@ -687,7 +687,7 @@ CborDecoder &CborDecoder::read(std::vector<uint8_t> &out)
     return *this;
   if (major != 2 || pos + n > buf.size())
   {
-    _last_error = 1;
+    _last_error = CborError::InvalidTypeError;
     return *this;
   }
   out.assign(buf.data() + pos, buf.data() + pos + n);
@@ -705,7 +705,7 @@ CborDecoder &CborDecoder::read(std::string &out)
     return *this;
   if (major != 3 || pos + n > buf.size())
   {
-    _last_error = 1;
+    _last_error = CborError::InvalidTypeError;
     return *this;
   }
   out.assign((const char *)(buf.data() + pos), n);
@@ -723,7 +723,7 @@ CborDecoder &CborDecoder::read(std::vector<uint32_t> &out)
     return *this;
   if (major != 4)
   {
-    _last_error = 1;
+    _last_error = CborError::InvalidTypeError;
     return *this;
   }
   out.clear();
@@ -745,7 +745,7 @@ bool CborDecoder::readHeader(uint8_t &major, uint32_t &value)
     return false;
   if (!cborReadHeader(buf, pos, major, value))
   {
-    _last_error = 1;
+    _last_error = CborError::InvalidTypeError;
     return false;
   }
   return true;

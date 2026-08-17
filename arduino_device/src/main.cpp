@@ -80,9 +80,9 @@ void setup()
   (void)greenLedActorId;
   (void)blueLedActorId;
   (void)serialActorId;
-  actor_system.send(redLedActorId, redLedActorId, new LedBlink{500});
-  actor_system.send(greenLedActorId, greenLedActorId, new LedBlink{1000});
-  actor_system.send(blueLedActorId, blueLedActorId, new LedBlink{1500});
+  actor_system.send(redLedActorId, redLedActorId, new LedBlink(500));
+  actor_system.send(greenLedActorId, greenLedActorId, new LedBlink(1000));
+  actor_system.send(blueLedActorId, blueLedActorId, new LedBlink(1500));
 }
 
 void loop()

@@ -40,7 +40,6 @@ Log &Log::tfl(const char *lvl, const char *file, const uint32_t line)
         uint32_t min = sec / 60;
         uint32_t hr = min / 60;
         uint32_t ms = msec % 1000;
-        int8_t buf[32];
         printf( "%s %2.2d:%2.2d:%2.2d.%3.3d | %15.15s:%4u | ", lvl,
                  (int)hr % 24,
                  (int)min % 60,
@@ -60,9 +59,15 @@ printf("%s.%03d\n", buffer, tv.tv_usec/1000);*/
     return *this;
 }
 
+#include "driverlib/uart.h"
+
 extern "C" void _write(int fd, char *ptr, int len)
 {
     (void)fd;
-    Serial.write((const unsigned char *)ptr, len);
-    Serial.flush();
+    for (int i = 0; i < len; i++)
+    {
+        UARTCharPut(UART0_BASE, (unsigned char)ptr[i]);
+  }
+    // Serial.write((const unsigned char *)ptr, len);
+    // Serial.flush();
 }
