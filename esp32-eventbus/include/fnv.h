@@ -1,45 +1,19 @@
 #ifndef FNV_H
 #define FNV_H
 
-#include <cstddef>
 #include <cstdint>
 
-namespace fnv
+// FNV-1a hash function for 32-bit hash value
+constexpr uint32_t fnv1a_32_1(const char *str, uint32_t hash = 2166136261U)
 {
-constexpr uint32_t FNV1A_32_OFFSET_BASIS = 2166136261u;
-constexpr uint32_t FNV1A_32_PRIME = 16777619u;
-
-// Hash a null-terminated C string.
-constexpr uint32_t fnv1a_32(const char *str,
-                            uint32_t hash = FNV1A_32_OFFSET_BASIS)
-{
-    return (*str == '\0')
-               ? hash
-               : fnv1a_32(str + 1,
-                          (hash ^ static_cast<uint32_t>(
-                                      static_cast<unsigned char>(*str))) *
-                              FNV1A_32_PRIME);
+    return *str == '\0' ? hash : fnv1a_32_1(str + 1, (hash ^ static_cast<uint32_t>(*str)) * 16777619U);
 }
 
-// Hash a buffer of known length (works with embedded null bytes).
-constexpr uint32_t fnv1a_32_n(const char *data, size_t len,
-                              uint32_t hash = FNV1A_32_OFFSET_BASIS)
+// Helper to compute the hash at compile time for a string literal
+template <std::size_t N>
+constexpr uint32_t FNV(const char (&str)[N])
 {
-    return (len == 0)
-               ? hash
-               : fnv1a_32_n(data + 1, len - 1,
-                            (hash ^ static_cast<uint32_t>(
-                                        static_cast<unsigned char>(*data))) *
-                                FNV1A_32_PRIME);
+    return fnv1a_32_1(str);
 }
-
-// Convenience helper for string literals.
-template <size_t N>
-constexpr uint32_t fnv1a_32(const char (&str)[N])
-{
-    return fnv1a_32_n(str, N - 1);
-}
-
-} // namespace fnv
 
 #endif // FNV_H

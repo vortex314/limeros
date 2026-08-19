@@ -272,9 +272,23 @@ public:
     }
 #endif
 template<class F>
+constexpr void just(F&& f) noexcept {
+    if (tag_ == Tag::Ok) {
+        f(ok_); // Execute the lambda with the `Ok` value
+    }
+}
+
+template<class F>
 constexpr void just(F&& f) const noexcept {
     if (tag_ == Tag::Ok) {
         f(ok_); // Execute the lambda with the `Ok` value
+    }
+}
+
+template<class F>
+constexpr void just_err(F&& f) noexcept {
+    if (tag_ == Tag::Err) {
+        f(err_); // Execute the lambda with the `Err` value
     }
 }
 

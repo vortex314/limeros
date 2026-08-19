@@ -132,11 +132,11 @@ Result<Buffer> HoverboardActor::cobs_decode(const Buffer &input)
         read_index++;
         for (i = 1; i < code; i++)
         {
-            output.push_back(input[read_index++]);
+            output.write(input[read_index++]);
         }
         if (code != 0xFF && read_index < input.size())
         {
-            output.push_back(0);
+            output.write(0);
         }
     }
     // output.resize(write_index);
@@ -186,7 +186,7 @@ Result<Buffer> HoverboardActor::check_crc(const Buffer &input)
     return Result<Buffer>::Ok(Buffer(std::vector<uint8_t>(input.data(), input.data() + input.size() - 2)));
 }
 
-Result<HoverboardEvent *> HoverboardActor::parse_info_msg(const Buffer &input)
+Result<HoverboardEvent *> HoverboardActor::parse_info_msg( Buffer &input)
 {
     HoverboardEvent* hb_event = new HoverboardEvent();
     if ( hb_event->decode(input) != 0)
@@ -212,8 +212,8 @@ void HoverboardActor::on_message(const ActorMessage &msg)
 {
     msg.handle_if<HoverboardRequest>([&](const auto hb_cmd)
                                   { INFO("Received HoverboardRequest: speed=%d, steer=%d", hb_cmd.speed.value_or(-1), hb_cmd.steer.value_or(-1));
-                                hb_cmd.speed.for_each([&](const auto& value) { _speed = value; });
-                                hb_cmd.steer.for_each([&](const auto& value) { _steer = value; }); });
+                                hb_cmd.speed.handle_if([&](const auto& value) { _speed = value; });
+                                hb_cmd.steer.handle_if([&](const auto& value) { _steer = value; }); });
     msg.handle_if<TimerMsg>([&](const TimerMsg &msg)
                          { on_timer(msg.timer_id); });
     msg.handle_if<UartRxd>([&](const UartRxd &uart_rxd)
@@ -234,7 +234,7 @@ void HoverboardActor::handle_uart_bytes(const Buffer &data)
             HoverboardEvent event;
             auto result = cobs_decode(uart_read_buffer)
                 .and_then(check_crc);
-            result.just([&](const Buffer &decoded)
+            result.just([&]( Buffer &decoded)
                        {
                         Envelope* env = new Envelope();
                         if (env->decode(decoded) == 0)
@@ -255,7 +255,7 @@ void HoverboardActor::handle_uart_bytes(const Buffer &data)
         }
         else
         {
-            uart_read_buffer.push_back(b);
+            uart_read_buffer.write(b);
         }
     }
 }

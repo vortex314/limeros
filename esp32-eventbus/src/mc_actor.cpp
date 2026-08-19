@@ -97,7 +97,7 @@ void McActor::init_event()
     setsockopt(_multicast_socket, IPPROTO_IP, IP_MULTICAST_LOOP, &loop, sizeof(loop));
 
     // Wait for broker discovery via DeviceAliveEvent before sending unicast traffic.
-    _broker_addr.none();
+    _broker_addr = Option<sockaddr_in>();
 }
 
 void McActor::stop_event()
@@ -155,17 +155,17 @@ void McActor::on_message(const ActorMessage &msg)
     // local actors specify their capabilities via EndpointAnnounce messages
     msg.handle_if<EndpointAnnounce>([&](const EndpointAnnounce &msg)
                                     {
-        msg.services.for_each([&](const std::vector<uint32_t> &services)
+        msg.services.handle_if([&](const std::vector<uint32_t> &services)
         {
              for (auto v : services) 
                 _services.push_back(v);
         });
-        msg.events.for_each([&](const std::vector<uint32_t> &events)
+        msg.events.handle_if([&](const std::vector<uint32_t> &events)
         {
             for (auto v : events)
                 _events.push_back(v);
         });
-        msg.subscribes.for_each([&](const std::vector<uint32_t> &subscribes)
+        msg.subscribes.handle_if([&](const std::vector<uint32_t> &subscribes)
         {
             for (auto v : subscribes)
                 _subscribes.push_back(v);
@@ -338,10 +338,10 @@ void show_envelope(const Envelope &env)
          env.src ? std::to_string(*(env.src)).c_str() : "-",
          env.dst ? std::to_string(*(env.dst)).c_str() : "-",
          env.msg_type ? id_to_string(*(env.msg_type)) : "-",
-         env.payload ? env.payload->size() : 0);
+         env.payload ? (*env.payload).size() : 0);
 }
 
-void McActor::on_udp_raw(const Buffer &request, const sockaddr_in &sender_addr)
+void McActor::on_udp_raw( Buffer &request, const sockaddr_in &sender_addr)
 {
     Envelope *envelope = new Envelope();
     if (envelope->decode(request) == 0)
@@ -368,7 +368,7 @@ void McActor::on_udp_message(Envelope *env, const sockaddr_in &sender_addr)
     }
     if (env->msg_type == PingReply::MSG_ID)
     {
-        send_ping_req(env->src.value(), ++_last_ping_number);
+        send_ping_req(*env->src, ++_last_ping_number);
         delete env;
         return;
     }
@@ -381,10 +381,10 @@ void McActor::on_udp_message(Envelope *env, const sockaddr_in &sender_addr)
             INFO("Received EndpointAnnounceReply from %s ", socketAddrToString(&sender_addr).c_str());
             if (_broker_addr)
             {
-                if (_broker_addr->sin_addr.s_addr != sender_addr.sin_addr.s_addr)
+                if ((*_broker_addr).sin_addr.s_addr != sender_addr.sin_addr.s_addr)
                 {
                     INFO("Setting (new) broker address to %s", socketAddrToString(&sender_addr).c_str());
-                    _broker_addr = sender_addr;
+                    *_broker_addr = sender_addr;
                 }
                 // ignore otherwise, we already have a broker address
             }

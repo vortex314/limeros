@@ -183,7 +183,7 @@ public:
     virtual void on_start() = 0;
     virtual void on_stop() = 0;
     virtual QueueHandle_t queue_handle() = 0;
-    Option<QueueHandle_t> additional_queue() { return Option<QueueHandle_t>::None(); }
+    Option<QueueHandle_t> additional_queue() { return Option<QueueHandle_t>(); }
     virtual uint64_t sleep_time() = 0;
     virtual void handle_expired_timers() = 0;
     virtual const char *name() = 0;
