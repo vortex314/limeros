@@ -59,16 +59,17 @@ pub fn opt_id_to_string(msg_id: Option<u32>) -> String {
 
 
 #[derive(Debug, Clone, PartialEq, cbor2::Cbor)]
+#[cbor(array)]
 pub struct {{ msg.name }} {
 {%- for field in msg.fields %}
-{%- if field.description %}
-    /// {{ field.description }}
-{%- endif %}
-    #[cbor(key = {{ field.id }})]
+
 {%- if field.rust_type == "Vec<u8>" %}
     #[serde(with = "serde_bytes")]
 {%- endif %}
     pub {{ field.name }}: Option<{{ field.rust_type }}>,
+    {%- if field.description -%}
+    // {{ field.description }}
+    {%- endif %}
 {%- endfor %}
 }
 

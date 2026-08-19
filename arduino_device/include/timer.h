@@ -1,21 +1,27 @@
 #ifndef TIMER_H
 #define TIMER_H
 #include "actor_framework.h"
+#include "messages.h"
 
 class Timer
 {
 private:
-    uint64_t _expires_at;
-    uint32_t _interval_ms;
+                uint64_t _expires_at;
+                uint32_t _interval_ms;
     int _id;
-    ActorId _owner;
+    std::shared_ptr<ActorMessage> _timer_msg;
     bool _running;
     bool _repeat;
 
 public:
-    Timer(ActorId owner, int id) : _expires_at(0), _interval_ms(0), _id(id), _owner(owner), _running(false), _repeat(false) {}
-    Timer() : _expires_at(0), _interval_ms(0), _id(0), _owner(0), _running(false), _repeat(false) {}
-    void setOwner(ActorId owner) { _owner = owner; }
+    Timer(int id) : _expires_at(0), _interval_ms(0), _id(id), _timer_msg(nullptr), _running(false), _repeat(false) {
+        _timer_msg = std::make_shared<ActorMessage>();
+        _timer_msg->src = 0;
+        _timer_msg->dst = 0;
+        _timer_msg->set_payload(new TimerMsg(_id));
+    }
+   
+    void setOwner(ActorId actor_id) { _timer_msg->src = actor_id; _timer_msg->dst = actor_id; }
     void start(uint32_t interval_ms, bool repeat = false);
     void stop();
     bool is_running() const;

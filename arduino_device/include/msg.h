@@ -8,13 +8,14 @@
 #include <cstdlib>
 #include <buffer.h>
 #include <fnv.h>
+#include <typed_message.h>
 
 typedef std::vector<uint8_t> Bytes;
 extern void print_cbor_diagnostic(const uint8_t *data, size_t size);
 
 // ---------------------- abstract class Msg ------------------
 
-class Msg
+class Msg : public TypedMessage
 {
 public:
     static const uint32_t MSG_ID = FNV("Msg");

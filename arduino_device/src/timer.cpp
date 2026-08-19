@@ -43,6 +43,6 @@ void Timer::update()
             _running = false;
         }
 
-        actor_system.send(_owner, _owner, new TimerMsg(_id));
+        actor_system.send(_timer_msg);
     }
 }

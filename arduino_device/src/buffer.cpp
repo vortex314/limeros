@@ -139,48 +139,53 @@ bool Buffer::verify_crc_remove()
 int Buffer::cobs_encode_inplace()
 {
     size_t data_len = size();
-    size_t encoded_len = 0;
     uint8_t *buffer = data();
-    if (data_len > _capacity)
-        return ENOSPC;
+
     if (data_len == 0)
     {
-        encoded_len = 1;
         buffer[0] = 0x00;
+        resize(1);
         return 0;
     }
 
-    // COBS encode
+    // COBS output grows, so encode from a scratch copy of the input held in
+    // the tail of this buffer; writing the front would otherwise clobber the
+    // not-yet-read input. Worst case is one code byte per input byte plus the
+    // final code and delimiter, so 2*data_len+1 bytes must fit.
+    if (2 * data_len + 1 > _capacity)
+        return ENOSPC;
+    memcpy(buffer + data_len, buffer, data_len);
+
+    const uint8_t *src = buffer + data_len;
     size_t write_pos = 0;
     size_t read_pos = 0;
     size_t block_start = 0;
     uint8_t code = 1;
 
-    // Write placeholder for first code
-    buffer[write_pos++] = 0x00;
+    buffer[write_pos++] = 0x00; // placeholder for the first code
 
     while (read_pos < data_len)
     {
-        if (buffer[read_pos] == 0)
+        if (src[read_pos] == 0x00)
         {
             // Found a zero - finalize previous block
             buffer[block_start] = code;
             block_start = write_pos;
             code = 1;
-            buffer[write_pos++] = 0x00; // Placeholder for next block
+            buffer[write_pos++] = 0x00; // placeholder for next code
             ++read_pos;
         }
         else
         {
-            // Copy non-zero byte
-            buffer[write_pos++] = buffer[read_pos++];
+            // Copy non-zero byte from the scratch copy
+            buffer[write_pos++] = src[read_pos++];
             if (++code == 0xFF)
             {
                 // Block full - finalize
                 buffer[block_start] = code;
                 block_start = write_pos;
                 code = 1;
-                buffer[write_pos++] = 0x00; // Placeholder
+                buffer[write_pos++] = 0x00; // placeholder for next code
             }
         }
     }
@@ -190,8 +195,7 @@ int Buffer::cobs_encode_inplace()
 
     // Add final delimiter
     buffer[write_pos++] = 0x00;
-    encoded_len = write_pos;
-    resize(encoded_len);
+    resize(write_pos);
 
     return 0;
 }

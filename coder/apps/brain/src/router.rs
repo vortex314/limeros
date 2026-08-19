@@ -67,10 +67,10 @@ impl Message<ToDevice> for RouterActor {
                 })
                 .await;
         } else {
-            warn!(
+            /*warn!(
                 "RouterActor: No recipient found for ToDevice with id '{}'",
                 id_to_string(msg.id)
-            );
+            );*/
         }
     }
 }

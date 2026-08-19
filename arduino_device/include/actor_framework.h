@@ -13,27 +13,18 @@ typedef uint32_t TimerId;
 #include <fnv.h>
 #include <vector>
 #include <log.h>
+#include <typed_message.h>
 
 class ActorSystem;
 
-class Message
-{
-public:
-    static const MsgType MSG_ID = FNV("Message");
-    static constexpr const char *MSG_NAME = "Message";
-
-    virtual ~Message() = default;
-    virtual MsgType msg_type() const = 0;
-    virtual const char *msg_name() const = 0;
-};
 
 #define DEFINE_MSG(Name, ...)                                      \
-    class Name : public Message                                    \
+    class Name : public TypedMessage                                    \
     {                                                              \
     public:                                                        \
         static constexpr MsgType MSG_ID = FNV(#Name);         \
         static constexpr const char *MSG_NAME = #Name;             \
-        virtual MsgType msg_type() const { return MSG_ID; };        \
+        virtual MsgType msg_id() const { return MSG_ID; };        \
         virtual const char *msg_name() const { return MSG_NAME; }; \
         virtual ~Name() = default;                                 \
         __VA_ARGS__                                                \
@@ -49,14 +40,12 @@ struct ActorMessage
 public:
     ActorId src = 0;
     ActorId dst = 0;
-
-private:
-    Message *payload = nullptr;
+    TypedMessage *payload = nullptr;
 
 public:
     // ---- type-safe helpers ----
     template <typename T>
-    bool is() const { return payload->msg_type() == T::MSG_ID; }
+    bool is() const { return payload->msg_id() == T::MSG_ID; }
     template <typename T>
     T *as() { return static_cast<T *>(payload); }
 
@@ -64,23 +53,25 @@ public:
     template <typename T, typename Func>
     bool handle(Func &&func) const
     {
-        if (payload->msg_type() == T::MSG_ID)
+        if (payload->msg_id() == T::MSG_ID)
         {
             func(*static_cast<const T *>(payload));
             return true;
         }
         return false;
     }
-    template <typename T>
-    void set_payload(const T *p)
+
+    ~ActorMessage()
     {
+        if (payload)
+            delete payload;
+    }
+    void set_payload(TypedMessage *p)
+    {
+        if (payload)
+            delete payload;
         payload = p;
     }
-
-    ~ActorMessage() {
-        delete payload;
-        payload = nullptr;
-    };
 };
 
 // ============================================================
@@ -92,7 +83,7 @@ public:
     uint8_t id = 0;
 
     virtual void setup() {}
-    virtual void receive(const ActorMessage &msg) = 0;
+    virtual void receive(std::shared_ptr<ActorMessage> msg) = 0;
     virtual void update() {}
 
     virtual ~Actor() {}
@@ -123,7 +114,7 @@ public:
 
 private:
     std::vector<Actor *> _actors;
-    CircBuf<ActorMessage *> _circ_buf;
+    CircBuf<std::shared_ptr<ActorMessage>> _circ_buf;
 
 public:
     ActorSystem() : _circ_buf(MAX_MESSAGES)
@@ -142,25 +133,22 @@ public:
         return actor->id;
     }
 
-    bool send( ActorMessage *msg)
+    bool send(std::shared_ptr<ActorMessage> msg)
     {
         if (_circ_buf.hasSpace() == false)
         {
-            delete msg->payload;
-            msg->payload = nullptr;
-            delete msg;
             WARN("ActorSystem message queue full, dropping message");
             return false;
         }
-        return _circ_buf.write(const_cast<ActorMessage *>(msg)) == 0 ? true : false;
+        return _circ_buf.write(msg) == 0 ? true : false;
     }
 
-    bool send(ActorId dst, ActorId src,Message* payload)
+    bool send(ActorId dst, ActorId src, TypedMessage* payload)
     {
-        ActorMessage *msg = new ActorMessage();
+        auto msg = std::make_shared<ActorMessage>();
         msg->src = src;
         msg->dst = dst;
-        msg->payload = payload;
+        msg->set_payload(payload);
         return send(msg);
     }
 
@@ -169,16 +157,10 @@ public:
         if (_circ_buf.isEmpty())
             return;
 
-        ActorMessage *msg = _circ_buf.read();
+        auto msg = _circ_buf.read();
 
         if (msg && msg->dst >= 0 && msg->dst < _actors.size() && _actors[msg->dst])
-            _actors[msg->dst]->receive(*msg);
-        if (msg->payload != nullptr)
-        {
-            delete msg->payload;
-            msg->payload = nullptr;
-        }
-        delete msg;
+            _actors[msg->dst]->receive(msg);
     }
 
     void processAll()

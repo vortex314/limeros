@@ -24,7 +24,7 @@ public:
     explicit LedActor(uint8_t ledPin);
     void setup() override;
     void update() override;
-    void receive(const ActorMessage &msg) override;
+    void receive(std::shared_ptr<ActorMessage> msg) override;
 };
 
 #endif // LED_ACTOR_H

@@ -117,10 +117,9 @@ pub fn opt_id_to_string(msg_id: Option<u32>) -> String {
 
 
 #[derive(Debug, Clone, PartialEq, cbor2::Cbor)]
+#[cbor(array)]
 pub struct BrokerSubscribeRequest {
-    #[cbor(key = 0)]
     pub src: Option<u32>,
-    #[cbor(key = 1)]
     pub msg_type: Option<u32>,
 }
 
@@ -168,34 +167,17 @@ impl Msg for BrokerSubscribeRequest {
 
 
 #[derive(Debug, Clone, PartialEq, cbor2::Cbor)]
+#[cbor(array)]
 pub struct CompassEvent {
-    /// Heading in degrees
-    #[cbor(key = 0)]
-    pub heading: Option<f32>,
-    /// Pitch in degrees
-    #[cbor(key = 1)]
-    pub pitch: Option<f32>,
-    /// Roll in degrees
-    #[cbor(key = 2)]
-    pub roll: Option<f32>,
-    /// Magnetometer X axis in uT
-    #[cbor(key = 3)]
-    pub mag_x: Option<f32>,
-    /// Magnetometer Y axis in uT
-    #[cbor(key = 4)]
-    pub mag_y: Option<f32>,
-    /// Magnetometer Z axis in uT
-    #[cbor(key = 5)]
-    pub mag_z: Option<f32>,
-    /// Accelerometer X axis in m/s^2
-    #[cbor(key = 6)]
-    pub accel_x: Option<f32>,
-    /// Accelerometer Y axis in m/s^2
-    #[cbor(key = 7)]
-    pub accel_y: Option<f32>,
-    /// Accelerometer Z axis in m/s^2
-    #[cbor(key = 8)]
-    pub accel_z: Option<f32>,
+    pub heading: Option<f32>,// Heading in degrees
+    pub pitch: Option<f32>,// Pitch in degrees
+    pub roll: Option<f32>,// Roll in degrees
+    pub mag_x: Option<f32>,// Magnetometer X axis in uT
+    pub mag_y: Option<f32>,// Magnetometer Y axis in uT
+    pub mag_z: Option<f32>,// Magnetometer Z axis in uT
+    pub accel_x: Option<f32>,// Accelerometer X axis in m/s^2
+    pub accel_y: Option<f32>,// Accelerometer Y axis in m/s^2
+    pub accel_z: Option<f32>,// Accelerometer Z axis in m/s^2
 }
 
 impl Default for CompassEvent {
@@ -249,22 +231,13 @@ impl Msg for CompassEvent {
 
 
 #[derive(Debug, Clone, PartialEq, cbor2::Cbor)]
+#[cbor(array)]
 pub struct CutterEvent {
-    /// Cutter enabled or disabled
-    #[cbor(key = 0)]
-    pub enabled: Option<bool>,
-    /// Current speed of the cutter in RPM
-    #[cbor(key = 1)]
-    pub rpm: Option<i32>,
-    /// Current drawn by the cutter in Amperes
-    #[cbor(key = 2)]
-    pub current: Option<f32>,
-    /// Voltage supplied to the cutter in Volts
-    #[cbor(key = 3)]
-    pub voltage: Option<f32>,
-    /// Temperature of the cutter in Celsius
-    #[cbor(key = 4)]
-    pub temperature: Option<f32>,
+    pub enabled: Option<bool>,// Cutter enabled or disabled
+    pub rpm: Option<i32>,// Current speed of the cutter in RPM
+    pub current: Option<f32>,// Current drawn by the cutter in Amperes
+    pub voltage: Option<f32>,// Voltage supplied to the cutter in Volts
+    pub temperature: Option<f32>,// Temperature of the cutter in Celsius
 }
 
 impl Default for CutterEvent {
@@ -314,19 +287,12 @@ impl Msg for CutterEvent {
 
 
 #[derive(Debug, Clone, PartialEq, cbor2::Cbor)]
+#[cbor(array)]
 pub struct CutterReply {
-    /// For request/reply matching, 0 if not a request/reply
-    #[cbor(key = 0)]
-    pub req_id: Option<u32>,
-    /// Error code, 0 if no error
-    #[cbor(key = 1)]
-    pub error_code: Option<u32>,
-    /// Error message or additional information
-    #[cbor(key = 2)]
-    pub message: Option<String>,
-    /// Message type identifier , the original request
-    #[cbor(key = 3)]
-    pub msg_type: Option<u32>,
+    pub req_id: Option<u32>,// For request/reply matching, 0 if not a request/reply
+    pub error_code: Option<u32>,// Error code, 0 if no error
+    pub message: Option<String>,// Error message or additional information
+    pub msg_type: Option<u32>,// Message type identifier , the original request
 }
 
 impl Default for CutterReply {
@@ -375,13 +341,10 @@ impl Msg for CutterReply {
 
 
 #[derive(Debug, Clone, PartialEq, cbor2::Cbor)]
+#[cbor(array)]
 pub struct CutterRequest {
-    /// Enable or disable the cutter
-    #[cbor(key = 0)]
-    pub enabled: Option<bool>,
-    /// Speed command for the cutter in RPM
-    #[cbor(key = 1)]
-    pub rpm: Option<i32>,
+    pub enabled: Option<bool>,// Enable or disable the cutter
+    pub rpm: Option<i32>,// Speed command for the cutter in RPM
 }
 
 impl Default for CutterRequest {
@@ -428,14 +391,11 @@ impl Msg for CutterRequest {
 
 
 #[derive(Debug, Clone, PartialEq, cbor2::Cbor)]
+#[cbor(array)]
 pub struct DeviceAliveEvent {
-    #[cbor(key = 0)]
     pub device: Option<String>,
-    #[cbor(key = 1)]
     pub endpoint: Option<String>,
-    /// Timestamp in milliseconds since epoch
-    #[cbor(key = 2)]
-    pub timestamp: Option<u64>,
+    pub timestamp: Option<u64>,// Timestamp in milliseconds since epoch
 }
 
 impl Default for DeviceAliveEvent {
@@ -483,28 +443,15 @@ impl Msg for DeviceAliveEvent {
 
 
 #[derive(Debug, Clone, PartialEq, cbor2::Cbor)]
+#[cbor(array)]
 pub struct EndpointAnnounce {
-    /// Unique identifier for the announcing endpoint
-    #[cbor(key = 0)]
-    pub id: Option<u32>,
-    /// Name of the announcing endpoint
-    #[cbor(key = 1)]
-    pub name: Option<String>,
-    /// Description of the announcing endpoint
-    #[cbor(key = 6)]
-    pub description: Option<String>,
-    /// List of services provided by the endpoint
-    #[cbor(key = 2)]
-    pub services: Option<Vec<u32>>,
-    /// List of events emitted by the endpoint
-    #[cbor(key = 3)]
-    pub events: Option<Vec<u32>>,
-    /// List of replies supported by the endpoint
-    #[cbor(key = 4)]
-    pub replies: Option<Vec<u32>>,
-    /// List of subscriptions for the endpoint
-    #[cbor(key = 5)]
-    pub subscribes: Option<Vec<u32>>,
+    pub id: Option<u32>,// Unique identifier for the announcing endpoint
+    pub name: Option<String>,// Name of the announcing endpoint
+    pub description: Option<String>,// Description of the announcing endpoint
+    pub services: Option<Vec<u32>>,// List of services provided by the endpoint
+    pub events: Option<Vec<u32>>,// List of events emitted by the endpoint
+    pub replies: Option<Vec<u32>>,// List of replies supported by the endpoint
+    pub subscribes: Option<Vec<u32>>,// List of subscriptions for the endpoint
 }
 
 impl Default for EndpointAnnounce {
@@ -556,10 +503,9 @@ impl Msg for EndpointAnnounce {
 
 
 #[derive(Debug, Clone, PartialEq, cbor2::Cbor)]
+#[cbor(array)]
 pub struct EndpointAnnounceReply {
-    /// Timestamp in milliseconds since epoch
-    #[cbor(key = 0)]
-    pub utc: Option<u64>,
+    pub utc: Option<u64>,// Timestamp in milliseconds since epoch
 }
 
 impl Default for EndpointAnnounceReply {
@@ -605,26 +551,15 @@ impl Msg for EndpointAnnounceReply {
 
 
 #[derive(Debug, Clone, PartialEq, cbor2::Cbor)]
+#[cbor(array)]
 pub struct Envelope {
-    /// Source endpoint name
-    #[cbor(key = 0)]
-    pub src: Option<u32>,
-    /// Destination endpoint name
-    #[cbor(key = 1)]
-    pub dst: Option<u32>,
-    /// Message type name
-    #[cbor(key = 2)]
-    pub msg_type: Option<u32>,
-    /// Request ID for matching request/reply
-    #[cbor(key = 3)]
-    pub sequence: Option<u32>,
-    /// Instance ID for matching request/reply
-    #[cbor(key = 4)]
-    pub instance_id: Option<u32>,
-    /// Serialized payload of the message
-    #[cbor(key = 5)]
+    pub src: Option<u32>,// Source endpoint name
+    pub dst: Option<u32>,// Destination endpoint name
+    pub msg_type: Option<u32>,// Message type name
+    pub sequence: Option<u32>,// Request ID for matching request/reply
+    pub instance_id: Option<u32>,// Instance ID for matching request/reply
     #[serde(with = "serde_bytes")]
-    pub payload: Option<Vec<u8>>,
+    pub payload: Option<Vec<u8>>,// Serialized payload of the message
 }
 
 impl Default for Envelope {
@@ -675,19 +610,12 @@ impl Msg for Envelope {
 
 
 #[derive(Debug, Clone, PartialEq, cbor2::Cbor)]
+#[cbor(array)]
 pub struct GenericReply {
-    /// For request/reply matching, 0 if not a request/reply
-    #[cbor(key = 0)]
-    pub req_id: Option<u32>,
-    /// Error code, 0 if no error
-    #[cbor(key = 1)]
-    pub error_code: Option<u32>,
-    /// Error message or additional information
-    #[cbor(key = 2)]
-    pub message: Option<String>,
-    /// Message type identifier , the original request
-    #[cbor(key = 3)]
-    pub msg_type: Option<u32>,
+    pub req_id: Option<u32>,// For request/reply matching, 0 if not a request/reply
+    pub error_code: Option<u32>,// Error code, 0 if no error
+    pub message: Option<String>,// Error message or additional information
+    pub msg_type: Option<u32>,// Message type identifier , the original request
 }
 
 impl Default for GenericReply {
@@ -736,28 +664,15 @@ impl Msg for GenericReply {
 
 
 #[derive(Debug, Clone, PartialEq, cbor2::Cbor)]
+#[cbor(array)]
 pub struct HeatingEvent {
-    /// Current temperature in Celsius
-    #[cbor(key = 0)]
-    pub temperature_c: Option<f32>,
-    /// Setpoint temperature in Celsius
-    #[cbor(key = 1)]
-    pub setpoint_c: Option<f32>,
-    /// Heating enabled or disabled
-    #[cbor(key = 2)]
-    pub enabled: Option<bool>,
-    /// Output percentage of the heating element
-    #[cbor(key = 3)]
-    pub output_pct: Option<f32>,
-    /// Heater is currently on or off
-    #[cbor(key = 4)]
-    pub heater_on: Option<bool>,
-    /// Fault detected in the heating system
-    #[cbor(key = 5)]
-    pub fault: Option<bool>,
-    /// Timestamp in milliseconds since epoch
-    #[cbor(key = 6)]
-    pub timestamp_ms: Option<u64>,
+    pub temperature_c: Option<f32>,// Current temperature in Celsius
+    pub setpoint_c: Option<f32>,// Setpoint temperature in Celsius
+    pub enabled: Option<bool>,// Heating enabled or disabled
+    pub output_pct: Option<f32>,// Output percentage of the heating element
+    pub heater_on: Option<bool>,// Heater is currently on or off
+    pub fault: Option<bool>,// Fault detected in the heating system
+    pub timestamp_ms: Option<u64>,// Timestamp in milliseconds since epoch
 }
 
 impl Default for HeatingEvent {
@@ -809,25 +724,14 @@ impl Msg for HeatingEvent {
 
 
 #[derive(Debug, Clone, PartialEq, cbor2::Cbor)]
+#[cbor(array)]
 pub struct HeatingRequest {
-    /// Setpoint temperature in Celsius
-    #[cbor(key = 0)]
-    pub setpoint_c: Option<f32>,
-    /// Enable or disable heating
-    #[cbor(key = 1)]
-    pub enabled: Option<bool>,
-    /// Proportional gain for PID controller
-    #[cbor(key = 2)]
-    pub kp: Option<f32>,
-    /// Integral gain for PID controller
-    #[cbor(key = 3)]
-    pub ki: Option<f32>,
-    /// Derivative gain for PID controller
-    #[cbor(key = 4)]
-    pub kd: Option<f32>,
-    /// Reset the integral term of the PID controller
-    #[cbor(key = 5)]
-    pub reset_integral: Option<bool>,
+    pub setpoint_c: Option<f32>,// Setpoint temperature in Celsius
+    pub enabled: Option<bool>,// Enable or disable heating
+    pub kp: Option<f32>,// Proportional gain for PID controller
+    pub ki: Option<f32>,// Integral gain for PID controller
+    pub kd: Option<f32>,// Derivative gain for PID controller
+    pub reset_integral: Option<bool>,// Reset the integral term of the PID controller
 }
 
 impl Default for HeatingRequest {
@@ -878,145 +782,54 @@ impl Msg for HeatingRequest {
 
 
 #[derive(Debug, Clone, PartialEq, cbor2::Cbor)]
+#[cbor(array)]
 pub struct HoverboardEvent {
-    /// 1:Voltage 2:Speed 3:Torque
-    #[cbor(key = 0)]
-    pub ctrl_mod: Option<i32>,
-    /// 0:Commutation 1:Sinusoidal 2:FOC
-    #[cbor(key = 1)]
-    pub ctrl_typ: Option<i32>,
-    /// Max phase current A
-    #[cbor(key = 2)]
-    pub cur_mot_max: Option<i32>,
-    /// Max motor RPM
-    #[cbor(key = 3)]
-    pub rpm_mot_max: Option<i32>,
-    /// Enable field weak 0:OFF 1:ON
-    #[cbor(key = 4)]
-    pub fi_weak_ena: Option<i32>,
-    /// Field weak high RPM
-    #[cbor(key = 5)]
-    pub fi_weak_hi: Option<i32>,
-    /// Field weak low RPM
-    #[cbor(key = 6)]
-    pub fi_weak_lo: Option<i32>,
-    /// Field weak max current A (FOC only)
-    #[cbor(key = 7)]
-    pub fi_weak_max: Option<i32>,
-    /// Max Phase Adv angle Deg (SIN only)
-    #[cbor(key = 8)]
-    pub phase_adv_max_deg: Option<i32>,
-    /// Input1 raw value
-    #[cbor(key = 9)]
-    pub input1_raw: Option<i32>,
-    /// Input1 type 0:Disabled, 1:Normal Pot, 2:Middle Resting Pot, 3:Auto-detect
-    #[cbor(key = 10)]
-    pub input1_typ: Option<i32>,
-    /// Input1 minimum value
-    #[cbor(key = 11)]
-    pub input1_min: Option<i32>,
-    /// Input1 middle value
-    #[cbor(key = 12)]
-    pub input1_mid: Option<i32>,
-    /// Input1 maximum value
-    #[cbor(key = 13)]
-    pub input1_max: Option<i32>,
-    /// Input1 command value
-    #[cbor(key = 14)]
-    pub input1_cmd: Option<i32>,
-    /// Input2 raw value
-    #[cbor(key = 15)]
-    pub input2_raw: Option<i32>,
-    /// Input2 type 0:Disabled, 1:Normal Pot, 2:Middle Resting Pot, 3:Auto-detect
-    #[cbor(key = 16)]
-    pub input2_typ: Option<i32>,
-    /// Input2 minimum value
-    #[cbor(key = 17)]
-    pub input2_min: Option<i32>,
-    /// Input2 middle value
-    #[cbor(key = 18)]
-    pub input2_mid: Option<i32>,
-    /// Input2 maximum value
-    #[cbor(key = 19)]
-    pub input2_max: Option<i32>,
-    /// Input2 command value
-    #[cbor(key = 20)]
-    pub input2_cmd: Option<i32>,
-    /// Input1 raw value
-    #[cbor(key = 21)]
-    pub aux_input1_raw: Option<i32>,
-    /// Input1 type 0:Disabled, 1:Normal Pot, 2:Middle Resting Pot, 3:Auto-detect
-    #[cbor(key = 22)]
-    pub aux_input1_typ: Option<i32>,
-    /// Input1 minimum value
-    #[cbor(key = 23)]
-    pub aux_input1_min: Option<i32>,
-    /// Input1 middle value
-    #[cbor(key = 24)]
-    pub aux_input1_mid: Option<i32>,
-    /// Input1 maximum value
-    #[cbor(key = 25)]
-    pub aux_input1_max: Option<i32>,
-    /// Input1 command value
-    #[cbor(key = 26)]
-    pub aux_input1_cmd: Option<i32>,
-    /// Input2 raw value
-    #[cbor(key = 27)]
-    pub aux_input2_raw: Option<i32>,
-    /// Input2 type 0:Disabled, 1:Normal Pot, 2:Middle Resting Pot, 3:Auto-detect
-    #[cbor(key = 28)]
-    pub aux_input2_typ: Option<i32>,
-    /// Input2 minimum value
-    #[cbor(key = 29)]
-    pub aux_input2_min: Option<i32>,
-    /// Input2 middle value
-    #[cbor(key = 30)]
-    pub aux_input2_mid: Option<i32>,
-    /// Input2 maximum value
-    #[cbor(key = 31)]
-    pub aux_input2_max: Option<i32>,
-    /// Input2 command value
-    #[cbor(key = 32)]
-    pub aux_input2_cmd: Option<i32>,
-    /// Total DC Link current A *100
-    #[cbor(key = 33)]
-    pub dc_curr: Option<i32>,
-    /// Right DC Link current A *100
-    #[cbor(key = 34)]
-    pub rdc_curr: Option<i32>,
-    /// Left DC Link current A *100
-    #[cbor(key = 35)]
-    pub ldc_curr: Option<i32>,
-    /// Left Motor Command RPM
-    #[cbor(key = 36)]
-    pub cmdl: Option<i32>,
-    /// Right Motor Command RPM
-    #[cbor(key = 37)]
-    pub cmdr: Option<i32>,
-    /// Motor Measured Avg RPM
-    #[cbor(key = 38)]
-    pub spd_avg: Option<i32>,
-    /// Left Motor Measured RPM
-    #[cbor(key = 39)]
-    pub spdl: Option<i32>,
-    /// Right Motor Measured RPM
-    #[cbor(key = 40)]
-    pub spdr: Option<i32>,
-    /// Rate *10
-    #[cbor(key = 41)]
-    pub filter_rate: Option<i32>,
-    /// Speed Coefficient *10
-    #[cbor(key = 42)]
-    pub spd_coef: Option<i32>,
-    /// Steer Coefficient *10
-    #[cbor(key = 43)]
-    pub str_coef: Option<i32>,
-    /// Calibrated Battery Voltage *100
-    #[cbor(key = 44)]
-    pub batv: Option<i32>,
-    /// Calibrated Temperature C *10
-    #[cbor(key = 45)]
-    pub temp: Option<i32>,
+    pub ctrl_mod: Option<i32>,// 1:Voltage 2:Speed 3:Torque
+    pub ctrl_typ: Option<i32>,// 0:Commutation 1:Sinusoidal 2:FOC
+    pub cur_mot_max: Option<i32>,// Max phase current A
+    pub rpm_mot_max: Option<i32>,// Max motor RPM
+    pub fi_weak_ena: Option<i32>,// Enable field weak 0:OFF 1:ON
+    pub fi_weak_hi: Option<i32>,// Field weak high RPM
+    pub fi_weak_lo: Option<i32>,// Field weak low RPM
+    pub fi_weak_max: Option<i32>,// Field weak max current A (FOC only)
+    pub phase_adv_max_deg: Option<i32>,// Max Phase Adv angle Deg (SIN only)
+    pub input1_raw: Option<i32>,// Input1 raw value
+    pub input1_typ: Option<i32>,// Input1 type 0:Disabled, 1:Normal Pot, 2:Middle Resting Pot, 3:Auto-detect
+    pub input1_min: Option<i32>,// Input1 minimum value
+    pub input1_mid: Option<i32>,// Input1 middle value
+    pub input1_max: Option<i32>,// Input1 maximum value
+    pub input1_cmd: Option<i32>,// Input1 command value
+    pub input2_raw: Option<i32>,// Input2 raw value
+    pub input2_typ: Option<i32>,// Input2 type 0:Disabled, 1:Normal Pot, 2:Middle Resting Pot, 3:Auto-detect
+    pub input2_min: Option<i32>,// Input2 minimum value
+    pub input2_mid: Option<i32>,// Input2 middle value
+    pub input2_max: Option<i32>,// Input2 maximum value
+    pub input2_cmd: Option<i32>,// Input2 command value
+    pub aux_input1_raw: Option<i32>,// Input1 raw value
+    pub aux_input1_typ: Option<i32>,// Input1 type 0:Disabled, 1:Normal Pot, 2:Middle Resting Pot, 3:Auto-detect
+    pub aux_input1_min: Option<i32>,// Input1 minimum value
+    pub aux_input1_mid: Option<i32>,// Input1 middle value
+    pub aux_input1_max: Option<i32>,// Input1 maximum value
+    pub aux_input1_cmd: Option<i32>,// Input1 command value
+    pub aux_input2_raw: Option<i32>,// Input2 raw value
+    pub aux_input2_typ: Option<i32>,// Input2 type 0:Disabled, 1:Normal Pot, 2:Middle Resting Pot, 3:Auto-detect
+    pub aux_input2_min: Option<i32>,// Input2 minimum value
+    pub aux_input2_mid: Option<i32>,// Input2 middle value
+    pub aux_input2_max: Option<i32>,// Input2 maximum value
+    pub aux_input2_cmd: Option<i32>,// Input2 command value
+    pub dc_curr: Option<i32>,// Total DC Link current A *100
+    pub rdc_curr: Option<i32>,// Right DC Link current A *100
+    pub ldc_curr: Option<i32>,// Left DC Link current A *100
+    pub cmdl: Option<i32>,// Left Motor Command RPM
+    pub cmdr: Option<i32>,// Right Motor Command RPM
+    pub spd_avg: Option<i32>,// Motor Measured Avg RPM
+    pub spdl: Option<i32>,// Left Motor Measured RPM
+    pub spdr: Option<i32>,// Right Motor Measured RPM
+    pub filter_rate: Option<i32>,// Rate *10
+    pub spd_coef: Option<i32>,// Speed Coefficient *10
+    pub str_coef: Option<i32>,// Steer Coefficient *10
+    pub batv: Option<i32>,// Calibrated Battery Voltage *100
+    pub temp: Option<i32>,// Calibrated Temperature C *10
 }
 
 impl Default for HoverboardEvent {
@@ -1107,13 +920,10 @@ impl Msg for HoverboardEvent {
 
 
 #[derive(Debug, Clone, PartialEq, cbor2::Cbor)]
+#[cbor(array)]
 pub struct HoverboardReply {
-    /// Speed command for the hoverboard
-    #[cbor(key = 0)]
-    pub speed: Option<i32>,
-    /// Steering command for the hoverboard
-    #[cbor(key = 1)]
-    pub steer: Option<i32>,
+    pub speed: Option<i32>,// Speed command for the hoverboard
+    pub steer: Option<i32>,// Steering command for the hoverboard
 }
 
 impl Default for HoverboardReply {
@@ -1160,13 +970,10 @@ impl Msg for HoverboardReply {
 
 
 #[derive(Debug, Clone, PartialEq, cbor2::Cbor)]
+#[cbor(array)]
 pub struct HoverboardRequest {
-    /// Speed command for the hoverboard
-    #[cbor(key = 0)]
-    pub speed: Option<i32>,
-    /// Steering command for the hoverboard
-    #[cbor(key = 1)]
-    pub steer: Option<i32>,
+    pub speed: Option<i32>,// Speed command for the hoverboard
+    pub steer: Option<i32>,// Steering command for the hoverboard
 }
 
 impl Default for HoverboardRequest {
@@ -1213,25 +1020,14 @@ impl Msg for HoverboardRequest {
 
 
 #[derive(Debug, Clone, PartialEq, cbor2::Cbor)]
+#[cbor(array)]
 pub struct ImuEvent {
-    /// Gyroscope X axis in deg/s
-    #[cbor(key = 0)]
-    pub gyro_x: Option<f32>,
-    /// Gyroscope Y axis in deg/s
-    #[cbor(key = 1)]
-    pub gyro_y: Option<f32>,
-    /// Gyroscope Z axis in deg/s
-    #[cbor(key = 2)]
-    pub gyro_z: Option<f32>,
-    /// Accelerometer X axis in m/s^2
-    #[cbor(key = 3)]
-    pub accel_x: Option<f32>,
-    /// Accelerometer Y axis in m/s^2
-    #[cbor(key = 4)]
-    pub accel_y: Option<f32>,
-    /// Accelerometer Z axis in m/s^2
-    #[cbor(key = 5)]
-    pub accel_z: Option<f32>,
+    pub gyro_x: Option<f32>,// Gyroscope X axis in deg/s
+    pub gyro_y: Option<f32>,// Gyroscope Y axis in deg/s
+    pub gyro_z: Option<f32>,// Gyroscope Z axis in deg/s
+    pub accel_x: Option<f32>,// Accelerometer X axis in m/s^2
+    pub accel_y: Option<f32>,// Accelerometer Y axis in m/s^2
+    pub accel_z: Option<f32>,// Accelerometer Z axis in m/s^2
 }
 
 impl Default for ImuEvent {
@@ -1282,25 +1078,14 @@ impl Msg for ImuEvent {
 
 
 #[derive(Debug, Clone, PartialEq, cbor2::Cbor)]
+#[cbor(array)]
 pub struct Max31855Event {
-    /// Thermocouple temperature in Celsius
-    #[cbor(key = 0)]
-    pub thermocouple_temp: Option<f32>,
-    /// Internal temperature in Celsius
-    #[cbor(key = 1)]
-    pub internal_temp: Option<f32>,
-    /// Fault detected
-    #[cbor(key = 2)]
-    pub fault: Option<bool>,
-    /// Short to VCC detected
-    #[cbor(key = 3)]
-    pub fault_short_vcc: Option<bool>,
-    /// Short to GND detected
-    #[cbor(key = 4)]
-    pub fault_short_gnd: Option<bool>,
-    /// Open thermocouple detected
-    #[cbor(key = 5)]
-    pub fault_open_tc: Option<bool>,
+    pub thermocouple_temp: Option<f32>,// Thermocouple temperature in Celsius
+    pub internal_temp: Option<f32>,// Internal temperature in Celsius
+    pub fault: Option<bool>,// Fault detected
+    pub fault_short_vcc: Option<bool>,// Short to VCC detected
+    pub fault_short_gnd: Option<bool>,// Short to GND detected
+    pub fault_open_tc: Option<bool>,// Open thermocouple detected
 }
 
 impl Default for Max31855Event {
@@ -1351,12 +1136,10 @@ impl Msg for Max31855Event {
 
 
 #[derive(Debug, Clone, PartialEq, cbor2::Cbor)]
+#[cbor(array)]
 pub struct PingReply {
-    #[cbor(key = 0)]
     pub req_id: Option<u32>,
-    /// Timestamp in milliseconds since epoch
-    #[cbor(key = 1)]
-    pub timestamp: Option<u64>,
+    pub timestamp: Option<u64>,// Timestamp in milliseconds since epoch
 }
 
 impl Default for PingReply {
@@ -1403,12 +1186,10 @@ impl Msg for PingReply {
 
 
 #[derive(Debug, Clone, PartialEq, cbor2::Cbor)]
+#[cbor(array)]
 pub struct PingRequest {
-    #[cbor(key = 0)]
     pub req_id: Option<u32>,
-    /// Timestamp in milliseconds since epoch
-    #[cbor(key = 1)]
-    pub timestamp: Option<u64>,
+    pub timestamp: Option<u64>,// Timestamp in milliseconds since epoch
 }
 
 impl Default for PingRequest {
@@ -1455,72 +1236,40 @@ impl Msg for PingRequest {
 
 
 #[derive(Debug, Clone, PartialEq, cbor2::Cbor)]
+#[cbor(array)]
 pub struct Ps4Event {
-    #[cbor(key = 0)]
     pub button_left: Option<bool>,
-    #[cbor(key = 1)]
     pub button_right: Option<bool>,
-    #[cbor(key = 2)]
     pub button_up: Option<bool>,
-    #[cbor(key = 3)]
     pub button_down: Option<bool>,
-    #[cbor(key = 4)]
     pub button_square: Option<bool>,
-    #[cbor(key = 5)]
     pub button_cross: Option<bool>,
-    #[cbor(key = 6)]
     pub button_circle: Option<bool>,
-    #[cbor(key = 7)]
     pub button_triangle: Option<bool>,
-    #[cbor(key = 8)]
     pub button_left_shoulder: Option<bool>,
-    #[cbor(key = 9)]
     pub button_right_shoulder: Option<bool>,
-    #[cbor(key = 10)]
     pub button_left_trigger: Option<bool>,
-    #[cbor(key = 11)]
     pub button_right_trigger: Option<bool>,
-    #[cbor(key = 12)]
     pub button_left_joystick: Option<bool>,
-    #[cbor(key = 13)]
     pub button_right_joystick: Option<bool>,
-    #[cbor(key = 14)]
     pub button_share: Option<bool>,
-    #[cbor(key = 15)]
     pub button_options: Option<bool>,
-    #[cbor(key = 16)]
     pub button_touchpad: Option<bool>,
-    #[cbor(key = 17)]
     pub button_ps: Option<bool>,
-    #[cbor(key = 18)]
     pub axis_lx: Option<i32>,
-    #[cbor(key = 19)]
     pub axis_ly: Option<i32>,
-    #[cbor(key = 20)]
     pub axis_rx: Option<i32>,
-    #[cbor(key = 21)]
     pub axis_ry: Option<i32>,
-    #[cbor(key = 22)]
     pub gyro_x: Option<i32>,
-    #[cbor(key = 23)]
     pub gyro_y: Option<i32>,
-    #[cbor(key = 24)]
     pub gyro_z: Option<i32>,
-    #[cbor(key = 25)]
     pub accel_x: Option<i32>,
-    #[cbor(key = 26)]
     pub accel_y: Option<i32>,
-    #[cbor(key = 27)]
     pub accel_z: Option<i32>,
-    #[cbor(key = 28)]
     pub connected: Option<bool>,
-    #[cbor(key = 29)]
     pub battery_level: Option<i32>,
-    #[cbor(key = 30)]
     pub bluetooth: Option<bool>,
-    #[cbor(key = 31)]
     pub debug: Option<String>,
-    #[cbor(key = 32)]
     pub temp: Option<i32>,
 }
 
@@ -1599,23 +1348,15 @@ impl Msg for Ps4Event {
 
 
 #[derive(Debug, Clone, PartialEq, cbor2::Cbor)]
+#[cbor(array)]
 pub struct Ps4Request {
-    /// For request/reply matching, 0 if not a request/reply
-    #[cbor(key = 0)]
-    pub req_id: Option<u32>,
-    #[cbor(key = 1)]
+    pub req_id: Option<u32>,// For request/reply matching, 0 if not a request/reply
     pub rumble_small: Option<i32>,
-    #[cbor(key = 2)]
     pub rumble_large: Option<i32>,
-    #[cbor(key = 3)]
     pub led_red: Option<i32>,
-    #[cbor(key = 4)]
     pub led_green: Option<i32>,
-    #[cbor(key = 5)]
     pub led_blue: Option<i32>,
-    #[cbor(key = 6)]
     pub led_flash_on: Option<i32>,
-    #[cbor(key = 7)]
     pub led_flash_off: Option<i32>,
 }
 
@@ -1669,18 +1410,13 @@ impl Msg for Ps4Request {
 
 
 #[derive(Debug, Clone, PartialEq, cbor2::Cbor)]
+#[cbor(array)]
 pub struct SysEvent {
-    #[cbor(key = 0)]
     pub utc: Option<u64>,
-    #[cbor(key = 1)]
     pub uptime: Option<u64>,
-    #[cbor(key = 2)]
     pub free_heap: Option<u64>,
-    #[cbor(key = 3)]
     pub flash_size: Option<u64>,
-    #[cbor(key = 4)]
     pub cpu_board_type: Option<String>,
-    #[cbor(key = 5)]
     pub build_date_time: Option<String>,
 }
 
@@ -1732,13 +1468,10 @@ impl Msg for SysEvent {
 
 
 #[derive(Debug, Clone, PartialEq, cbor2::Cbor)]
+#[cbor(array)]
 pub struct SysReply {
-    /// For request/reply matching, 0 if not a request/reply
-    #[cbor(key = 0)]
-    pub req_id: Option<u32>,
-    #[cbor(key = 1)]
+    pub req_id: Option<u32>,// For request/reply matching, 0 if not a request/reply
     pub rc: Option<i32>,
-    #[cbor(key = 2)]
     pub message: Option<String>,
 }
 
@@ -1787,15 +1520,11 @@ impl Msg for SysReply {
 
 
 #[derive(Debug, Clone, PartialEq, cbor2::Cbor)]
+#[cbor(array)]
 pub struct SysRequest {
-    /// For request/reply matching, 0 if not a request/reply
-    #[cbor(key = 0)]
-    pub req_id: Option<u32>,
-    #[cbor(key = 1)]
+    pub req_id: Option<u32>,// For request/reply matching, 0 if not a request/reply
     pub set_time: Option<u64>,
-    #[cbor(key = 2)]
     pub reboot: Option<bool>,
-    #[cbor(key = 3)]
     pub console: Option<String>,
 }
 
@@ -1845,16 +1574,11 @@ impl Msg for SysRequest {
 
 
 #[derive(Debug, Clone, PartialEq, cbor2::Cbor)]
+#[cbor(array)]
 pub struct UsEvent {
-    /// Distance in meters
-    #[cbor(key = 0)]
-    pub distance: Option<f32>,
-    /// Temperature in Celsius
-    #[cbor(key = 1)]
-    pub temperature: Option<f32>,
-    /// Status code, 0 if no error
-    #[cbor(key = 2)]
-    pub status: Option<i32>,
+    pub distance: Option<f32>,// Distance in meters
+    pub temperature: Option<f32>,// Temperature in Celsius
+    pub status: Option<i32>,// Status code, 0 if no error
 }
 
 impl Default for UsEvent {
@@ -1902,22 +1626,15 @@ impl Msg for UsEvent {
 
 
 #[derive(Debug, Clone, PartialEq, cbor2::Cbor)]
+#[cbor(array)]
 pub struct WifiEvent {
-    #[cbor(key = 0)]
     pub ip: Option<String>,
-    #[cbor(key = 1)]
     pub gateway: Option<String>,
-    #[cbor(key = 2)]
     pub netmask: Option<String>,
-    #[cbor(key = 3)]
     pub ssid: Option<String>,
-    #[cbor(key = 4)]
     pub bssid: Option<String>,
-    #[cbor(key = 5)]
     pub channel: Option<i32>,
-    #[cbor(key = 6)]
     pub rssi: Option<i32>,
-    #[cbor(key = 7)]
     pub mac: Option<String>,
 }
 

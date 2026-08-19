@@ -11,7 +11,6 @@
 #include <msg.h>
 #include <unordered_map>
 #include <string>
-#include <fnv.h>
 
 // ── TinyCBOR helper ────────────────────────────────────────────────────────
 

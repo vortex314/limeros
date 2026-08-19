@@ -124,7 +124,7 @@ impl MulticastActor {
             dst: Some(src),
             msg_type: Some(EndpointAnnounceReply::id()),
             payload: Some(ep_announce_reply.to_bytes()?),
-            request_id: None,
+            sequence: None,
             instance_id: None,
         };
         self.udp_actor

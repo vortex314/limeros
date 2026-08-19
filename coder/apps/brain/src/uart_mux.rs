@@ -9,7 +9,7 @@ use std::fmt;
 use std::sync::Arc;
 use std::time::Duration;
 
-use generated::generated::{EndpointAnnounce, Envelope, opt_id_to_string};
+use generated::generated::{EndpointAnnounce, Envelope, ImuEvent, opt_id_to_string};
 use kameo::actor::{ActorId, ActorRef, Recipient, WeakActorRef};
 use kameo::error::ActorStopReason;
 use kameo::message::{Context, Message};
@@ -181,16 +181,24 @@ impl UartMuxActor {
                 let frame = uart_buffer.clone();
                 uart_buffer.clear();
                 let v = decode_cobs_frame(&frame)?;
-                let envelope =Envelope::from_bytes(&v) ?;
+
+                let envelope = Envelope::from_bytes(&v).context("failed parsing envelope")?;
                 let src = envelope.src.context("missing src in envelope")?;
                 let msg_type = envelope.msg_type.context("missing msg_type in envelope")?;
                 if msg_type == EndpointAnnounce::MSG_ID {
+                    let ep_an = EndpointAnnounce::from_bytes(&envelope.payload.context("missing payload in EndpointAnnounce")?)?;
                     warn!("endpoint announce from UART {} {} ", msg.uart, opt_id_to_string(envelope.src));
+                    info!("EndpointAnnounce: {:?}", ep_an);
                     self.id_to_uart.insert(src, msg.uart);
                     self.router_ref.tell(RegisterDevice{ recipient: ctx.actor_ref().clone().recipient(), id: src }).try_send().ok();
+                    // use ep_an fields as needed
+                } else {
+                    info!("Found message {}", opt_id_to_string(envelope.msg_type));
+                    let x= ImuEvent::from_bytes(&envelope.payload.context("missing payload in ImuEvent")?).context("failed parsing ImuEvent")?;
+                    info!("IMU event from UART {}: {:?}", msg.uart, x);
                 }
                 // send the envelope to the router
-                self.router_ref.tell(FromDevice{ envelope:Arc::new(envelope), id: src }).try_send().ok();
+      //          self.router_ref.tell(FromDevice{ envelope:Arc::new(envelope), id: src }).try_send().ok();
             } else {
                 uart_buffer.push(b);
                 if uart_buffer.len() > 1024 {
@@ -495,6 +503,12 @@ impl Message<ReceivedFrame> for UartMuxActor {
         ctx: &mut Context<Self, Self::Reply>,
     ) -> Self::Reply {
         // convert frame to uart and payload
+        info!(
+            "Received frame from UART {}: {} bytes",
+            msg.uart,
+            msg.data.len()
+        );
+
         self.handle_recvd_frame(msg,ctx).await.log_error(" Cannot handle received frame ");
     }
 }

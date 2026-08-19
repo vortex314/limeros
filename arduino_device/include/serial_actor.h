@@ -24,13 +24,16 @@ private:
     } _state = SerialState::IDLE;
     CircBuf<uint8_t> _txBuffer{256};
     CircBuf<uint8_t> _rxBuffer{256};
+    Buffer _cborBuffer{256};
+    std::shared_ptr<ActorMessage> _led_pulse_msg;
 
 
 public:
     explicit SerialActor(HardwareSerial &serial, ActorId greenLedActorId);
     void setup() override;
     void update() override;
-    void receive(const ActorMessage &msg) override;
+    void receive(std::shared_ptr<ActorMessage> msg) override;
+    void sendSerialMsg(Msg *msg);
 };
 
 #endif // SERIAL_ACTOR_H

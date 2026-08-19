@@ -10,6 +10,8 @@
 
 #include "actor_framework.h"
 #include "led_actor.h"
+#include "serial_actor.h"
+#include "imu_actor.h"
 
 // ---------------------------------------------------------------------------
 // Configuration
@@ -61,7 +63,6 @@
 
 Log logger;
 
-
 void setup()
 {
 
@@ -75,14 +76,16 @@ void setup()
   ActorId redLedActorId = actor_system.registerActor(new LedActor(RED_LED));
   ActorId greenLedActorId = actor_system.registerActor(new LedActor(GREEN_LED));
   ActorId blueLedActorId = actor_system.registerActor(new LedActor(BLUE_LED));
-  ActorId serialActorId = actor_system.registerActor(new SerialActor(Serial1,greenLedActorId));
+  ActorId serialActorId = actor_system.registerActor(new SerialActor(Serial1, greenLedActorId));
+  ActorId imuActorId = actor_system.registerActor(new ImuActor(serialActorId));
   (void)redLedActorId;
   (void)greenLedActorId;
   (void)blueLedActorId;
   (void)serialActorId;
-  actor_system.send(redLedActorId, redLedActorId, new LedBlink(500));
-  actor_system.send(greenLedActorId, greenLedActorId, new LedBlink(1000));
-  actor_system.send(blueLedActorId, blueLedActorId, new LedBlink(1500));
+  (void)imuActorId;
+  actor_system.send(redLedActorId, redLedActorId, new LedOn(false));
+  actor_system.send(greenLedActorId, greenLedActorId, new LedOn(false));
+  actor_system.send(blueLedActorId, blueLedActorId, new LedOn(false));
 }
 
 void loop()
@@ -103,5 +106,3 @@ extern "C" void _exit()
   while (1)
     ;
 }
-
-

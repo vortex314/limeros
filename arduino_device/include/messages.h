@@ -24,6 +24,7 @@ DEFINE_MSG(SerialSendFrameMsg, uint8_t *data; size_t length;)
 DEFINE_MSG(SerialReceiveFrameMsg, uint8_t *data; size_t length;)
 DEFINE_MSG(LedPulse, uint32_t duration_ms;LedPulse(uint32_t duration) : duration_ms(duration) {})
 DEFINE_MSG(LedBlink, uint32_t interval_ms;LedBlink(uint32_t interval) : interval_ms(interval) {})
-
+DEFINE_MSG(LedOn, bool on; LedOn(bool state) : on(state) {})
+DEFINE_MSG(FromDevice, Msg* msg ; FromDevice(Msg* m) : msg(m) {})
 
 #endif // MESSAGES_H
