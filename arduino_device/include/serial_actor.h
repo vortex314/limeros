@@ -27,6 +27,7 @@ private:
     std::shared_ptr<ActorMessage> _led_pulse_msg;
     EndpointAnnounce _announce_msg;
     uint32_t _endpopint_id;
+    uint32_t sequence_number = 0;
 
 public:
     explicit SerialActor(HardwareSerial &serial, ActorId greenLedActorId);

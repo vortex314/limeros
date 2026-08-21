@@ -24,23 +24,39 @@ def patch_file(rel_path, pattern, replacement):
             f.write(patched)
         print(f"[Energia Patch] Successfully patched {rel_path}")
 
-# 1. Patch random.c (srandom signature)
+# 1. Patch WMath.cpp: srandom() signature must match newlib stdlib.h's
+#    `void srandom(unsigned)`; Energia's `unsigned long` version conflicts.
+patch_file(
+    join("cores", "tivac", "WMath.cpp"),
+    r"extern\s+void\s+srandom\(unsigned long __seed\);",
+    "extern void srandom(unsigned int __seed);"
+)
+
+# 2. Patch random.c: keep its srandom() definition in sync with the header.
 patch_file(
     join("cores", "tivac", "random.c"),
     r"srandom\s*\(\s*unsigned\s+long\s+seed\s*\)",
     "srandom(unsigned int seed)"
 )
 
-# 2. Patch WMath.cpp (redundant extern prototypes)
-patch_file(
-    join("cores", "tivac", "WMath.cpp"),
-    r"extern\s+void\s+srandom\(unsigned long __seed\);",
-    "// patched: extern void srandom(unsigned long __seed);"
-)
+# 3. Provide a _fini stub in startup_gcc.c: the titiva platform links with
+#    -nostartfiles, so crtn.o (which normally defines _fini) is omitted,
+#    leaving an undefined reference from newlib's __libc_fini_array.
+#    (_init is already defined by the framework's cores/tivac/main.cpp.)
+startup = join("cores", "tivac", "startup_gcc.c")
+if isfile(join(FRAMEWORK_DIR, startup)):
+    spath = join(FRAMEWORK_DIR, startup)
+    with open(spath, "r") as f:
+        content = f.read()
+    if "void _fini(void) {}" not in content:
+        with open(spath, "a") as f:
+            f.write(
+                "\n/* Patched by patch.py: _fini stub (crtn.o not linked due to "
+                "-nostartfiles) */\n"
+                "void _fini(void) {}\n"
+            )
+        print(f"[Energia Patch] Added _fini stub to {startup}")
 
-# 3. Patch itoa.h (utoa duplicate prototype)
-patch_file(
-    join("cores", "tivac", "itoa.h"),
-    r"extern\s+char\*\s+utoa\(\s*unsigned long value,\s*char \*string,\s*int radix\s*\)\s*;",
-    "// patched: extern char* utoa(unsigned long, char*, int);"
-)
+# Note: -D_ITOA_ was removed from build_flags because it pre-defines the
+# include guard of cores/tivac/itoa.h, silently disabling that header and
+# leaving ltoa()/ultoa() undeclared.

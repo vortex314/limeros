@@ -28,16 +28,6 @@ void SerialActor::update()
     _timer.update();
 }
 
-void print_buffer_hex(Buffer &buffer)
-{
-    printf("[%d] ", buffer.size());
-    for (size_t i = 0; i < buffer.size(); ++i)
-    {
-        printf("%02X ", buffer[i]);
-    }
-    printf("\n");
-}
-
 void SerialActor::sendSerialMsg(Msg *msg)
 {
     Buffer buffer(256);
@@ -46,10 +36,10 @@ void SerialActor::sendSerialMsg(Msg *msg)
         WARN("Failed to encode Msg");
         return;
     }
-    print_buffer_hex(buffer);
     Envelope env;
     env.src = FNV("Imu");
     env.msg_type = msg->msg_id();
+    env.sequence = sequence_number++;
     env.payload = std::vector<uint8_t>(buffer.data(), buffer.data() + buffer.size());
     if (env.encode(buffer))
     {
@@ -69,7 +59,7 @@ void SerialActor::sendSerialMsg(Msg *msg)
 
     actor_system.send(_led_pulse_msg);
 
-    Serial1.write(buffer.data(), buffer.size());
+    _serial.write(buffer.data(), buffer.size());
 }
 
 

@@ -8,8 +8,6 @@
 #include "serial_actor.h"
 #include "imu_actor.h"
 
-
-
 // ---------------------------------------------------------------------------
 // Configuration
 // ---------------------------------------------------------------------------
@@ -75,14 +73,16 @@ void setup()
   ActorId blueLedActorId = actor_system.registerActor(new LedActor(BLUE_LED));
   ActorId serialActorId = actor_system.registerActor(new SerialActor(Serial1, greenLedActorId));
   ActorId imuActorId = actor_system.registerActor(new ImuActor(serialActorId));
+
+  actor_system.send(redLedActorId, redLedActorId, new LedOn(false));
+  actor_system.send(greenLedActorId, greenLedActorId, new LedOn(false));
+  actor_system.send(blueLedActorId, blueLedActorId, new LedOn(false));
+
   (void)redLedActorId;
   (void)greenLedActorId;
   (void)blueLedActorId;
   (void)serialActorId;
   (void)imuActorId;
-  actor_system.send(redLedActorId, redLedActorId, new LedOn(false));
-  actor_system.send(greenLedActorId, greenLedActorId, new LedOn(false));
-  actor_system.send(blueLedActorId, blueLedActorId, new LedOn(false));
 }
 
 void loop()

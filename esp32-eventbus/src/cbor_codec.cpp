@@ -1,6 +1,5 @@
 #include "cbor_codec.h"
 
-#include <string.h>
 
 CborEncoder::CborEncoder(Buffer &buffer)
     : _buffer(buffer), _last_error(0) {
