@@ -1,7 +1,6 @@
 #ifndef FNV_H
 #define FNV_H
 
-#include <cstdint>
 
 // FNV-1a hash function for 32-bit hash value
 constexpr uint32_t fnv1a_32_1(const char *str, uint32_t hash = 2166136261U)

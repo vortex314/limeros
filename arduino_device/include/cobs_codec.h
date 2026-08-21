@@ -1,7 +1,5 @@
 #pragma once
-
-#include <stddef.h>
-#include <stdint.h>
+#include "app_compat.h"
 
 size_t cobs_encode(const uint8_t *data,
                    size_t len,

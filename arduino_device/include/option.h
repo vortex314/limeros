@@ -1,5 +1,5 @@
 #pragma once
-#include <functional>
+#include "app_compat.h"
 template <typename T>
 class Option {
 public:

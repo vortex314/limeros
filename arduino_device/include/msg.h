@@ -1,11 +1,9 @@
 #ifndef MSG_H
 #define MSG_H
+#include "app_compat.h"
 #include <option.h>
-#include <errno.h>
 #include <log.h>
-#include <assert.h>
-#include <vector>
-#include <cstdlib>
+
 #include <buffer.h>
 #include <fnv.h>
 #include <typed_message.h>
@@ -15,7 +13,15 @@ extern void print_cbor_diagnostic(const uint8_t *data, size_t size);
 
 // ---------------------- abstract class Msg ------------------
 
-class Msg : public TypedMessage
+class SerdesMsg 
+{
+public:
+    virtual ~SerdesMsg() = default;
+    virtual int encode(Buffer &buffer) const = 0;
+    virtual int decode(Buffer &buffer) = 0;
+};
+
+class Msg : public TypedMsg,public SerdesMsg
 {
 public:
     static const uint32_t MSG_ID = FNV("Msg");
@@ -42,8 +48,7 @@ public:
         if (msg_id() == T::MSG_ID)
             f(static_cast<const T &>(*this));
     }
-    template <typename T>
-    bool is() const { return msg_id() == T::MSG_ID; }
+
 };
 
 #endif // MSG_H

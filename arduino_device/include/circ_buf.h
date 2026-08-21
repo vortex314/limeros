@@ -2,8 +2,7 @@
 #define CIRCBUF_H_
 
 // #include "base.h"
-#include <stdint.h>
-#include <errno.h>
+
 
 #define POW 4
 #define CIRCBUF_SIZE (1 << POW)

@@ -1,9 +1,4 @@
-#include <Arduino.h>
-#include <stddef.h>
-#include <stdint.h>
-#include <string.h>
-#include <vector>
-
+#include "app_compat.h"
 #include <option.h>
 #include "cbor_codec.h"
 #include "cobs_codec.h"
@@ -12,6 +7,8 @@
 #include "led_actor.h"
 #include "serial_actor.h"
 #include "imu_actor.h"
+
+
 
 // ---------------------------------------------------------------------------
 // Configuration

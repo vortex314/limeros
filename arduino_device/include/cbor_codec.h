@@ -1,16 +1,7 @@
 #ifndef CBOR_CODEC_H
 #define CBOR_CODEC_H
-#pragma once
-
-#include <stddef.h>
-#include <stdint.h>
-#include <string.h>
-
+#include "app_compat.h"
 #include "option.h"
-#include <string>
-#include <type_traits>
-#include <vector>
-
 #include "buffer.h"
 
   typedef enum {

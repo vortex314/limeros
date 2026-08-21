@@ -1,11 +1,15 @@
 
 #include "serial_actor.h"
-#include "msgs.h"
+
+#ifndef ENDPOINT_ID 
+#define ENDPOINT_ID FNV("IMU")
+#endif 
 
 SerialActor::SerialActor(HardwareSerial &serial, ActorId greenLedActorId) : _serial(serial), _tx_led(greenLedActorId), _timer(1) {}
 
 void SerialActor::setup()
 {
+    _endpopint_id = ENDPOINT_ID;
     _timer.setOwner(id);
     _timer.start(1000, true); // Start the timer with a 1 msec interval
     _serial.begin(115200);
@@ -13,6 +17,10 @@ void SerialActor::setup()
     _led_pulse_msg->src = id;
     _led_pulse_msg->dst = _tx_led;
     _led_pulse_msg->set_payload(new LedPulse(10));
+    _announce_msg.id = _endpopint_id;
+    _announce_msg.name = "IMU Sensor";
+    _announce_msg.description = "Inertial Measurement Unit";
+    _announce_msg.events = std::vector<uint32_t>{ImuEvent::MSG_ID};
 }
 
 void SerialActor::update()
@@ -64,25 +72,7 @@ void SerialActor::sendSerialMsg(Msg *msg)
     Serial1.write(buffer.data(), buffer.size());
 }
 
-#include <malloc.h>
-// ============================================================================
 
-void print_heap_stats()
-{
-    struct mallinfo info = mallinfo();
-
-    // Total allocated space from system
-    printf("arena: %d bytes\n", info.arena);
-
-    // Total allocated space (in use by application)
-    printf("uordblks: %d bytes\n", info.uordblks);
-
-    // Total free space (available for allocation)
-    printf("fordblks: %d bytes\n", info.fordblks);
-
-    // Total mmapped memory
-    printf("hblkhd: %d bytes\n", info.hblkhd);
-}
 
 void SerialActor::receive(std::shared_ptr<ActorMessage> msg)
 {
@@ -97,12 +87,7 @@ void SerialActor::receive(std::shared_ptr<ActorMessage> msg)
     msg->handle<TimerMsg>([this](const TimerMsg &m)
                           {
                               INFO("TimerMsg received, sending EndpointAnnounce message");
-                              EndpointAnnounce announce;
-                              announce.id = 1;
-                              announce.name = "IMU Sensor";
-                              announce.description = "Inertial Measurement Unit";
-                              announce.events = std::vector<uint32_t>{ImuEvent::MSG_ID};
-                              sendSerialMsg(&announce); });
+                              sendSerialMsg(&_announce_msg); });
     msg->handle<FromDevice>([this](const FromDevice &m)
                             { INFO("FromDevice message received, sending to serial port.");
                                 sendSerialMsg(m.msg); });

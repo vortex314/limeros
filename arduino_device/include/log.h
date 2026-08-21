@@ -1,9 +1,6 @@
 #ifndef SRC_LOG_H_
 #define SRC_LOG_H_
-#include <stdint.h>
-#include <stdarg.h>
-#include <stdio.h>
-#include <atomic>
+#include "app_compat.h"
 
 #define ColorOrange "\033[33m"
 #define ColorGreen "\033[32m"

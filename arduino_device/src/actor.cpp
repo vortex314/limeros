@@ -1,6 +1,4 @@
-#include <stdint.h>
-#include <cstddef>
-#include <Arduino.h>
+#include "app_compat.h"
 
 // constexpr for FNV hashing of strings at compile time
 constexpr uint32_t fnv1a_32(const char *str, size_t len, uint32_t hash = 0x811c9dc5)

@@ -1,25 +1,21 @@
-#pragma once
-
-#include <Arduino.h>
-#include <string.h> // for strncpy
+#ifndef _ACTOR_FRAMEWORK_H
+#define _ACTOR_FRAMEWORK_H
+#include "app_compat.h"
+#include "circ_buf.h"
+#include <fnv.h>
+#include <log.h>
+#include <typed_message.h>
 
 typedef uint32_t ActorId;
 typedef uint32_t MsgType;
 typedef uint32_t TimerId;
 
-#include "circ_buf.h"
-#include <array>
-#include <memory>
-#include <fnv.h>
-#include <vector>
-#include <log.h>
-#include <typed_message.h>
 
 class ActorSystem;
 
 
 #define DEFINE_MSG(Name, ...)                                      \
-    class Name : public TypedMessage                                    \
+    class Name : public TypedMsg                                    \
     {                                                              \
     public:                                                        \
         static constexpr MsgType MSG_ID = FNV(#Name);         \
@@ -40,7 +36,7 @@ struct ActorMessage
 public:
     ActorId src = 0;
     ActorId dst = 0;
-    TypedMessage *payload = nullptr;
+    TypedMsg *payload = nullptr;
 
 public:
     // ---- type-safe helpers ----
@@ -66,7 +62,7 @@ public:
         if (payload)
             delete payload;
     }
-    void set_payload(TypedMessage *p)
+    void set_payload(TypedMsg *p)
     {
         if (payload)
             delete payload;
@@ -143,7 +139,7 @@ public:
         return _circ_buf.write(msg) == 0 ? true : false;
     }
 
-    bool send(ActorId dst, ActorId src, TypedMessage* payload)
+    bool send(ActorId dst, ActorId src, TypedMsg* payload)
     {
         auto msg = std::make_shared<ActorMessage>();
         msg->src = src;
@@ -188,3 +184,5 @@ public:
 
 // Global instance
 extern ActorSystem actor_system;
+
+#endif

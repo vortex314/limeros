@@ -2,13 +2,9 @@
 #define MESSAGES_H
 #pragma once
 
-#include <cstdint>
-#include <cstring>
-#include <option.h>
-#include <vector>
-#include <string>
-#include <msg.h>
+#include "app_compat.h"
 #include <actor_framework.h>
+#include "msg.h"
 
 
 // ============================================================

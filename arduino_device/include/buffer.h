@@ -1,12 +1,7 @@
 #ifndef BUFFER_H
 #define BUFFER_H
-#include <cstdint>
-#include <cstdlib>
-#include <cstring>
-#include <vector>
-#include <log.h>
-#include <assert.h>
-#include <errno.h>
+#include <app_compat.h>
+#include "log.h"
 
 class Buffer
 {

@@ -6,11 +6,11 @@
 #ifndef HCL_CPP_TERA
 #define HCL_CPP_TERA
 #pragma once
-
-#include <errno.h>
-#include <msg.h>
-#include <unordered_map>
-#include <string>
+#include "app_compat.h"
+#include "option.h"
+#include "buffer.h"
+#include "msg.h"
+#include "fnv.h"
 
 // ── TinyCBOR helper ────────────────────────────────────────────────────────
 

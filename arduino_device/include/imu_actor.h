@@ -1,10 +1,17 @@
 #ifndef IMU_ACTOR_H
 #define IMU_ACTOR_H
 #include <actor_framework.h>
-#include <Arduino.h>
+
 #include "timer.h"
 #include "messages.h"
 #include "msgs.h"
+
+// Clean up problematic macros defined by Energia/Arduino core
+#undef min
+#undef max
+#undef abs
+#undef round
+#undef swap
 
 class ImuActor : public Actor
 {

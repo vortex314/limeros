@@ -1,14 +1,13 @@
 #ifndef SERIAL_ACTOR_H
 #define SERIAL_ACTOR_H
+#include "app_compat.h"
 #include <actor_framework.h>
-#include <Arduino.h>
 #include "timer.h"
 #include "messages.h"
-
+#include "msgs.h"
 #include "circ_buf.h"
 #include "cbor_codec.h"
 #include "cobs_codec.h"
-
 
 class SerialActor : public Actor
 {
@@ -26,7 +25,8 @@ private:
     CircBuf<uint8_t> _rxBuffer{256};
     Buffer _cborBuffer{256};
     std::shared_ptr<ActorMessage> _led_pulse_msg;
-
+    EndpointAnnounce _announce_msg;
+    uint32_t _endpopint_id;
 
 public:
     explicit SerialActor(HardwareSerial &serial, ActorId greenLedActorId);

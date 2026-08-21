@@ -1,7 +1,6 @@
 #ifndef LED_ACTOR_H
 #define LED_ACTOR_H
 #include <actor_framework.h>
-#include <Arduino.h>
 #include "timer.h"
 #include "messages.h"
 
