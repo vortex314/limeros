@@ -9,7 +9,7 @@ LedActor::~LedActor()
 {
 }
 
-void LedActor::on_message(const ActorMessage &msg)
+void LedActor::receive(const ActorMessage &msg)
 {
 
     msg.handle_if<LedOn>([&](auto _)
@@ -97,7 +97,7 @@ void LedActor::on_timer(int timer_id)
     }
 }
 
-void LedActor::on_start()
+void LedActor::setup()
 {
     gpio_set_direction(GPIO_LED, GPIO_MODE_OUTPUT);
     gpio_set_level(GPIO_LED, LED_OFF_VALUE);

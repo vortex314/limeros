@@ -15,9 +15,9 @@ private:
 public:
   SysActor(const char *name);
   ~SysActor();
-  void on_message(const ActorMessage &msg);
+  void receive(const ActorMessage &msg);
   void on_timer(int timer_id);
-  void on_start();
+  void setup();
   void set_utc(int64_t utc);
   void publish_info();
   static void reboot(bool b);

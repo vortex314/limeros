@@ -17,27 +17,6 @@
 #include "driver/mcpwm_fault.h"
 #include <driver/gpio.h>
 
-struct MotorMsg : public Msg
-{
-    static const uint32_t MSG_ID = FNV("MotorMsg");
-    static constexpr const char *MSG_NAME = "MotorMsg";
-
-    virtual uint32_t msg_id() const { return MSG_ID; };
-    virtual const char *msg_name() const { return MSG_NAME; };
-
-    Option<uint32_t> rpm_target;
-    Option<uint32_t> rpm_measured;
-    Option<float> pwm;
-    Option<float> Kp;
-    Option<float> Ki;
-    Option<float> Kd;
-    Option<float> p;
-    Option<float> i;
-    Option<float> d;
-
-    int encode(Buffer& buffer) const;
-    int decode(Buffer& buffer);
-};
 
 struct MotorEvent
 {
@@ -60,11 +39,10 @@ class MotorActor : public Actor
 {
 public:
     MotorActor();
-    MotorActor(const char *name, size_t stack_size, int priority, size_t queue_depth);
     ~MotorActor();
     void on_cmd(MotorCmd &cmd);
     void on_timer(int timer_id);
-    void on_start(void);
+    void setup(void);
     Res pwm_init();
     Res capture_init();
     Res pwm_test();
@@ -78,6 +56,7 @@ public:
     Res pwm_stop();
 
 private:
+    EventBus *_eventbus = nullptr;
     int _timer_publish = -1;
     int _timer_watchdog = -1;
     int _timer_pid = -1;

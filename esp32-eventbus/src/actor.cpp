@@ -327,7 +327,7 @@ void EventBus::loop()
     ActorMessage *pmsg;
     for (Actor *actor : _actors)
     {
-        actor->on_start();
+        actor->setup();
     }
     uint32_t timeout = 100; // 100 ms timeout
 
@@ -342,7 +342,7 @@ void EventBus::loop()
             }
             for (Actor *actor : _actors)
             {
-                    actor->on_message(*pmsg);
+                    actor->receive(*pmsg);
             }
             delete pmsg;
         }
@@ -353,7 +353,7 @@ void EventBus::loop()
             for (int id : actor->timers().get_expired_timers())
             {
                 TimerMsg tm(id);
-                actor->on_message(tm);
+                actor->receive(tm);
                 actor->timers().refresh(id);
             }
             uint64_t sleep_duration = actor->sleep_time();

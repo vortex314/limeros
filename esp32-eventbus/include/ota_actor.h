@@ -38,8 +38,8 @@ private:
 public:
   OtaActor(const char *name);
   ~OtaActor();
-  void on_message(const ActorMessage &);
-  void on_start();
+  void receive(const ActorMessage &);
+  void setup();
   static void tftp_ota_server_task(void *arg);
   void start_task();
   void stop_task();

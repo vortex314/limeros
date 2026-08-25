@@ -41,7 +41,7 @@ Max31855Actor::~Max31855Actor()
     }
 }
 
-void Max31855Actor::on_start()
+void Max31855Actor::setup()
 {
     if (!init_spi())
     {
@@ -70,7 +70,7 @@ void Max31855Actor::on_start()
          MAX31855_SPI_MODE);
 }
 
-void Max31855Actor::on_message(const ActorMessage &msg)
+void Max31855Actor::receive(const ActorMessage &msg)
 {
     msg.handle_if<TimerMsg>([&](const TimerMsg &timer_msg)
                             {

@@ -180,7 +180,7 @@ public:
 class ThreadSupport
 {
 public:
-    virtual void on_start() = 0;
+    virtual void setup() = 0;
     virtual void on_stop() = 0;
     virtual QueueHandle_t queue_handle() = 0;
     Option<QueueHandle_t> additional_queue() { return Option<QueueHandle_t>(); }
@@ -201,6 +201,7 @@ class EventBus : public Queue<const ActorMessage *>
 
 public:
     EventBus(size_t size);
+    ~EventBus();
     void push(const ActorMessage *env);
     void register_actor(Actor *);
     void register_handler(std::function<void(const ActorMessage &)> handler)
@@ -224,9 +225,9 @@ public:
     Actor(const char *name) : _self(name) { _self.set_local(true); };
     ~Actor() { INFO("Destroying actor %s", name()); }
 
-    virtual void on_start() { INFO("actor %s default started.", _self.name()); }
+    virtual void setup() { INFO("actor %s default started.", _self.name()); }
     virtual void on_stop() { INFO("actor %s default stopped.", _self.name()); }
-    virtual void on_message(const ActorMessage &env)
+    virtual void receive(const ActorMessage &env)
     {
         WARN(" No message handler for actor %s ", _self.name());
     }
@@ -253,12 +254,10 @@ public:
         for (int id : _timers.get_expired_timers())
         {
             ActorMessage *env =  new TimerMsg(id);
-            on_message(*env);
+            receive(*env);
             _timers.refresh(id);
         }
     };
-    void loop() {};
-    void stop() {}
     int timer_one_shot(uint64_t delay) { return _timers.create_one_shot(delay); }
     int timer_repetitive(uint64_t period) { return _timers.create_repetitive(period); }
     void timer_stop(int id) { _timers.stop(id); }

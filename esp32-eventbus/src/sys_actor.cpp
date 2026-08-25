@@ -10,7 +10,7 @@ SysActor::SysActor(const char *name) : Actor(name)
     _timer_publish = timer_repetitive(1000);
 }
 
-void SysActor::on_start()
+void SysActor::setup()
 {
     EndpointAnnounce *announce = new EndpointAnnounce();
     announce->events={SysEvent::MSG_ID};
@@ -56,7 +56,7 @@ void SysActor::reboot(bool b)
         esp_restart();
 }
 
-void SysActor::on_message(const ActorMessage &msg)
+void SysActor::receive(const ActorMessage &msg)
 {
     msg.handle_if<SysRequest>([&](auto sys_request)
                        { if ( sys_request.reboot) reboot(*sys_request.reboot);

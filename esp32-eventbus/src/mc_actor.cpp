@@ -28,7 +28,7 @@ McActor::~McActor()
 {
 }
 
-void McActor::on_start()
+void McActor::setup()
 {
     INFO("UDP Actor started");
 }
@@ -150,7 +150,7 @@ void McActor::stop_listener()
     _running = false;
 }
 
-void McActor::on_message(const ActorMessage &msg)
+void McActor::receive(const ActorMessage &msg)
 {
     // local actors specify their capabilities via EndpointAnnounce messages
     msg.handle_if<EndpointAnnounce>([&](const EndpointAnnounce &msg)

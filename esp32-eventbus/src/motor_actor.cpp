@@ -133,7 +133,7 @@ void MotorActor::on_timer(int id)
     }
 }
 
-void MotorActor::on_start(void)
+void MotorActor::setup(void)
 {
     capture_init()
         .and_then([&](auto r)
@@ -432,38 +432,4 @@ Res MotorActor::pwm_stop()
     return ResOk;
 }
 
-Res MotorMsg::serialize(Serializer &ser) const
-{
-    ser.reset();
-    ser.map_begin();
-    ser.serialize(KEY("rpm_measured"), rpm_measured);
-    ser.serialize(KEY("rpm_target"), rpm_target);
-    ser.serialize(KEY("Kp"), Kp);
-    ser.serialize(KEY("Ki"), Ki);
-    ser.serialize(KEY("Kd"), Kd);
-    ser.serialize(KEY("pwm"), pwm);
-    ser.serialize(KEY("p"), p);
-    ser.serialize(KEY("i"), i);
-    ser.serialize(KEY("d"), d);
-    return ser.map_end();
-}
 
-Res MotorMsg::deserialize(Deserializer &des)
-{
-    return des.iterate_map([&](Deserializer &d, uint32_t key) -> Res
-                           {
-        switch (key)
-        {
-        case H("rpm_target"):
-            return d.deserialize(rpm_target);
-        case H("Kp"):   
-           return d.deserialize(Kp);
-        case H("Ki"):   
-           return d.deserialize(Ki);
-        case H("Kd"):   
-           return d.deserialize(Kd);
-        default:
-            INFO("unknown key %d",key);
-            return d.skip_next();
-        } });
-}

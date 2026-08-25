@@ -39,7 +39,7 @@ WifiActor::WifiActor(const char *name) : Actor(name)
   //  esp_wifi_set_ps(WIFI_PS_MIN_MODEM);
 }
 
-void WifiActor::on_start()
+void WifiActor::setup()
 {
   /*if (net_init().is_err())
   {
@@ -78,7 +78,7 @@ void WifiActor::on_start()
   }
 }
 
-void WifiActor::on_message(const ActorMessage &msg)
+void WifiActor::receive(const ActorMessage &msg)
 {
   msg.handle_if<TimerMsg>([&](const TimerMsg &msg)
                             { handle_timer(msg.timer_id); });

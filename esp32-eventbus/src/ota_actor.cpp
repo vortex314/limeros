@@ -10,12 +10,12 @@ OtaActor::~OtaActor()
 {
 }
 
-void OtaActor::on_start()
+void OtaActor::setup()
 {
     INFO("OTA Actor started");
 }
 
-void OtaActor::on_message(const ActorMessage &msg)
+void OtaActor::receive(const ActorMessage &msg)
 {
     msg.handle_if<WifiConnected>([&](const auto &msg){ start_task();});
     msg.handle_if<WifiDisconnected>([&](const auto &msg) { stop_task(); });

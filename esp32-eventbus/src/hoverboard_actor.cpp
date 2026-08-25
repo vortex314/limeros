@@ -102,7 +102,7 @@ Result<bool> HoverboardActor::init_uart()
     return Result<bool>::Ok(true);
 }
 
-void HoverboardActor::on_start()
+void HoverboardActor::setup()
 {
     INFO("Starting HoverboardActor");
 
@@ -208,7 +208,7 @@ HoverboardActor::~HoverboardActor()
     }
 }
 
-void HoverboardActor::on_message(const ActorMessage &msg)
+void HoverboardActor::receive(const ActorMessage &msg)
 {
     msg.handle_if<HoverboardRequest>([&](const auto hb_cmd)
                                   { INFO("Received HoverboardRequest: speed=%d, steer=%d", hb_cmd.speed.value_or(-1), hb_cmd.steer.value_or(-1));

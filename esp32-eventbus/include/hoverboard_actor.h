@@ -41,9 +41,9 @@ public:
 public:
     HoverboardActor(const char *name);
     ~HoverboardActor();
-    void on_message(const ActorMessage &msg);
+    void receive(const ActorMessage &msg);
     void on_timer(int timer_id);
-    void on_start();
+    void setup();
     Result<bool> init_uart();
     void write_uart(const Buffer &);
     void handle_uart_bytes(const Buffer &);

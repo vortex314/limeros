@@ -44,8 +44,8 @@ private:
 public:
   WifiActor(const char *name);
   ~WifiActor();
-  void on_message(const ActorMessage &);
-  void on_start();
+  void receive(const ActorMessage &);
+  void setup();
   void handle_timer(int id);
   Res net_init();
   Res wifi_set_config(const char *ssid, const char *password);

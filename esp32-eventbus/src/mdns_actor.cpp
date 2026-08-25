@@ -13,7 +13,7 @@ MdnsActor::~MdnsActor()
 {
 }
 
-void MdnsActor::on_start()
+void MdnsActor::setup()
 {
     INFO("mDNS Actor started");
 }
@@ -47,7 +47,7 @@ void MdnsActor::init()
     INFO("mDNS started, hostname: %s.local", _hostname.c_str());
 }
 
-void MdnsActor::on_message(const ActorMessage &msg)
+void MdnsActor::receive(const ActorMessage &msg)
 {
 
     msg.handle_if<WifiConnected>([&](const auto &msg)

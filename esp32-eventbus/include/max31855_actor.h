@@ -96,8 +96,8 @@ private:
 public:
   Max31855Actor(const char *name, uint32_t poll_interval_ms = 500);
   ~Max31855Actor();
-  void on_start() override;
-  void on_message(const ActorMessage &env) override;
+  void setup() override;
+  void receive(const ActorMessage &env) override;
 
 private:
   bool init_spi();

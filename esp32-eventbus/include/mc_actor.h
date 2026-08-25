@@ -91,8 +91,8 @@ private:
 public:
   McActor(const char *name, const char *hostname);
   ~McActor();
-  void on_message(const ActorMessage &);
-  void on_start();
+  void receive(const ActorMessage &);
+  void setup();
   void init_event();
   void stop_event();
   void start_unicast_listener();

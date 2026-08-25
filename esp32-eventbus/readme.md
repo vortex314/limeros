@@ -1,3 +1,14 @@
+
+# latest updat 25/8/2026
+- looking at mavlink simplified approach : devices to brain link
+- full binary
+- Actor model
+- Actors are owned by the eventbus , which also has a dedicated thread or task assigned to it
+- Async actors need to start independent threads, but delegate internal work via their eventbus
+- An eventbus is created with a thread assigned
+- Actors register themselves
+- every message is a broadcast and actor filters what it needs based on uint32 compariuson of the message type
+- actors can upfront prepare messages to be send and act as a shared ptr during processing
 # Latest model 6/10/2025
 
 ## Middleware approach - back to Zenoh 
