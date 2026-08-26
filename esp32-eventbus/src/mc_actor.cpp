@@ -15,8 +15,8 @@ std::string socketAddrToString(const struct sockaddr_in *addr)
     return std::string(ip_str) + ":" + std::to_string(port);
 }
 
-McActor::McActor(const char *name, const char *hostname)
-    : Actor(name), _txd_unicast_buffer(1000), _rxd_unicast_buffer(1000), _txd_multicast_buffer(1000), _rxd_multicast_buffer(1000)
+McActor::McActor( const char *hostname)
+    : Actor(), _txd_unicast_buffer(1000), _rxd_unicast_buffer(1000), _txd_multicast_buffer(1000), _rxd_multicast_buffer(1000)
 {
     _hostname = std::string(hostname);
     _timer_publish = timer_repetitive(1000);
@@ -153,7 +153,7 @@ void McActor::stop_listener()
 void McActor::receive(const ActorMessage &msg)
 {
     // local actors specify their capabilities via EndpointAnnounce messages
-    msg.handle_if<EndpointAnnounce>([&](const EndpointAnnounce &msg)
+    msg.handle<EndpointAnnounce>([&](const EndpointAnnounce &msg)
                                     {
         msg.services.handle_if([&](const std::vector<uint32_t> &services)
         {
@@ -171,18 +171,18 @@ void McActor::receive(const ActorMessage &msg)
                 _subscribes.push_back(v);
         }); });
 
-    msg.handle_if<WifiConnected>([&](const WifiConnected &msg)
+    msg.handle<WifiConnected>([&](const WifiConnected &msg)
                                  { INFO("MC Actor received WifiConnected event, starting listeners");
                                     _connected = true; 
                                 init_event();
                                 start_unicast_listener();
                                 start_multicast_listener(); });
 
-    msg.handle_if<WifiDisconnected>([&](const auto &msg) { /*stop_listener(); */ });
+    msg.handle<WifiDisconnected>([&](const auto &msg) { /*stop_listener(); */ });
 
     if (!_connected) // ignore other messages if not connected
         return;
-    msg.handle_if<TimerMsg>([&](const TimerMsg &msg)
+    msg.handle<TimerMsg>([&](const TimerMsg &msg)
                             {
         EndpointAnnounce announce;
         announce.id = endpoint_id;
@@ -191,11 +191,11 @@ void McActor::receive(const ActorMessage &msg)
         announce.services = _services;
         announce.subscribes = _subscribes;
         broadcast_event(announce); });
-    msg.handle_if<TxdMsg>([&](const TxdMsg &pub)
+    msg.handle<TxdMsg>([&](const TxdMsg &pub)
                           { send_unicast(pub.env); });
-    msg.handle_if<SysEvent>([&](const SysEvent &msg)
+    msg.handle<SysEvent>([&](const SysEvent &msg)
                             { send_event(msg); });
-    msg.handle_if<HoverboardEvent>([&](const HoverboardEvent &msg)
+    msg.handle<HoverboardEvent>([&](const HoverboardEvent &msg)
                                    { send_event(msg); });
 }
 static Buffer msg_buffer(1000);
@@ -397,7 +397,7 @@ void McActor::on_udp_message(Envelope *env, const sockaddr_in &sender_addr)
         delete env;
         return;
     }
-    emit(env);
+  //  emit(env);
 }
 
 void McActor::send_multicast(const Envelope &envelope)

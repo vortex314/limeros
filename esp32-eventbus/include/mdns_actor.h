@@ -25,7 +25,7 @@ private:
 std::string _hostname;
 
 public:
-  MdnsActor(const char *name,const char* hostname);
+  MdnsActor(const char* hostname);
   ~MdnsActor();
   void receive(const ActorMessage &);
   void setup();

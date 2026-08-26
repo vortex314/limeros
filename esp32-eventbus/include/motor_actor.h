@@ -17,30 +17,18 @@
 #include "driver/mcpwm_fault.h"
 #include <driver/gpio.h>
 
-
-struct MotorEvent
-{
-    Option<MotorMsg> publish;
-};
-
 struct IsrMsg {
     uint32_t sum = 0;
     uint32_t count = 0;
 };
 
-struct MotorCmd
-{
-    //    Option<PublishSerdes> serdes;
-    Option<MotorMsg> publish;
-    Option<IsrMsg> isr_msg;
-};
 
 class MotorActor : public Actor
 {
 public:
     MotorActor();
     ~MotorActor();
-    void on_cmd(MotorCmd &cmd);
+    void receive(const ActorMessage &msg);
     void on_timer(int timer_id);
     void setup(void);
     Res pwm_init();
@@ -61,7 +49,7 @@ private:
     int _timer_watchdog = -1;
     int _timer_pid = -1;
     bool _light = false;
-    MotorMsg _motor_msg;
+    MotorEvent _motor_event;
     Bytes _image;
     float _Kp, _Ki, _Kd;
     float _p,_i, _d;

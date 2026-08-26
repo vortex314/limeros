@@ -1,7 +1,7 @@
 #include "ota_actor.h"
 
-OtaActor::OtaActor(const char *name)
-    : Actor(name)
+OtaActor::OtaActor()
+    : Actor()
 {
     _ota_task_handle = nullptr;
 }
@@ -17,8 +17,8 @@ void OtaActor::setup()
 
 void OtaActor::receive(const ActorMessage &msg)
 {
-    msg.handle_if<WifiConnected>([&](const auto &msg){ start_task();});
-    msg.handle_if<WifiDisconnected>([&](const auto &msg) { stop_task(); });
+    msg.handle<WifiConnected>([&](const auto &msg){ start_task();});
+    msg.handle<WifiDisconnected>([&](const auto &msg) { stop_task(); });
 }
 
 void OtaActor::start_task()

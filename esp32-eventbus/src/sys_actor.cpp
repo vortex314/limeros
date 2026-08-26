@@ -5,16 +5,15 @@
 #include <string.h>
 #include <esp_flash.h>
 
-SysActor::SysActor(const char *name) : Actor(name)
+SysActor::SysActor() : Actor()
 {
     _timer_publish = timer_repetitive(1000);
 }
 
 void SysActor::setup()
 {
-    EndpointAnnounce *announce = new EndpointAnnounce();
-    announce->events={SysEvent::MSG_ID};
-    emit(announce);
+
+    _sys_event = new SysEvent();
 }
 
 SysActor::~SysActor()
@@ -58,11 +57,11 @@ void SysActor::reboot(bool b)
 
 void SysActor::receive(const ActorMessage &msg)
 {
-    msg.handle_if<SysRequest>([&](auto sys_request)
-                       { if ( sys_request.reboot) reboot(*sys_request.reboot);
-                         if ( sys_request.set_time) set_utc(*sys_request.set_time); }); 
-    msg.handle_if<TimerMsg>([&](const TimerMsg &msg)
-                         { on_timer(msg.timer_id); });
+    msg.handle<SysRequest>([&](auto sys_request)
+                              { if ( sys_request.reboot) reboot(*sys_request.reboot);
+                         if ( sys_request.set_time) set_utc(*sys_request.set_time); });
+    msg.handle<TimerMsg>([&](const TimerMsg &msg)
+                            { on_timer(msg.timer_id); });
 }
 void SysActor::on_timer(int id)
 {
@@ -74,16 +73,15 @@ void SysActor::on_timer(int id)
 
 void SysActor::publish_info()
 {
-    SysEvent *sys_event = new SysEvent();
-    sys_event->cpu_board_type = "ESP32-DEVKIT1";
-    sys_event->free_heap = (int64_t)esp_get_free_heap_size();
-    sys_event->uptime = esp_timer_get_time() / 1000;
+    _sys_event->cpu_board_type = "ESP32-DEVKIT1";
+    _sys_event->free_heap = (int64_t)esp_get_free_heap_size();
+    _sys_event->uptime = esp_timer_get_time() / 1000;
     uint32_t flash_size = 0;
     esp_flash_get_size(NULL, &flash_size);
-    sys_event->flash_size = (int64_t)flash_size;
-    sys_event->build_date_time = __DATE__ " " __TIME__;
+    _sys_event->flash_size = (int64_t)flash_size;
+    _sys_event->build_date_time = __DATE__ " " __TIME__;
     struct timeval tv1;
     gettimeofday(&tv1, NULL);
-    sys_event->utc = tv1.tv_sec;
-    emit(sys_event);
+    _sys_event->utc = tv1.tv_sec;
+    emit(_sys_event);
 }

@@ -3,8 +3,8 @@
 
 static const char *MDNS_INSTANCE = "ESP32 mDNS Service";
 
-MdnsActor::MdnsActor(const char *name, const char *hostname)
-    : Actor(name)
+MdnsActor::MdnsActor( const char *hostname)
+    : Actor()
 {
     _hostname = std::string(hostname);
 }
@@ -50,8 +50,8 @@ void MdnsActor::init()
 void MdnsActor::receive(const ActorMessage &msg)
 {
 
-    msg.handle_if<WifiConnected>([&](const auto &msg)
+    msg.handle<WifiConnected>([&](const auto &msg)
                               { init(); });
 
-    msg.handle_if<WifiDisconnected>([&](const auto &msg) {});
+    msg.handle<WifiDisconnected>([&](const auto &msg) {});
 }

@@ -2,25 +2,16 @@
 #include <actor.h>
 #include <queue>
 
-ActorRef NULL_ACTOR = ActorRef("null");
-
-void Actor::set_eventbus(EventBus *eventbus)
+void Actor::set_eventbus(ActorId id, EventBus &eventbus)
 {
     this->_eventbus = eventbus;
+    this->_id = id;
 }
 
-void Actor::emit(const ActorMessage *env)
+void Actor::emit(const ActorPayload *env)
 {
-    if (_eventbus)
-    {
-        _eventbus->push(env);
-    }
-    else
-    {
-        ERROR("EventBus not set for actor %s", name());
-    }
+    _eventbus->push(env);
 }
-
 
 void panic_here(const char *s)
 {
@@ -270,7 +261,7 @@ void Thread::run()
 {
     INFO("starting Thread %s", name());
     for (auto actor : _actors)
-        actor->on_start();
+        actor->setup();
     while (!_stop_thread)
     {
         uint64_t min_sleep_msec = UINT64_MAX;
@@ -313,6 +304,13 @@ void Thread::run()
 
 EventBus::EventBus(size_t size) : Queue<const ActorMessage *>(size) {};
 
+void EventBus::register_actor(const char *name, Actor *actor)
+{
+    _actors[_next_actor_id] = actor;
+    actor->set_eventbus(_next_actor_id, this);
+    _next_actor_id++;
+}
+
 void EventBus::push(const ActorMessage *msg)
 {
     if (send(msg) == false)
@@ -325,31 +323,34 @@ void EventBus::push(const ActorMessage *msg)
 void EventBus::loop()
 {
     ActorMessage *pmsg;
-    for (Actor *actor : _actors)
+    for (const auto &it : _actors)
     {
-        actor->setup();
+        Actor *actor = it.second;
+            actor->setup();
     }
     uint32_t timeout = 100; // 100 ms timeout
 
     while (true)
     {
-    //    INFO("EventBus waiting for messages or timeout %d ms", timeout);
+        //    INFO("EventBus waiting for messages or timeout %d ms", timeout);
         if (receive((const ActorMessage **)&pmsg, timeout))
         {
             for (const auto &handler : _message_handlers)
             {
                 handler(*pmsg);
             }
-            for (Actor *actor : _actors)
+            for (auto& it : _actors)
             {
-                    actor->receive(*pmsg);
+                Actor *actor = it.second;
+                actor->receive(*pmsg);
             }
             delete pmsg;
         }
 
         timeout = 1000;
-        for (Actor *actor : _actors)
+        for (auto &it : _actors)
         {
+            Actor *actor = it.second;
             for (int id : actor->timers().get_expired_timers())
             {
                 TimerMsg tm(id);
@@ -375,7 +376,7 @@ void EventBus::start()
         "EventBus", _stack_size, this, 5, &_task_handle);
 }
 
-void EventBus::register_actor(Actor *actor)
+void EventBus::register_actor(const char *name, Actor *actor)
 {
     _actors.push_back(actor);
     actor->set_eventbus(this);

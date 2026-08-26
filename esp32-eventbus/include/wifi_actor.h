@@ -6,25 +6,17 @@
 #include <functional>
 #include <vector>
 #include <msgs.h>
+#include <typed_message.h>
 
-struct WifiConnected : public Msg
+class WifiConnected : public ActorPayload
 {
-    static const uint32_t MSG_ID = FNV("WifiConnected");
-    static constexpr const char *MSG_NAME = "WifiConnected";
-
-    virtual uint32_t msg_id() const { return MSG_ID; };
-    virtual const char *msg_name() const { return MSG_NAME; };
+  TYPED_MESSAGE(WifiConnected)
 };
 
-struct WifiDisconnected : public Msg
+class WifiDisconnected : public ActorPayload
 {
-    static const uint32_t MSG_ID = FNV("WifiDisconnected");
-    static constexpr const char *MSG_NAME = "WifiDisconnected";
-
-    virtual uint32_t msg_id() const { return MSG_ID; };
-    virtual const char *msg_name() const { return MSG_NAME; };
+  TYPED_MESSAGE(WifiDisconnected)
 };
-
 
 class WifiActor : public Actor
 {
@@ -41,8 +33,9 @@ private:
   int channel;
   std::vector<std::string> ssid_list;
 
+
 public:
-  WifiActor(const char *name);
+  WifiActor();
   ~WifiActor();
   void receive(const ActorMessage &);
   void setup();

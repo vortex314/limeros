@@ -54,9 +54,6 @@ lazy_static! {
         let m = DashMap::new();
         m.insert(3190208493, "BrokerSubscribeRequest".to_string());
         m.insert(3197332525, "CompassEvent".to_string());
-        m.insert(3974472274, "CutterEvent".to_string());
-        m.insert(3901793882, "CutterReply".to_string());
-        m.insert(2133047659, "CutterRequest".to_string());
         m.insert(2637772092, "DeviceAliveEvent".to_string());
         m.insert(2371693343, "EndpointAnnounce".to_string());
         m.insert(3238220441, "EndpointAnnounceReply".to_string());
@@ -69,6 +66,9 @@ lazy_static! {
         m.insert(2735870956, "HoverboardRequest".to_string());
         m.insert(1802836182, "ImuEvent".to_string());
         m.insert(2831607083, "Max31855Event".to_string());
+        m.insert(2506002638, "MotorEvent".to_string());
+        m.insert(1863653678, "MotorReply".to_string());
+        m.insert(929372191, "MotorRequest".to_string());
         m.insert(1594103907, "PingReply".to_string());
         m.insert(31253678, "PingRequest".to_string());
         m.insert(4282593576, "Ps4Event".to_string());
@@ -218,166 +218,6 @@ impl CompassEvent {
 }
 
 impl Msg for CompassEvent {
-    fn id() -> u32 {
-        Self::id()
-    }
-
-    fn name() -> &'static str {
-        Self::name()
-    }
-}
-
-
-
-
-#[derive(Debug, Clone, PartialEq, cbor2::Cbor)]
-#[cbor(array)]
-pub struct CutterEvent {
-    pub enabled: Option<bool>,// Cutter enabled or disabled
-    pub rpm: Option<i32>,// Current speed of the cutter in RPM
-    pub current: Option<f32>,// Current drawn by the cutter in Amperes
-    pub voltage: Option<f32>,// Voltage supplied to the cutter in Volts
-    pub temperature: Option<f32>,// Temperature of the cutter in Celsius
-}
-
-impl Default for CutterEvent {
-    fn default() -> Self {
-        CutterEvent {
-            enabled: None,
-            rpm: None,
-            current: None,
-            voltage: None,
-            temperature: None,
-        }
-    }
-}
-
-impl CutterEvent {
-    pub const MSG_ID : u32 = 3974472274;
-    pub const MSG_NAME: &'static str = "CutterEvent";
-
-    pub const fn id() -> u32 {
-        3974472274
-    }
-
-    pub fn name() -> &'static str {
-        "CutterEvent"
-    }
-
-    pub fn from_bytes(data: &[u8]) -> anyhow::Result<Self> {
-        cbor2::from_reader(data).context("Failed to deserialize from CBOR")
-    }
-
-    pub fn to_bytes(&self) -> anyhow::Result<Vec<u8>> {
-        cbor2::to_vec(self).context("Failed to serialize to CBOR")
-    }
-}
-
-impl Msg for CutterEvent {
-    fn id() -> u32 {
-        Self::id()
-    }
-
-    fn name() -> &'static str {
-        Self::name()
-    }
-}
-
-
-
-
-#[derive(Debug, Clone, PartialEq, cbor2::Cbor)]
-#[cbor(array)]
-pub struct CutterReply {
-    pub req_id: Option<u32>,// For request/reply matching, 0 if not a request/reply
-    pub error_code: Option<u32>,// Error code, 0 if no error
-    pub message: Option<String>,// Error message or additional information
-    pub msg_type: Option<u32>,// Message type identifier , the original request
-}
-
-impl Default for CutterReply {
-    fn default() -> Self {
-        CutterReply {
-            req_id: None,
-            error_code: None,
-            message: None,
-            msg_type: None,
-        }
-    }
-}
-
-impl CutterReply {
-    pub const MSG_ID : u32 = 3901793882;
-    pub const MSG_NAME: &'static str = "CutterReply";
-
-    pub const fn id() -> u32 {
-        3901793882
-    }
-
-    pub fn name() -> &'static str {
-        "CutterReply"
-    }
-
-    pub fn from_bytes(data: &[u8]) -> anyhow::Result<Self> {
-        cbor2::from_reader(data).context("Failed to deserialize from CBOR")
-    }
-
-    pub fn to_bytes(&self) -> anyhow::Result<Vec<u8>> {
-        cbor2::to_vec(self).context("Failed to serialize to CBOR")
-    }
-}
-
-impl Msg for CutterReply {
-    fn id() -> u32 {
-        Self::id()
-    }
-
-    fn name() -> &'static str {
-        Self::name()
-    }
-}
-
-
-
-
-#[derive(Debug, Clone, PartialEq, cbor2::Cbor)]
-#[cbor(array)]
-pub struct CutterRequest {
-    pub enabled: Option<bool>,// Enable or disable the cutter
-    pub rpm: Option<i32>,// Speed command for the cutter in RPM
-}
-
-impl Default for CutterRequest {
-    fn default() -> Self {
-        CutterRequest {
-            enabled: None,
-            rpm: None,
-        }
-    }
-}
-
-impl CutterRequest {
-    pub const MSG_ID : u32 = 2133047659;
-    pub const MSG_NAME: &'static str = "CutterRequest";
-
-    pub const fn id() -> u32 {
-        2133047659
-    }
-
-    pub fn name() -> &'static str {
-        "CutterRequest"
-    }
-
-    pub fn from_bytes(data: &[u8]) -> anyhow::Result<Self> {
-        cbor2::from_reader(data).context("Failed to deserialize from CBOR")
-    }
-
-    pub fn to_bytes(&self) -> anyhow::Result<Vec<u8>> {
-        cbor2::to_vec(self).context("Failed to serialize to CBOR")
-    }
-}
-
-impl Msg for CutterRequest {
     fn id() -> u32 {
         Self::id()
     }
@@ -1123,6 +963,172 @@ impl Max31855Event {
 }
 
 impl Msg for Max31855Event {
+    fn id() -> u32 {
+        Self::id()
+    }
+
+    fn name() -> &'static str {
+        Self::name()
+    }
+}
+
+
+
+
+#[derive(Debug, Clone, PartialEq, cbor2::Cbor)]
+#[cbor(array)]
+pub struct MotorEvent {
+    pub enabled: Option<bool>,// Cutter enabled or disabled
+    pub rpm_measured: Option<i32>,// Current speed of the cutter in RPM
+    pub rpm_target: Option<i32>,// Commanded speed of the cutter in RPM
+    pub pwm: Option<f32>,// PWM duty cycle for the cutter motor in percent
+    pub current: Option<f32>,// Current drawn by the cutter in Amperes
+    pub voltage: Option<f32>,// Voltage supplied to the cutter in Volts
+    pub temperature: Option<f32>,// Temperature of the cutter in Celsius
+    pub Kp: Option<f32>,// Proportional gain for the cutter motor controller
+    pub Ki: Option<f32>,// Integral gain for the cutter motor controller
+    pub Kd: Option<f32>,// Derivative gain for the cutter motor controller
+}
+
+impl Default for MotorEvent {
+    fn default() -> Self {
+        MotorEvent {
+            enabled: None,
+            rpm_measured: None,
+            rpm_target: None,
+            pwm: None,
+            current: None,
+            voltage: None,
+            temperature: None,
+            Kp: None,
+            Ki: None,
+            Kd: None,
+        }
+    }
+}
+
+impl MotorEvent {
+    pub const MSG_ID : u32 = 2506002638;
+    pub const MSG_NAME: &'static str = "MotorEvent";
+
+    pub const fn id() -> u32 {
+        2506002638
+    }
+
+    pub fn name() -> &'static str {
+        "MotorEvent"
+    }
+
+    pub fn from_bytes(data: &[u8]) -> anyhow::Result<Self> {
+        cbor2::from_reader(data).context("Failed to deserialize from CBOR")
+    }
+
+    pub fn to_bytes(&self) -> anyhow::Result<Vec<u8>> {
+        cbor2::to_vec(self).context("Failed to serialize to CBOR")
+    }
+}
+
+impl Msg for MotorEvent {
+    fn id() -> u32 {
+        Self::id()
+    }
+
+    fn name() -> &'static str {
+        Self::name()
+    }
+}
+
+
+
+
+#[derive(Debug, Clone, PartialEq, cbor2::Cbor)]
+#[cbor(array)]
+pub struct MotorReply {
+    pub status_code: Option<u32>,// Error code, 0 if no error
+    pub message: Option<String>,// Error message or additional information
+}
+
+impl Default for MotorReply {
+    fn default() -> Self {
+        MotorReply {
+            status_code: None,
+            message: None,
+        }
+    }
+}
+
+impl MotorReply {
+    pub const MSG_ID : u32 = 1863653678;
+    pub const MSG_NAME: &'static str = "MotorReply";
+
+    pub const fn id() -> u32 {
+        1863653678
+    }
+
+    pub fn name() -> &'static str {
+        "MotorReply"
+    }
+
+    pub fn from_bytes(data: &[u8]) -> anyhow::Result<Self> {
+        cbor2::from_reader(data).context("Failed to deserialize from CBOR")
+    }
+
+    pub fn to_bytes(&self) -> anyhow::Result<Vec<u8>> {
+        cbor2::to_vec(self).context("Failed to serialize to CBOR")
+    }
+}
+
+impl Msg for MotorReply {
+    fn id() -> u32 {
+        Self::id()
+    }
+
+    fn name() -> &'static str {
+        Self::name()
+    }
+}
+
+
+
+
+#[derive(Debug, Clone, PartialEq, cbor2::Cbor)]
+#[cbor(array)]
+pub struct MotorRequest {
+    pub enabled: Option<bool>,// Enable or disable the cutter
+    pub rpm_target: Option<i32>,// Speed command for the cutter in RPM
+}
+
+impl Default for MotorRequest {
+    fn default() -> Self {
+        MotorRequest {
+            enabled: None,
+            rpm_target: None,
+        }
+    }
+}
+
+impl MotorRequest {
+    pub const MSG_ID : u32 = 929372191;
+    pub const MSG_NAME: &'static str = "MotorRequest";
+
+    pub const fn id() -> u32 {
+        929372191
+    }
+
+    pub fn name() -> &'static str {
+        "MotorRequest"
+    }
+
+    pub fn from_bytes(data: &[u8]) -> anyhow::Result<Self> {
+        cbor2::from_reader(data).context("Failed to deserialize from CBOR")
+    }
+
+    pub fn to_bytes(&self) -> anyhow::Result<Vec<u8>> {
+        cbor2::to_vec(self).context("Failed to serialize to CBOR")
+    }
+}
+
+impl Msg for MotorRequest {
     fn id() -> u32 {
         Self::id()
     }

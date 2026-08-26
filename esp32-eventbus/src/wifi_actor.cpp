@@ -27,9 +27,8 @@
 
 static int s_retry_count = 0;
 
-WifiActor::WifiActor(const char *name) : Actor(name)
+WifiActor::WifiActor() : Actor()
 {
-  INFO("Creating WiFi actor %s ", name);
   _timer_publish = timer_repetitive(1000);
   //  _timer_publish_props = timer_repetitive(5000);
   wifi_ssid = "";
@@ -41,11 +40,7 @@ WifiActor::WifiActor(const char *name) : Actor(name)
 
 void WifiActor::setup()
 {
-  /*if (net_init().is_err())
-  {
-    ERROR("Failed to init net");
-    return;
-  }*/
+
   while (true)
   {
     auto r = scan();
@@ -80,7 +75,7 @@ void WifiActor::setup()
 
 void WifiActor::receive(const ActorMessage &msg)
 {
-  msg.handle_if<TimerMsg>([&](const TimerMsg &msg)
+  msg.handle<TimerMsg>([&](const TimerMsg &msg)
                             { handle_timer(msg.timer_id); });
 }
 
@@ -147,7 +142,7 @@ void WifiActor::event_handler(void *arg, esp_event_base_t event_base,
   }
   else if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP)
   {
-    INFO("WiFi STA got IP address in %s", actor->ref().name());
+    INFO("WiFi STA got IP address ");
     actor->emit(new WifiConnected());
     actor->_wifi_connected = true;
     s_retry_count = 0;

@@ -17,57 +17,68 @@
 #include <memory>
 #include <stdint.h>
 #include <msgs.h>
-#pragma once
+#include <unordered_map>
+#include <typed_message.h>
+
+typedef uint32_t ActorId;
+typedef uint32_t MsgType;
+typedef uint32_t TimerId;
+class ActorPayload : public TypedMsg
+{
+};
 
 uint64_t current_time();
 
-class ActorRef
+// ============================================================
+// ActorMessage
+// ============================================================
+struct ActorMessage
 {
-    std::string _actor_name;
-    bool _local = false;
+    friend class ActorSystem;
 
 public:
-    ActorRef() = delete;
-    constexpr ActorRef(const char *name) : _actor_name(name) {};
-    ActorRef(const ActorRef &other) : _actor_name(other._actor_name) {};
-    bool operator==(ActorRef &other) { return _actor_name == other._actor_name; }; // matches same id
-    void operator=(ActorRef other) { _actor_name = other._actor_name; }
-    bool match_name(ActorRef &other) { return strcmp(_actor_name.c_str(), other._actor_name.c_str()) == 0; };
-    inline const char *name() const { return _actor_name.c_str(); };
-    bool is_local() const { return _local; }
-    void set_local(bool local) { _local = local; }
-    ~ActorRef()= default;
+    ActorId src = 0;
+    ActorId dst = 0;
+    ActorPayload *payload = nullptr;
+
+public:
+    // ---- type-safe helpers ----
+    template <typename T>
+    bool is() const { return payload->msg_id() == T::MSG_ID; }
+    template <typename T>
+    T *as() { return static_cast<T *>(payload); }
+
+    // handle() – returns true if the message was of type T
+    template <typename T, typename Func>
+    bool handle(Func &&func) const
+    {
+        if (payload->msg_id() == T::MSG_ID)
+        {
+            func(*static_cast<const T *>(payload));
+            return true;
+        }
+        return false;
+    }
+
+    ~ActorMessage()
+    {
+        if (payload)
+            delete payload;
+    }
+    void set_payload(ActorPayload *p)
+    {
+        if (payload)
+            delete payload;
+        payload = p;
+    }
 };
 
-extern ActorRef NULL_ACTOR;
-
-typedef Msg ActorMessage;
-/*
-class ActorMessage
+class TimerMsg : public ActorPayload
 {
-public:
-    std::optional<ActorRef> src = std::nullopt;
-    std::optional<ActorRef> dst = std::nullopt;
-    const Msg *msg;
-    ActorMessage(Msg *msg) : msg(msg) {}
-    ActorMessage(ActorRef src, const Msg *msg) : src(src), msg(msg) {}
-    ActorMessage(ActorRef src, ActorRef dst, const Msg *msg) : src(src), dst(dst), msg(msg) {}
-    ~ActorMessage() { delete msg; }
-};
-*/
-
-class TimerMsg : public Msg
-{
-public:
-    static const uint32_t MSG_ID = FNV("TimerMsg");
-    static constexpr const char *MSG_NAME = "TimerMsg";
-
-    virtual uint32_t msg_id() const { return MSG_ID; };
-    virtual const char *msg_name() const { return MSG_NAME; };
+TYPED_MSG(TimerMsg)
     int timer_id;
     TimerMsg(int id) : timer_id(id) {}
 };
-
 
 template <class T>
 class Queue
@@ -137,6 +148,8 @@ public:
 
 struct Timer
 {
+    ActorId _actor_id;
+    int _timer_id;
     bool _auto_reload;
     uint64_t _expires_at;
     uint64_t _period;
@@ -194,42 +207,47 @@ class Actor;
 
 class EventBus : public Queue<const ActorMessage *>
 {
-    std::vector<Actor *> _actors;
+    std::unordered_map<uint32_t, Actor *> _actors;
+    ActorId _next_actor_id = 1;
     std::vector<std::function<void(const ActorMessage &)>> _message_handlers;
     size_t _stack_size = 1024;
     TaskHandle_t _task_handle;
+
 
 public:
     EventBus(size_t size);
     ~EventBus();
     void push(const ActorMessage *env);
-    void register_actor(Actor *);
+    void register_actor(const char *name, Actor * actor);
     void register_handler(std::function<void(const ActorMessage &)> handler)
     {
         _message_handlers.push_back(handler);
     }
     void loop();
     void start();
-    ActorRef find_actor(const char *name);
-    const std::vector<Actor *> &actors() { return _actors; }
+    ActorId find_actor(const char *name);
+    const char *find_actor_name(ActorId id);
+    const std::unordered_map<uint32_t, Actor *> &actors() { return _actors; }
 };
+
+class EventBus;
 
 class Actor
 {
 private:
-    ActorRef _self;
+    ActorId _self;
     Timers _timers;
-    EventBus *_eventbus = nullptr;
+    EventBus *_eventbus;
 
 public:
-    Actor(const char *name) : _self(name) { _self.set_local(true); };
+    Actor() { };
     ~Actor() { INFO("Destroying actor %s", name()); }
 
-    virtual void setup() { INFO("actor %s default started.", _self.name()); }
-    virtual void on_stop() { INFO("actor %s default stopped.", _self.name()); }
+    virtual void setup() { INFO("actor %s default started.", _eventbus->find_actor_name(_self)); }
+    virtual void on_stop() { INFO("actor %s default stopped.", _eventbus->find_actor_name(_self)); }
     virtual void receive(const ActorMessage &env)
     {
-        WARN(" No message handler for actor %s ", _self.name());
+        WARN(" No message handler for actor %s ", _eventbus->find_actor_name(_self));
     }
 
     /// Declare that this actor handles messages of the given type name.
@@ -242,19 +260,36 @@ public:
     std::vector<int> get_expired_timers() { return _timers.get_expired_timers(); }
     Timers &timers() { return _timers; }
     uint64_t sleep_time() { return _timers.sleep_time(); }
-    ActorRef ref() const { return _self; }
-    const char *name() { return _self.name(); }
-    EventBus *eventbus() const { return _eventbus; }
+    ActorId ref() const { return _self; }
+    const char *name() { return _eventbus->name(); }
+    EventBus &eventbus() const { return *_eventbus; }
 
-    void emit(const ActorMessage *env);
-    void set_eventbus(EventBus *eventbus);
+    int tell(ActorId dst,  ActorPayload *payload)
+    {
+        ActorMessage *env = new ActorMessage();
+        env->src = _self;
+        env->dst = dst;
+        env->payload = payload;
+        _eventbus->push(env);
+        return 0; // Added return statement to match the int return type
+    }
+
+    void emit(const ActorPayload *env);
+    void set_eventbus(ActorId id, EventBus *eventbus)
+    {
+        _self = id;
+        _eventbus = eventbus;
+    }
 
     void handle_expired_timers()
     {
         for (int id : _timers.get_expired_timers())
         {
-            ActorMessage *env =  new TimerMsg(id);
-            receive(*env);
+            ActorMessage *env = new ActorMessage();
+            env->payload =  new TimerMsg(id);
+            env->src = _self;
+            env->dst = _self;
+            _eventbus->push(env);
             _timers.refresh(id);
         }
     };
@@ -313,7 +348,5 @@ public:
     void step();
     void handle_expired_timers();
 };
-
-
 
 #endif

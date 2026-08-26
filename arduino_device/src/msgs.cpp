@@ -11,9 +11,6 @@
 std::unordered_map<uint32_t, const char*> id_to_name = {
     { 3190208493, "BrokerSubscribeRequest" },
     { 3197332525, "CompassEvent" },
-    { 3974472274, "CutterEvent" },
-    { 3901793882, "CutterReply" },
-    { 2133047659, "CutterRequest" },
     { 2637772092, "DeviceAliveEvent" },
     { 2371693343, "EndpointAnnounce" },
     { 3238220441, "EndpointAnnounceReply" },
@@ -26,6 +23,9 @@ std::unordered_map<uint32_t, const char*> id_to_name = {
     { 2735870956, "HoverboardRequest" },
     { 1802836182, "ImuEvent" },
     { 2831607083, "Max31855Event" },
+    { 2506002638, "MotorEvent" },
+    { 1863653678, "MotorReply" },
+    { 929372191, "MotorRequest" },
     { 1594103907, "PingReply" },
     { 31253678, "PingRequest" },
     { 4282593576, "Ps4Event" },
@@ -104,67 +104,6 @@ int CompassEvent::decode(Buffer& buffer) {
     .read(accel_x)
     .read(accel_y)
     .read(accel_z)
-    .err();
-}
-
-
-
-int CutterEvent::encode(Buffer& buffer) const {
-    return CborEncoder(buffer)
-    .beginArray(5)
-    .write(enabled)
-    .write(rpm)
-    .write(current)
-    .write(voltage)
-    .write(temperature).err();
-}
-
-int CutterEvent::decode(Buffer& buffer) {
-    return CborDecoder(buffer)
-    .beginArray(5)
-    .read(enabled)
-    .read(rpm)
-    .read(current)
-    .read(voltage)
-    .read(temperature)
-    .err();
-}
-
-
-
-int CutterReply::encode(Buffer& buffer) const {
-    return CborEncoder(buffer)
-    .beginArray(4)
-    .write(req_id)
-    .write(error_code)
-    .write(message)
-    .write(msg_type).err();
-}
-
-int CutterReply::decode(Buffer& buffer) {
-    return CborDecoder(buffer)
-    .beginArray(4)
-    .read(req_id)
-    .read(error_code)
-    .read(message)
-    .read(msg_type)
-    .err();
-}
-
-
-
-int CutterRequest::encode(Buffer& buffer) const {
-    return CborEncoder(buffer)
-    .beginArray(2)
-    .write(enabled)
-    .write(rpm).err();
-}
-
-int CutterRequest::decode(Buffer& buffer) {
-    return CborDecoder(buffer)
-    .beginArray(2)
-    .read(enabled)
-    .read(rpm)
     .err();
 }
 
@@ -513,6 +452,73 @@ int Max31855Event::decode(Buffer& buffer) {
     .read(fault_short_vcc)
     .read(fault_short_gnd)
     .read(fault_open_tc)
+    .err();
+}
+
+
+
+int MotorEvent::encode(Buffer& buffer) const {
+    return CborEncoder(buffer)
+    .beginArray(10)
+    .write(enabled)
+    .write(rpm_measured)
+    .write(rpm_target)
+    .write(pwm)
+    .write(current)
+    .write(voltage)
+    .write(temperature)
+    .write(Kp)
+    .write(Ki)
+    .write(Kd).err();
+}
+
+int MotorEvent::decode(Buffer& buffer) {
+    return CborDecoder(buffer)
+    .beginArray(10)
+    .read(enabled)
+    .read(rpm_measured)
+    .read(rpm_target)
+    .read(pwm)
+    .read(current)
+    .read(voltage)
+    .read(temperature)
+    .read(Kp)
+    .read(Ki)
+    .read(Kd)
+    .err();
+}
+
+
+
+int MotorReply::encode(Buffer& buffer) const {
+    return CborEncoder(buffer)
+    .beginArray(2)
+    .write(status_code)
+    .write(message).err();
+}
+
+int MotorReply::decode(Buffer& buffer) {
+    return CborDecoder(buffer)
+    .beginArray(2)
+    .read(status_code)
+    .read(message)
+    .err();
+}
+
+
+
+int MotorRequest::encode(Buffer& buffer) const {
+    return CborEncoder(buffer)
+    .beginArray(2)
+    .write(enabled)
+    .write(rpm_target).err();
+}
+
+int MotorRequest::decode(Buffer& buffer) {
+    return CborDecoder(buffer)
+    .beginArray(2)
+    .read(enabled)
+    .read(rpm_target)
     .err();
 }
 

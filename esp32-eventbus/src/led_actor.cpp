@@ -3,7 +3,7 @@
 #define LED_ON_VALUE 1
 #define LED_OFF_VALUE 0
 
-LedActor::LedActor(const char *name) : Actor(name) { _timer_led = timer_repetitive(_duration); }
+LedActor::LedActor() : Actor() { _timer_led = timer_repetitive(_duration); }
 
 LedActor::~LedActor()
 {
@@ -12,17 +12,17 @@ LedActor::~LedActor()
 void LedActor::receive(const ActorMessage &msg)
 {
 
-    msg.handle_if<LedOn>([&](auto _)
+    msg.handle<LedOn>([&](auto _)
                          { 
                         _state = LED_STATE_ON;
             gpio_set_level(GPIO_LED, LED_ON_VALUE); });
 
-    msg.handle_if<LedOff>([&](auto _)
+    msg.handle<LedOff>([&](auto _)
                           {             
                         _state = LED_STATE_OFF;
             gpio_set_level(GPIO_LED, LED_OFF_VALUE); });
 
-    msg.handle_if<LedPulse>([&](auto led_pulse)
+    msg.handle<LedPulse>([&](auto led_pulse)
                             {
                             _duration = led_pulse.duration_msec;
         _state = LED_STATE_PULSE;
@@ -30,17 +30,17 @@ void LedActor::receive(const ActorMessage &msg)
         gpio_set_level(GPIO_LED, LED_ON_VALUE);
         timer_fire(_timer_led, _duration); });
 
-    msg.handle_if<LedBlink>([&](auto led_blink)
+    msg.handle<LedBlink>([&](auto led_blink)
                             {
         _duration = led_blink.interval_msec;
         _state = LED_STATE_BLINK;
         _led_is_on = true;
         gpio_set_level(GPIO_LED, LED_ON_VALUE);
         timer_fire(_timer_led, _duration); });
-    msg.handle_if<TimerMsg>([&](const TimerMsg &msg)
+    msg.handle<TimerMsg>([&](const TimerMsg &msg)
                             { on_timer(msg.timer_id); });
 
-    msg.handle_if<TxdMsg>([&](const TxdMsg &msg)
+    msg.handle<TxdMsg>([&](const TxdMsg &msg)
                            {
                              _duration = 10;
         _state = LED_STATE_PULSE;

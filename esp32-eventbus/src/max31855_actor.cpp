@@ -72,7 +72,7 @@ void Max31855Actor::setup()
 
 void Max31855Actor::receive(const ActorMessage &msg)
 {
-    msg.handle_if<TimerMsg>([&](const TimerMsg &timer_msg)
+    msg.handle<TimerMsg>([&](const TimerMsg &timer_msg)
                             {
     if (timer_msg.timer_id == _timer_poll)
     {
@@ -84,10 +84,10 @@ void Max31855Actor::receive(const ActorMessage &msg)
             publish_heating_event(esp_timer_get_time() / 1000);
     } });
 
-    msg.handle_if<Max31855Read>([&](auto _)
+    msg.handle<Max31855Read>([&](auto _)
                                 { control(); });
 
-    msg.handle_if<HeatingRequest>([&](const HeatingRequest &req)
+    msg.handle<HeatingRequest>([&](const HeatingRequest &req)
                                   {
             if (req.setpoint_c)
             {

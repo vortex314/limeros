@@ -96,91 +96,6 @@ public:
 
 
 
-class CutterEvent : public Msg {
-public:
-
-    static const uint32_t MSG_ID = FNV("CutterEvent");
-    static constexpr const char *MSG_NAME ="CutterEvent";
-
-    virtual uint32_t msg_id() const { return MSG_ID; };
-    virtual const char *msg_name() const { return MSG_NAME; };
-
-    typedef enum FieldId {
-        ENABLED = 0,
-        RPM = 1,
-        CURRENT = 2,
-        VOLTAGE = 3,
-        TEMPERATURE = 4,
-    } FieldId;
-    Option<bool> enabled;// Cutter enabled or disabled
-    Option<int32_t> rpm;// Current speed of the cutter in RPM
-    Option<float> current;// Current drawn by the cutter in Amperes
-    Option<float> voltage;// Voltage supplied to the cutter in Volts
-    Option<float> temperature;// Temperature of the cutter in Celsius
-
-    /// Serialize this message into a CBOR map keyed by field id.
-    int encode(Buffer& buffer) const;
-
-    /// Deserialize a CutterEvent from a CBOR map value.
-    int decode(const Buffer& buffer);
-};
-
-
-
-class CutterReply : public Msg {
-public:
-
-    static const uint32_t MSG_ID = FNV("CutterReply");
-    static constexpr const char *MSG_NAME ="CutterReply";
-
-    virtual uint32_t msg_id() const { return MSG_ID; };
-    virtual const char *msg_name() const { return MSG_NAME; };
-
-    typedef enum FieldId {
-        REQ_ID = 0,
-        ERROR_CODE = 1,
-        MESSAGE = 2,
-        MSG_TYPE = 3,
-    } FieldId;
-    Option<uint32_t> req_id;// For request/reply matching, 0 if not a request/reply
-    Option<uint32_t> error_code;// Error code, 0 if no error
-    Option<std::string> message;// Error message or additional information
-    Option<uint32_t> msg_type;// Message type identifier , the original request
-
-    /// Serialize this message into a CBOR map keyed by field id.
-    int encode(Buffer& buffer) const;
-
-    /// Deserialize a CutterReply from a CBOR map value.
-    int decode(const Buffer& buffer);
-};
-
-
-
-class CutterRequest : public Msg {
-public:
-
-    static const uint32_t MSG_ID = FNV("CutterRequest");
-    static constexpr const char *MSG_NAME ="CutterRequest";
-
-    virtual uint32_t msg_id() const { return MSG_ID; };
-    virtual const char *msg_name() const { return MSG_NAME; };
-
-    typedef enum FieldId {
-        ENABLED = 0,
-        RPM = 1,
-    } FieldId;
-    Option<bool> enabled;// Enable or disable the cutter
-    Option<int32_t> rpm;// Speed command for the cutter in RPM
-
-    /// Serialize this message into a CBOR map keyed by field id.
-    int encode(Buffer& buffer) const;
-
-    /// Deserialize a CutterRequest from a CBOR map value.
-    int decode(const Buffer& buffer);
-};
-
-
-
 class DeviceAliveEvent : public Msg {
 public:
 
@@ -620,6 +535,97 @@ public:
     int encode(Buffer& buffer) const;
 
     /// Deserialize a Max31855Event from a CBOR map value.
+    int decode(const Buffer& buffer);
+};
+
+
+
+class MotorEvent : public Msg {
+public:
+
+    static const uint32_t MSG_ID = FNV("MotorEvent");
+    static constexpr const char *MSG_NAME ="MotorEvent";
+
+    virtual uint32_t msg_id() const { return MSG_ID; };
+    virtual const char *msg_name() const { return MSG_NAME; };
+
+    typedef enum FieldId {
+        ENABLED = 0,
+        RPM_MEASURED = 1,
+        RPM_TARGET = 2,
+        PWM = 3,
+        CURRENT = 2,
+        VOLTAGE = 3,
+        TEMPERATURE = 4,
+        KP = 5,
+        KI = 6,
+        KD = 7,
+    } FieldId;
+    Option<bool> enabled;// Cutter enabled or disabled
+    Option<int32_t> rpm_measured;// Current speed of the cutter in RPM
+    Option<int32_t> rpm_target;// Commanded speed of the cutter in RPM
+    Option<float> pwm;// PWM duty cycle for the cutter motor in percent
+    Option<float> current;// Current drawn by the cutter in Amperes
+    Option<float> voltage;// Voltage supplied to the cutter in Volts
+    Option<float> temperature;// Temperature of the cutter in Celsius
+    Option<float> Kp;// Proportional gain for the cutter motor controller
+    Option<float> Ki;// Integral gain for the cutter motor controller
+    Option<float> Kd;// Derivative gain for the cutter motor controller
+
+    /// Serialize this message into a CBOR map keyed by field id.
+    int encode(Buffer& buffer) const;
+
+    /// Deserialize a MotorEvent from a CBOR map value.
+    int decode(const Buffer& buffer);
+};
+
+
+
+class MotorReply : public Msg {
+public:
+
+    static const uint32_t MSG_ID = FNV("MotorReply");
+    static constexpr const char *MSG_NAME ="MotorReply";
+
+    virtual uint32_t msg_id() const { return MSG_ID; };
+    virtual const char *msg_name() const { return MSG_NAME; };
+
+    typedef enum FieldId {
+        STATUS_CODE = 1,
+        MESSAGE = 2,
+    } FieldId;
+    Option<uint32_t> status_code;// Error code, 0 if no error
+    Option<std::string> message;// Error message or additional information
+
+    /// Serialize this message into a CBOR map keyed by field id.
+    int encode(Buffer& buffer) const;
+
+    /// Deserialize a MotorReply from a CBOR map value.
+    int decode(const Buffer& buffer);
+};
+
+
+
+class MotorRequest : public Msg {
+public:
+
+    static const uint32_t MSG_ID = FNV("MotorRequest");
+    static constexpr const char *MSG_NAME ="MotorRequest";
+
+    virtual uint32_t msg_id() const { return MSG_ID; };
+    virtual const char *msg_name() const { return MSG_NAME; };
+
+    typedef enum FieldId {
+        ENABLED = 0,
+        RPM_TARGET = 1,
+    } FieldId;
+    Option<bool> enabled;// Enable or disable the cutter
+    Option<int32_t> rpm_target;// Speed command for the cutter in RPM
+
+    /// Serialize this message into a CBOR map keyed by field id.
+    int encode(Buffer& buffer) const;
+
+    /// Deserialize a MotorRequest from a CBOR map value.
     int decode(const Buffer& buffer);
 };
 

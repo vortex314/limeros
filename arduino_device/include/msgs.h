@@ -72,62 +72,6 @@ public:
 
 
 
-class CutterEvent : public Msg {
-public:
-
-    static const uint32_t MSG_ID = FNV("CutterEvent");
-    static constexpr const char *MSG_NAME ="CutterEvent";
-
-    virtual uint32_t msg_id() const { return MSG_ID; };
-    virtual const char *msg_name() const { return MSG_NAME; };
-    Option<bool> enabled;// Cutter enabled or disabled
-    Option<int32_t> rpm;// Current speed of the cutter in RPM
-    Option<float> current;// Current drawn by the cutter in Amperes
-    Option<float> voltage;// Voltage supplied to the cutter in Volts
-    Option<float> temperature;// Temperature of the cutter in Celsius
-
-    int encode(Buffer& buffer) const;
-    int decode(Buffer& buffer);
-};
-
-
-
-class CutterReply : public Msg {
-public:
-
-    static const uint32_t MSG_ID = FNV("CutterReply");
-    static constexpr const char *MSG_NAME ="CutterReply";
-
-    virtual uint32_t msg_id() const { return MSG_ID; };
-    virtual const char *msg_name() const { return MSG_NAME; };
-    Option<uint32_t> req_id;// For request/reply matching, 0 if not a request/reply
-    Option<uint32_t> error_code;// Error code, 0 if no error
-    Option<std::string> message;// Error message or additional information
-    Option<uint32_t> msg_type;// Message type identifier , the original request
-
-    int encode(Buffer& buffer) const;
-    int decode(Buffer& buffer);
-};
-
-
-
-class CutterRequest : public Msg {
-public:
-
-    static const uint32_t MSG_ID = FNV("CutterRequest");
-    static constexpr const char *MSG_NAME ="CutterRequest";
-
-    virtual uint32_t msg_id() const { return MSG_ID; };
-    virtual const char *msg_name() const { return MSG_NAME; };
-    Option<bool> enabled;// Enable or disable the cutter
-    Option<int32_t> rpm;// Speed command for the cutter in RPM
-
-    int encode(Buffer& buffer) const;
-    int decode(Buffer& buffer);
-};
-
-
-
 class DeviceAliveEvent : public Msg {
 public:
 
@@ -397,6 +341,65 @@ public:
     Option<bool> fault_short_vcc;// Short to VCC detected
     Option<bool> fault_short_gnd;// Short to GND detected
     Option<bool> fault_open_tc;// Open thermocouple detected
+
+    int encode(Buffer& buffer) const;
+    int decode(Buffer& buffer);
+};
+
+
+
+class MotorEvent : public Msg {
+public:
+
+    static const uint32_t MSG_ID = FNV("MotorEvent");
+    static constexpr const char *MSG_NAME ="MotorEvent";
+
+    virtual uint32_t msg_id() const { return MSG_ID; };
+    virtual const char *msg_name() const { return MSG_NAME; };
+    Option<bool> enabled;// Cutter enabled or disabled
+    Option<int32_t> rpm_measured;// Current speed of the cutter in RPM
+    Option<int32_t> rpm_target;// Commanded speed of the cutter in RPM
+    Option<float> pwm;// PWM duty cycle for the cutter motor in percent
+    Option<float> current;// Current drawn by the cutter in Amperes
+    Option<float> voltage;// Voltage supplied to the cutter in Volts
+    Option<float> temperature;// Temperature of the cutter in Celsius
+    Option<float> Kp;// Proportional gain for the cutter motor controller
+    Option<float> Ki;// Integral gain for the cutter motor controller
+    Option<float> Kd;// Derivative gain for the cutter motor controller
+
+    int encode(Buffer& buffer) const;
+    int decode(Buffer& buffer);
+};
+
+
+
+class MotorReply : public Msg {
+public:
+
+    static const uint32_t MSG_ID = FNV("MotorReply");
+    static constexpr const char *MSG_NAME ="MotorReply";
+
+    virtual uint32_t msg_id() const { return MSG_ID; };
+    virtual const char *msg_name() const { return MSG_NAME; };
+    Option<uint32_t> status_code;// Error code, 0 if no error
+    Option<std::string> message;// Error message or additional information
+
+    int encode(Buffer& buffer) const;
+    int decode(Buffer& buffer);
+};
+
+
+
+class MotorRequest : public Msg {
+public:
+
+    static const uint32_t MSG_ID = FNV("MotorRequest");
+    static constexpr const char *MSG_NAME ="MotorRequest";
+
+    virtual uint32_t msg_id() const { return MSG_ID; };
+    virtual const char *msg_name() const { return MSG_NAME; };
+    Option<bool> enabled;// Enable or disable the cutter
+    Option<int32_t> rpm_target;// Speed command for the cutter in RPM
 
     int encode(Buffer& buffer) const;
     int decode(Buffer& buffer);

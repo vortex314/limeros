@@ -6,14 +6,20 @@
 #include <option.h>
 #include <msgs.h>
 
+class SysRequest : public ActorPayload
+{
+  TYPED_MESSAGE(SysRequest)
+};
+
 class SysActor : public Actor
 {
 private:
   int _timer_publish = -1;
   int _prop_counter = 0;
+  SysEvent *_sys_event = nullptr;
 
 public:
-  SysActor(const char *name);
+  SysActor();
   ~SysActor();
   void receive(const ActorMessage &msg);
   void on_timer(int timer_id);

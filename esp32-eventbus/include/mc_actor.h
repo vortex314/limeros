@@ -89,7 +89,7 @@ private:
   Buffer _rxd_multicast_buffer;
 
 public:
-  McActor(const char *name, const char *hostname);
+  McActor( const char *hostname);
   ~McActor();
   void receive(const ActorMessage &);
   void setup();

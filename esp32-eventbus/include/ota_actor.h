@@ -36,7 +36,7 @@ private:
     TaskHandle_t _ota_task_handle = nullptr;
 
 public:
-  OtaActor(const char *name);
+  OtaActor();
   ~OtaActor();
   void receive(const ActorMessage &);
   void setup();

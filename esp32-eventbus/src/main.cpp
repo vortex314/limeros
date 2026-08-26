@@ -91,12 +91,12 @@ extern "C" void app_main()
   INFO("Device MAC address: %02X:%02X:%02X:%02X:%02X:%02X", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
   snprintf(hostname, sizeof(hostname), "%s-%02X%02X%02X", DEVICE_NAME, mac[3], mac[4], mac[5]);
 
-  eventbus.register_actor(new WifiActor("wifi"));           // manage wifi connection, will block on start until connected
-  eventbus.register_actor(new SysActor("sys"));             // manage the system
-  eventbus.register_actor(new McActor("mc", hostname));     // multicast actor
-  eventbus.register_actor(new LedActor("led"));             // blink the led
-  eventbus.register_actor(new OtaActor("ota"));             // ota via tftp
-  eventbus.register_actor(new MdnsActor("mdns", hostname)); // mdns service
+  eventbus.register_actor("wifi",new WifiActor());           // manage wifi connection, will block on start until connected
+  eventbus.register_actor("sys", new SysActor());             // manage the system
+  eventbus.register_actor("mc", new McActor( hostname));     // multicast actor
+  eventbus.register_actor("led",new LedActor());             // blink the led
+  eventbus.register_actor("ota",new OtaActor());             // ota via tftp
+  eventbus.register_actor("mdns",new MdnsActor( hostname)); // mdns service
 #ifdef ENABLE_DESOLDERING
   eventbus.register_actor(new Max31855Actor(hostname, 500)); // MAX31855 + PID + SSR heating control
 #endif
@@ -104,7 +104,7 @@ extern "C" void app_main()
   eventbus.register_actor(new HoverboardActor("hb")); // hoverboard interface
 #endif
   // debugging handler to log all eventbus traffic, comment for beauty
-  eventbus.register_handler([](const Msg &msg) // just log eventbus traffic
+  eventbus.register_handler([](const ActorMessage &msg) // just log eventbus traffic
                             { 
                               uint32_t msg_id = msg.msg_id() ? msg.msg_id() : 0;
                               INFO("EventBus '%s' (%d) Free heap size: %ld", id_to_string(msg_id), msg_id, esp_get_free_heap_size());
