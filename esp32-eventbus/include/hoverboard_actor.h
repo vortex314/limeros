@@ -8,17 +8,11 @@
 #include <driver/uart.h>
 #include <mc_actor.h>
 
-class UartRxd : public Msg
+class UartRxd : public ActorPayload
 {
-public:
-    static const uint32_t MSG_ID = FNV("UartRxd");
-    static constexpr const char *MSG_NAME = "UartRxd";
-
-    virtual uint32_t msg_id() const { return MSG_ID; };
-    virtual const char *msg_name() const { return MSG_NAME; };
+TYPED_MESSAGE(UartRxd)
     Bytes payload;
     UartRxd(const Bytes &payload) : payload(payload) {};
-
 };
 
 
@@ -39,7 +33,7 @@ public:
     Buffer uart_read_buffer;
 
 public:
-    HoverboardActor(const char *name);
+    HoverboardActor();
     ~HoverboardActor();
     void receive(const ActorMessage &msg);
     void on_timer(int timer_id);

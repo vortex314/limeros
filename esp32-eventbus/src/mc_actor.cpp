@@ -1,4 +1,5 @@
 #include "mc_actor.h"
+#include "esp_netif.h"
 
 constexpr int MULTICAST_PORT = 50000;
 constexpr const char *MULTICAST_GROUP = "224.0.0.1";
@@ -22,6 +23,8 @@ McActor::McActor( const char *hostname)
     _timer_publish = timer_repetitive(1000);
     endpoint_name = "hoverboard";
     endpoint_id = FNV("hoverboard");
+    _unicast_socket = -1;
+    _multicast_socket = -1;
 }
 
 McActor::~McActor()
@@ -51,6 +54,55 @@ bool valid_rc(int rc, const char *msg)
 
 void McActor::init_event()
 {
+    // Resolve the STA interface IP. Multicast options (IP_MULTICAST_IF and
+    // IP_ADD_MEMBERSHIP) require the real interface address: 0.0.0.0 is not
+    // accepted and the group address is NOT a valid interface.
+    in_addr_t sta_ip = INADDR_ANY;
+    esp_netif_t *netif = esp_netif_get_handle_from_ifkey("WIFI_STA_DEF");
+    if (netif == NULL)
+    {
+        WARN("STA netif not found, multicast setup may fail");
+    }
+    else
+    {
+        // GOT_IP is emitted right when the address is assigned, but the netif
+        // may not have published it yet; retry briefly before giving up.
+        for (int attempt = 0; attempt < 10 && sta_ip == INADDR_ANY; ++attempt)
+        {
+            esp_netif_ip_info_t ip_info;
+            if (esp_netif_get_ip_info(netif, &ip_info) == ESP_OK && ip_info.ip.addr != 0)
+            {
+                sta_ip = ip_info.ip.addr;
+                break;
+            }
+            vTaskDelay(pdMS_TO_TICKS(100));
+        }
+        if (sta_ip != INADDR_ANY)
+        {
+            char ip_str[INET_ADDRSTRLEN];
+            inet_ntop(AF_INET, &sta_ip, ip_str, INET_ADDRSTRLEN);
+            INFO("Multicast on STA interface %s", ip_str);
+        }
+        else
+        {
+            WARN("STA IP still not available after retries, multicast setup may fail");
+        }
+    }
+
+    // Idempotent: close any sockets from a previous init (e.g. a WiFi
+    // reconnect) before creating new ones, so we don't leak fds or hit
+    // EADDRINUSE on re-bind.
+    if (_unicast_socket >= 0)
+    {
+        close(_unicast_socket);
+        _unicast_socket = -1;
+    }
+    if (_multicast_socket >= 0)
+    {
+        close(_multicast_socket);
+        _multicast_socket = -1;
+    }
+
     // create multicast socket
     _unicast_socket = socket(AF_INET, SOCK_DGRAM, 0);
     ERRNO_RET(_unicast_socket);
@@ -63,11 +115,24 @@ void McActor::init_event()
     timeout.tv_usec = 1000; // 1ms timeout
     setsockopt(_unicast_socket, SOL_SOCKET, SO_SNDTIMEO, &timeout, sizeof(timeout));
 
+    // Listeners must not block in recvfrom() forever, otherwise they can't
+    // notice _running == false (or a socket being replaced on reconnect).
+    struct timeval rcv_timeout;
+    rcv_timeout.tv_sec = 0;
+    rcv_timeout.tv_usec = 200000; // 200 ms
+    setsockopt(_unicast_socket, SOL_SOCKET, SO_RCVTIMEO, &rcv_timeout, sizeof(rcv_timeout));
+    setsockopt(_multicast_socket, SOL_SOCKET, SO_RCVTIMEO, &rcv_timeout, sizeof(rcv_timeout));
+
     memset(&_multicast_addr, 0, sizeof(_multicast_addr));
     _multicast_addr.sin_family = AF_INET;
     _multicast_addr.sin_port = htons(MULTICAST_PORT);
     _multicast_addr.sin_addr.s_addr = inet_addr(MULTICAST_GROUP);
-    setsockopt(_multicast_socket, IPPROTO_IP, IP_MULTICAST_IF, &_multicast_addr.sin_addr, sizeof(_multicast_addr.sin_addr));
+
+    // IP_MULTICAST_IF must be the local interface address, NOT the group address
+    if (sta_ip != INADDR_ANY)
+    {
+        setsockopt(_multicast_socket, IPPROTO_IP, IP_MULTICAST_IF, &sta_ip, sizeof(sta_ip));
+    }
 
     sockaddr_in _unicast_src_addr{};
     _unicast_src_addr.sin_family = AF_INET;
@@ -89,7 +154,7 @@ void McActor::init_event()
 
     struct ip_mreq imreq;
     imreq.imr_multiaddr.s_addr = inet_addr(MULTICAST_GROUP);
-    imreq.imr_interface.s_addr = htonl(INADDR_ANY); // default interface
+    imreq.imr_interface.s_addr = sta_ip; // real interface IP, not INADDR_ANY
     rc = setsockopt(_multicast_socket, IPPROTO_IP, IP_ADD_MEMBERSHIP, &imreq, sizeof(imreq));
     ERRNO_RET(rc);
 
@@ -102,6 +167,11 @@ void McActor::init_event()
 
 void McActor::stop_event()
 {
+    if (_unicast_socket >= 0)
+    {
+        close(_unicast_socket);
+        _unicast_socket = -1;
+    }
     if (_multicast_socket >= 0)
     {
         close(_multicast_socket);
@@ -173,12 +243,21 @@ void McActor::receive(const ActorMessage &msg)
 
     msg.handle<WifiConnected>([&](const WifiConnected &msg)
                                  { INFO("MC Actor received WifiConnected event, starting listeners");
-                                    _connected = true; 
-                                init_event();
-                                start_unicast_listener();
-                                start_multicast_listener(); });
+                                    init_event();
+                                    _connected = true;
+                                    _running = true;
+                                    if (!_listeners_started)
+                                    {
+                                        start_unicast_listener();
+                                        start_multicast_listener();
+                                        _listeners_started = true;
+                                    } });
 
-    msg.handle<WifiDisconnected>([&](const auto &msg) { /*stop_listener(); */ });
+    msg.handle<WifiDisconnected>([&](const auto &msg)
+                                 {
+        _connected = false;
+        _running = false;
+        stop_event(); });
 
     if (!_connected) // ignore other messages if not connected
         return;
@@ -280,12 +359,18 @@ void McActor::unicast_listener_task(void *pvParameters)
             int len = recvfrom(actor->_unicast_socket, actor->_rxd_unicast_buffer.data(), actor->_rxd_unicast_buffer.capacity(), 0, (sockaddr *)&sender, &sender_len);
             if (len < 0)
             {
-                ERROR("recvfrom failed: %s", strerror(errno));
-
+                if (!actor->_running)
+                {
+                    break;
+                }
                 if (errno == EWOULDBLOCK || errno == EAGAIN)
                 {
                     vTaskDelay(10 / portTICK_PERIOD_MS);
                     continue;
+                }
+                if (errno == EBADF || errno == ENOTSOCK)
+                {
+                    break; // socket closed / replaced by a re-init
                 }
                 ERROR("recvfrom failed: %s", strerror(errno));
                 continue;
@@ -294,6 +379,7 @@ void McActor::unicast_listener_task(void *pvParameters)
             INFO("<== UDP  [%d] from %s", len, socketAddrToString(&sender).c_str());
             actor->on_udp_raw(actor->_rxd_unicast_buffer, sender);
         }
+        vTaskDelay(10 / portTICK_PERIOD_MS);
     }
 }
 
@@ -314,12 +400,18 @@ void McActor::multicast_listener_task(void *pvParameters)
             int len = recvfrom(actor->_multicast_socket, actor->_rxd_multicast_buffer.data(), actor->_rxd_multicast_buffer.capacity() - 1, 0, (sockaddr *)&sender, &sender_len);
             if (len < 0)
             {
-                ERROR("recvfrom failed: %s", strerror(errno));
-
+                if (!actor->_running)
+                {
+                    break;
+                }
                 if (errno == EWOULDBLOCK || errno == EAGAIN)
                 {
                     vTaskDelay(10 / portTICK_PERIOD_MS);
                     continue;
+                }
+                if (errno == EBADF || errno == ENOTSOCK)
+                {
+                    break; // socket closed / replaced by a re-init
                 }
                 ERROR("recvfrom failed: %s", strerror(errno));
                 continue;
@@ -328,6 +420,7 @@ void McActor::multicast_listener_task(void *pvParameters)
             INFO("<== MC [%d] from %s", len, socketAddrToString(&sender).c_str());
             actor->on_udp_raw(actor->_rxd_multicast_buffer, sender);
         }
+        vTaskDelay(10 / portTICK_PERIOD_MS);
     }
 }
 

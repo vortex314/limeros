@@ -17,7 +17,10 @@
 #include "driver/mcpwm_fault.h"
 #include <driver/gpio.h>
 
-struct IsrMsg {
+class IsrMsg : public ActorPayload
+{
+TYPED_MESSAGE(IsrMsg)
+public:
     uint32_t sum = 0;
     uint32_t count = 0;
 };
@@ -49,7 +52,6 @@ private:
     int _timer_watchdog = -1;
     int _timer_pid = -1;
     bool _light = false;
-    MotorEvent _motor_event;
     Bytes _image;
     float _Kp, _Ki, _Kd;
     float _p,_i, _d;

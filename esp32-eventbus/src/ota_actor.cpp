@@ -26,16 +26,18 @@ void OtaActor::start_task()
     INFO("Starting OTA TFTP server task...");
     if ( _ota_task_handle == nullptr )
     {
+        _running = true;
         BaseType_t rc = xTaskCreate(
             &OtaActor::tftp_ota_server_task, 
             "tftp_ota_server_task", 
             8192, 
-            NULL, 
+            this, 
             5, 
             &_ota_task_handle); 
         if ( rc != pdPASS )
         {
             ERROR("Failed to create OTA TFTP server task: %d", rc);
+            _ota_task_handle = nullptr;
         } 
     }
 }
@@ -43,10 +45,12 @@ void OtaActor::start_task()
 void OtaActor::stop_task()
 {
     INFO("Stopping OTA TFTP server task...");
-    if ( _ota_task_handle != nullptr )
+    _running = false;
+    // The task deletes itself once it notices the stop flag (recvfrom times
+    // out within 200 ms). Wait for it so we never delete a dangling handle.
+    for (int i = 0; i < 50 && _ota_task_handle != nullptr; ++i)
     {
-        vTaskDelete( _ota_task_handle );
-        _ota_task_handle = nullptr;
+        vTaskDelay(pdMS_TO_TICKS(10));
     }
 }
 
@@ -88,6 +92,7 @@ static void tftp_send_error(int sock,
 
 void OtaActor::tftp_ota_server_task(void *arg)
 {
+    OtaActor *actor = static_cast<OtaActor *>(arg);
     int sock = -1;
     uint8_t rx_buf[4 + TFTP_BLOCK_SIZE];
     struct sockaddr_in server, client;
@@ -107,8 +112,16 @@ void OtaActor::tftp_ota_server_task(void *arg)
     if (sock < 0)
     {
         ERROR("socket() failed");
+        actor->_ota_task_handle = nullptr;
         vTaskDelete(NULL);
     }
+
+    // Periodically time out of recvfrom() so the task can notice a stop
+    // request, close its socket (freeing the TFTP port) and delete itself.
+    struct timeval rcv_timeout;
+    rcv_timeout.tv_sec = 0;
+    rcv_timeout.tv_usec = 200000; // 200 ms
+    setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, &rcv_timeout, sizeof(rcv_timeout));
 
     server.sin_family = AF_INET;
     server.sin_port = htons(TFTP_PORT);
@@ -118,15 +131,26 @@ void OtaActor::tftp_ota_server_task(void *arg)
     {
         ERROR("bind() failed");
         close(sock);
+        actor->_ota_task_handle = nullptr;
         vTaskDelete(NULL);
     }
 
-    while (1)
+    while (actor->_running)
     {
         //   esp_task_wdt_reset();
 
         int len = recvfrom(sock, rx_buf, sizeof(rx_buf), 0,
                            (struct sockaddr *)&client, &client_len);
+        if (len < 0)
+        {
+            // Stop requested (or recvfrom timeout): exit so the task cleans
+            // up its socket and deletes itself.
+            if (!actor->_running)
+            {
+                break;
+            }
+            continue;
+        }
         if (len < 4)
         {
             continue;
@@ -211,4 +235,9 @@ void OtaActor::tftp_ota_server_task(void *arg)
             tftp_send_error(sock, &client, 4, "Unsupported operation");
         }
     }
+
+    // Clean shutdown: close the socket (frees TFTP_PORT) and delete the task.
+    close(sock);
+    actor->_ota_task_handle = nullptr;
+    vTaskDelete(NULL);
 }

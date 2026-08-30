@@ -94,7 +94,7 @@ private:
   uint64_t _window_start_ms = 0;
 
 public:
-  Max31855Actor(const char *name, uint32_t poll_interval_ms = 500);
+  Max31855Actor( uint32_t poll_interval_ms = 500);
   ~Max31855Actor();
   void setup() override;
   void receive(const ActorMessage &env) override;

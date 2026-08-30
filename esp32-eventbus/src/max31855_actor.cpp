@@ -12,8 +12,8 @@ static float clampf(float v, float lo, float hi)
     return v;
 }
 
-Max31855Actor::Max31855Actor(const char *name, uint32_t poll_interval_ms)
-    : Actor(name), _poll_interval_ms(poll_interval_ms)
+Max31855Actor::Max31855Actor(uint32_t poll_interval_ms)
+    : Actor(), _poll_interval_ms(poll_interval_ms)
 {
     _setpoint_c = clampf(_setpoint_c, HEATER_SETPOINT_MIN_C, HEATER_SETPOINT_MAX_C);
     _timer_poll = timer_repetitive(_poll_interval_ms);
@@ -29,7 +29,7 @@ Max31855Actor::~Max31855Actor()
         esp_err_t rc = spi_bus_remove_device(_spi);
         if (rc != ESP_OK)
         {
-            WARN("%s: failed removing SPI device: %s", name(), esp_err_to_name(rc));
+            WARN("failed removing SPI device: %s", esp_err_to_name(rc));
         }
         _spi = nullptr;
     }
@@ -37,7 +37,7 @@ Max31855Actor::~Max31855Actor()
     esp_err_t bus_rc = spi_bus_free(MAX31855_SPI_HOST);
     if (bus_rc != ESP_OK && bus_rc != ESP_ERR_INVALID_STATE)
     {
-        WARN("%s: failed freeing SPI bus: %s", name(), esp_err_to_name(bus_rc));
+        WARN("failed freeing SPI bus: %s", esp_err_to_name(bus_rc));
     }
 }
 
@@ -45,13 +45,14 @@ void Max31855Actor::setup()
 {
     if (!init_spi())
     {
-        ERROR("%s: MAX31855 SPI init failed", name());
+        ERROR("MAX31855 SPI init failed");
         timer_stop(_timer_poll);
         return;
     }
     EndpointAnnounce *announce = new EndpointAnnounce;
     announce->events = {Max31855Event::MSG_ID, HeatingEvent::MSG_ID};
     announce->services = {Max31855Read::MSG_ID, HeatingRequest::MSG_ID};
+
     emit(announce);
 
     gpio_set_direction(_pin_ssr, GPIO_MODE_OUTPUT);
@@ -139,7 +140,7 @@ bool Max31855Actor::init_spi()
     esp_err_t rc = spi_bus_initialize(MAX31855_SPI_HOST, &bus_cfg, SPI_DMA_DISABLED);
     if (rc != ESP_OK && rc != ESP_ERR_INVALID_STATE)
     {
-        ERROR("%s: spi_bus_initialize failed: %s", name(), esp_err_to_name(rc));
+        ERROR(" spi_bus_initialize failed: %s", esp_err_to_name(rc));
         return false;
     }
 
@@ -152,7 +153,7 @@ bool Max31855Actor::init_spi()
     rc = gpio_config(&cs_cfg);
     if (rc != ESP_OK)
     {
-        ERROR("%s: gpio_config(CS) failed: %s", name(), esp_err_to_name(rc));
+        ERROR(" gpio_config(CS) failed: %s", esp_err_to_name(rc));
         return false;
     }
     gpio_set_level(_pin_cs, 1);
@@ -167,10 +168,10 @@ bool Max31855Actor::init_spi()
     rc = spi_bus_add_device(MAX31855_SPI_HOST, &dev_cfg, &_spi);
     if (rc != ESP_OK)
     {
-        ERROR("%s: spi_bus_add_device failed: %s", name(), esp_err_to_name(rc));
+        ERROR("spi_bus_add_device failed: %s", esp_err_to_name(rc));
         return false;
     }
-    INFO("%s: MAX31855 SPI initialized successfully", name());
+    INFO(" MAX31855 SPI initialized successfully");
     return true;
 }
 
@@ -194,7 +195,7 @@ bool Max31855Actor::read_sensor(float &thermocouple_c, float &internal_c, bool &
     gpio_set_level(_pin_cs, 1);
     if (rc != ESP_OK)
     {
-        ERROR("%s: spi_device_transmit failed: %s", name(), esp_err_to_name(rc));
+        ERROR(" spi_device_transmit failed: %s", esp_err_to_name(rc));
         return false;
     }
 
@@ -205,7 +206,7 @@ bool Max31855Actor::read_sensor(float &thermocouple_c, float &internal_c, bool &
 
     if (raw == 0x00000000UL || raw == 0xFFFFFFFFUL)
     {
-        WARN("%s: suspicious MAX31855 raw frame 0x%08lX (check wiring/pins/ground)", name(), static_cast<unsigned long>(raw));
+        WARN(" suspicious MAX31855 raw frame 0x%08lX (check wiring/pins/ground)", static_cast<unsigned long>(raw));
     }
 
     fault = (raw & (1UL << 16)) != 0;
@@ -244,12 +245,12 @@ void Max31855Actor::control()
 
     if (!read_sensor(thermocouple_c, internal_c, fault, open_circuit, short_to_gnd, short_to_vcc))
     {
-        WARN("%s: failed to read MAX31855", name());
+        WARN(" failed to read MAX31855");
         if (now_ms - _last_sensor_ok_ms > HEATER_SENSOR_TIMEOUT_MS)
         {
             if (!_safety_trip)
             {
-                ERROR("%s: safety trip - sensor timeout (%llu ms)", name(), now_ms - _last_sensor_ok_ms);
+                ERROR(" safety trip - sensor timeout (%llu ms)", now_ms - _last_sensor_ok_ms);
             }
             _safety_trip = true;
             _enabled = false;
@@ -264,12 +265,12 @@ void Max31855Actor::control()
     // ArduinoJson serializes NaN as null, so sanitize before emitting.
     if (!std::isfinite(thermocouple_c))
     {
-        WARN("%s: thermocouple value is NaN/Inf, forcing 0.0", name());
+        WARN(" thermocouple value is NaN/Inf, forcing 0.0");
         thermocouple_c = 0.0f;
     }
     if (!std::isfinite(internal_c))
     {
-        WARN("%s: internal value is NaN/Inf, forcing 0.0", name());
+        WARN(" internal value is NaN/Inf, forcing 0.0");
         internal_c = 0.0f;
     }
 
@@ -304,7 +305,7 @@ void Max31855Actor::control()
     {
         if (!_safety_trip)
         {
-            ERROR("%s: safety trip - overtemperature %.2fC >= %.2fC", name(), _last_temp_c, HEATER_MAX_TEMP_C);
+            ERROR(" safety trip - overtemperature %.2fC >= %.2fC", _last_temp_c, HEATER_MAX_TEMP_C);
         }
         _safety_trip = true;
         _enabled = false;

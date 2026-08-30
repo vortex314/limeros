@@ -23,6 +23,7 @@ class MdnsActor : public Actor
 private:
 
 std::string _hostname;
+bool _started = false;
 
 public:
   MdnsActor(const char* hostname);

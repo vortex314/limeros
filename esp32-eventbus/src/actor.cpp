@@ -2,15 +2,20 @@
 #include <actor.h>
 #include <queue>
 
-void Actor::set_eventbus(ActorId id, EventBus &eventbus)
+void Actor::emit(std::shared_ptr<ActorPayload> env)
 {
-    this->_eventbus = eventbus;
-    this->_id = id;
+    ActorMessage msg(env);
+    msg.src = _self;
+    msg.dst = 0; // broadcast
+    _eventbus->push(msg);
 }
 
 void Actor::emit(const ActorPayload *env)
 {
-    _eventbus->push(env);
+    ActorMessage msg(const_cast<ActorPayload *>(env));
+    msg.src = _self;
+    msg.dst = 0; // broadcast
+    _eventbus->push(msg);
 }
 
 void panic_here(const char *s)
@@ -302,49 +307,107 @@ void Thread::run()
         actor->on_stop();
 }
 
-EventBus::EventBus(size_t size) : Queue<const ActorMessage *>(size) {};
+EventBus::EventBus(size_t size) : _queue(size)
+{
+}
+
+EventBus::~EventBus() {}
+
 
 void EventBus::register_actor(const char *name, Actor *actor)
 {
     _actors[_next_actor_id] = actor;
+    _actor_names[_next_actor_id] = name;
     actor->set_eventbus(_next_actor_id, this);
     _next_actor_id++;
 }
 
-void EventBus::push(const ActorMessage *msg)
+const char *EventBus::find_actor_name(ActorId id)
 {
-    if (send(msg) == false)
+    auto it = _actor_names.find(id);
+    return it != _actor_names.end() ? it->second.c_str() : "?";
+}
+
+int EventBus::push(ActorMessage msg)
+{
+    int rc;
+    {
+        portENTER_CRITICAL(&_mux);
+        rc = _queue.write(msg);
+        portEXIT_CRITICAL(&_mux);
+    }
+    if (rc != 0)
     {
         ERROR("EventBus queue full, dropping message");
-        delete msg;
+        return rc; // last ref drops here -> transparently recycled / freed
     }
+    if (_task_handle)
+    {
+        xTaskNotifyGive(_task_handle);
+    }
+    return rc;
+}
+
+bool EventBus::pushFromIsr(ActorMessage msg)
+{
+    bool ok;
+    {
+        portENTER_CRITICAL_ISR(&_mux);
+        ok = _queue.write(msg) == 0;
+        portEXIT_CRITICAL_ISR(&_mux);
+    }
+    if (!ok)
+    {
+        // Queue full in ISR context: cannot log/block here, just drop it.
+        return false;
+    }
+    if (_task_handle)
+    {
+        BaseType_t woken = pdFALSE;
+        vTaskNotifyGiveFromISR(_task_handle, &woken);
+    }
+    return true;
 }
 
 void EventBus::loop()
 {
-    ActorMessage *pmsg;
+    _task_handle = xTaskGetCurrentTaskHandle();
     for (const auto &it : _actors)
     {
         Actor *actor = it.second;
-            actor->setup();
+        actor->setup();
     }
     uint32_t timeout = 100; // 100 ms timeout
 
     while (true)
     {
-        //    INFO("EventBus waiting for messages or timeout %d ms", timeout);
-        if (receive((const ActorMessage **)&pmsg, timeout))
+        // Wait until a message is pushed or the timeout expires.
+        ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(timeout));
+
+        // Process ONE message per iteration (same pacing as the original
+        // queue-based loop): timers are re-checked between messages, which
+        // prevents bursts of notifications from spinning the loop and stops
+        // messages from being re-drained/replayed.
+        ActorMessage pmsg;
+        {
+            portENTER_CRITICAL(&_mux);
+            if (_queue.hasData())
+            {
+                pmsg = _queue.read();
+            }
+            portEXIT_CRITICAL(&_mux);
+        }
+        if (pmsg.payload != nullptr)
         {
             for (const auto &handler : _message_handlers)
             {
-                handler(*pmsg);
+                handler(pmsg);
             }
             for (auto& it : _actors)
             {
                 Actor *actor = it.second;
-                actor->receive(*pmsg);
+                actor->receive(pmsg);
             }
-            delete pmsg;
         }
 
         timeout = 1000;
@@ -353,8 +416,10 @@ void EventBus::loop()
             Actor *actor = it.second;
             for (int id : actor->timers().get_expired_timers())
             {
-                TimerMsg tm(id);
-                actor->receive(tm);
+                ActorMessage msg(new TimerMsg(id));
+                msg.src = actor->ref();
+                msg.dst = actor->ref();
+                push(msg);
                 actor->timers().refresh(id);
             }
             uint64_t sleep_duration = actor->sleep_time();
@@ -376,20 +441,17 @@ void EventBus::start()
         "EventBus", _stack_size, this, 5, &_task_handle);
 }
 
-void EventBus::register_actor(const char *name, Actor *actor)
-{
-    _actors.push_back(actor);
-    actor->set_eventbus(this);
-}
 
-ActorRef EventBus::find_actor(const char *name)
+
+ActorId EventBus::find_actor(const char *name)
 {
-    for (auto actor : _actors)
+    for (auto& it : _actors)
     {
-        if (actor->name() == name)
+        Actor *actor = it.second;
+        if (strcmp(this->find_actor_name(actor->ref()), name) == 0)
         {
             return actor->ref();
         }
     }
-    return NULL_ACTOR;
+    return 0;
 }

@@ -54,7 +54,7 @@ public:
     }
 };
 
-HoverboardActor::HoverboardActor(const char *name) : Actor(name),uart_read_buffer(UART_BUF_SIZE)
+HoverboardActor::HoverboardActor() : Actor(),uart_read_buffer(UART_BUF_SIZE)
 {
     _timer_publish = timer_repetitive(5000);
     _timer_hb_alive = timer_repetitive(100);
@@ -210,13 +210,13 @@ HoverboardActor::~HoverboardActor()
 
 void HoverboardActor::receive(const ActorMessage &msg)
 {
-    msg.handle_if<HoverboardRequest>([&](const auto hb_cmd)
+    msg.handle<HoverboardRequest>([&](const auto hb_cmd)
                                   { INFO("Received HoverboardRequest: speed=%d, steer=%d", hb_cmd.speed.value_or(-1), hb_cmd.steer.value_or(-1));
                                 hb_cmd.speed.handle_if([&](const auto& value) { _speed = value; });
                                 hb_cmd.steer.handle_if([&](const auto& value) { _steer = value; }); });
-    msg.handle_if<TimerMsg>([&](const TimerMsg &msg)
+    msg.handle<TimerMsg>([&](const TimerMsg &msg)
                          { on_timer(msg.timer_id); });
-    msg.handle_if<UartRxd>([&](const UartRxd &uart_rxd)
+    msg.handle<UartRxd>([&](const UartRxd &uart_rxd)
                         { handle_uart_bytes(uart_rxd.payload); });
 }
 
@@ -302,7 +302,7 @@ void uart_event_task(void *pvParameters)
                 {
                     data[len] = '\0'; // Null-terminate
                     Bytes payload(data, data+len);
-                    actor->emit(new UartRxd(payload));
+                    actor->tell(actor->ref(), new UartRxd(payload));
                 }
                 break;
             }

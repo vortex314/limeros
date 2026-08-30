@@ -6,17 +6,13 @@
 #include <option.h>
 #include <msgs.h>
 
-class SysRequest : public ActorPayload
-{
-  TYPED_MESSAGE(SysRequest)
-};
 
 class SysActor : public Actor
 {
 private:
   int _timer_publish = -1;
   int _prop_counter = 0;
-  SysEvent *_sys_event = nullptr;
+  std::shared_ptr<SysEvent> _sys_event = std::make_shared<SysEvent>();
 
 public:
   SysActor();

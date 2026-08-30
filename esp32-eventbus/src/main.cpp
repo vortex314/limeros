@@ -104,10 +104,10 @@ extern "C" void app_main()
   eventbus.register_actor(new HoverboardActor("hb")); // hoverboard interface
 #endif
   // debugging handler to log all eventbus traffic, comment for beauty
-  eventbus.register_handler([](const ActorMessage &msg) // just log eventbus traffic
+  eventbus.register_handler([](const ActorMessage &am) // just log eventbus traffic
                             { 
-                              uint32_t msg_id = msg.msg_id() ? msg.msg_id() : 0;
-                              INFO("EventBus '%s' (%d) Free heap size: %ld", id_to_string(msg_id), msg_id, esp_get_free_heap_size());
+                              uint32_t msg_id = am.payload->msg_id() ? am.payload->msg_id() : 0;
+                              INFO("EventBus '%s' (%d) payload=%p heap=%ld", id_to_string(msg_id), msg_id, (void *)am.payload.get(), esp_get_free_heap_size());
                             });
   eventbus.loop();
 }

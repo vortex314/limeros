@@ -5,6 +5,7 @@
 #include <freertos/portmacro.h>
 #include <freertos/queue.h>
 #include <freertos/timers.h>
+#include <freertos/task.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <vector>
@@ -19,13 +20,12 @@
 #include <msgs.h>
 #include <unordered_map>
 #include <typed_message.h>
+#include <circ_buf.h>
 
 typedef uint32_t ActorId;
 typedef uint32_t MsgType;
 typedef uint32_t TimerId;
-class ActorPayload : public TypedMsg
-{
-};
+typedef TypedMessage ActorPayload;
 
 uint64_t current_time();
 
@@ -39,14 +39,24 @@ struct ActorMessage
 public:
     ActorId src = 0;
     ActorId dst = 0;
-    ActorPayload *payload = nullptr;
+    std::shared_ptr<ActorPayload> payload = nullptr;
 
 public:
     // ---- type-safe helpers ----
+    ActorMessage() = default;
+    ActorMessage(const ActorMessage &other) = default;
+    template <typename T>
+    ActorMessage(std::shared_ptr<T> msg)    {
+        payload = msg;
+    }
+    ActorMessage(ActorPayload *msg) : payload(msg)
+    {
+    }
+
     template <typename T>
     bool is() const { return payload->msg_id() == T::MSG_ID; }
     template <typename T>
-    T *as() { return static_cast<T *>(payload); }
+    T *as() { return static_cast<T *>(payload.get()); }
 
     // handle() – returns true if the message was of type T
     template <typename T, typename Func>
@@ -54,7 +64,7 @@ public:
     {
         if (payload->msg_id() == T::MSG_ID)
         {
-            func(*static_cast<const T *>(payload));
+            func(*static_cast<const T *>(payload.get()));
             return true;
         }
         return false;
@@ -62,20 +72,17 @@ public:
 
     ~ActorMessage()
     {
-        if (payload)
-            delete payload;
+        payload.reset();
     }
     void set_payload(ActorPayload *p)
     {
-        if (payload)
-            delete payload;
-        payload = p;
+        payload.reset(p);
     }
 };
 
 class TimerMsg : public ActorPayload
 {
-TYPED_MSG(TimerMsg)
+TYPED_MESSAGE(TimerMsg)
     int timer_id;
     TimerMsg(int id) : timer_id(id) {}
 };
@@ -205,19 +212,25 @@ public:
 
 class Actor;
 
-class EventBus : public Queue<const ActorMessage *>
+class EventBus
 {
     std::unordered_map<uint32_t, Actor *> _actors;
+    std::unordered_map<uint32_t, std::string> _actor_names;
     ActorId _next_actor_id = 1;
     std::vector<std::function<void(const ActorMessage &)>> _message_handlers;
     size_t _stack_size = 1024;
-    TaskHandle_t _task_handle;
+    TaskHandle_t _task_handle = nullptr;
+    portMUX_TYPE _mux = portMUX_INITIALIZER_UNLOCKED;
+
+    // Circular queue of messages (replaces the FreeRTOS queue).
+    CircBuf<ActorMessage> _queue;
 
 
 public:
     EventBus(size_t size);
     ~EventBus();
-    void push(const ActorMessage *env);
+    int push(ActorMessage msg);
+    bool pushFromIsr(ActorMessage msg);
     void register_actor(const char *name, Actor * actor);
     void register_handler(std::function<void(const ActorMessage &)> handler)
     {
@@ -241,13 +254,22 @@ private:
 
 public:
     Actor() { };
-    ~Actor() { INFO("Destroying actor %s", name()); }
+    ~Actor() { INFO("Destroying actor %s", _eventbus->find_actor_name(_self)); }
 
     virtual void setup() { INFO("actor %s default started.", _eventbus->find_actor_name(_self)); }
     virtual void on_stop() { INFO("actor %s default stopped.", _eventbus->find_actor_name(_self)); }
     virtual void receive(const ActorMessage &env)
     {
         WARN(" No message handler for actor %s ", _eventbus->find_actor_name(_self));
+    }
+    template<typename T>
+    std::shared_ptr<ActorMessage> create_message()
+    {
+        ActorMessage *msg = new ActorMessage();
+        msg->src = _self;
+        msg->dst = 0; // broadcast
+        msg->payload = new T();
+        return std::shared_ptr<ActorMessage>(msg);
     }
 
     /// Declare that this actor handles messages of the given type name.
@@ -261,19 +283,35 @@ public:
     Timers &timers() { return _timers; }
     uint64_t sleep_time() { return _timers.sleep_time(); }
     ActorId ref() const { return _self; }
-    const char *name() { return _eventbus->name(); }
     EventBus &eventbus() const { return *_eventbus; }
 
     int tell(ActorId dst,  ActorPayload *payload)
     {
-        ActorMessage *env = new ActorMessage();
-        env->src = _self;
-        env->dst = dst;
-        env->payload = payload;
-        _eventbus->push(env);
-        return 0; // Added return statement to match the int return type
+        ActorMessage env(payload);
+        env.src = _self;
+        env.dst = dst;
+        return _eventbus->push(env);
     }
 
+
+    int send(ActorMessage msg)
+    {
+        return _eventbus->push(msg);
+    }
+
+    // ISR-safe variant: may be called from interrupt context (e.g. hardware
+    // capture callbacks). The message comes from the pool prepared at setup
+    // time (no allocation), and the queue write is guarded by a critical
+    // section.
+    int tellFromIsr(ActorId dst,  ActorPayload *payload)
+    {
+        ActorMessage env(payload);
+        env.src = _self;
+        env.dst = dst;
+        _eventbus->pushFromIsr(env);
+        return 0;
+    }
+    void emit(std::shared_ptr<ActorPayload> env);
     void emit(const ActorPayload *env);
     void set_eventbus(ActorId id, EventBus *eventbus)
     {
@@ -285,10 +323,9 @@ public:
     {
         for (int id : _timers.get_expired_timers())
         {
-            ActorMessage *env = new ActorMessage();
-            env->payload =  new TimerMsg(id);
-            env->src = _self;
-            env->dst = _self;
+            ActorMessage env(new TimerMsg(id));
+            env.src = _self;
+            env.dst = _self;
             _eventbus->push(env);
             _timers.refresh(id);
         }

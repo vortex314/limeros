@@ -61,7 +61,7 @@
     auto r = (VAL);                                            \
     if (r.is_err())                                            \
     {                                                          \
-      INFO("[%d] %s:%d %s", r.err()->rc(), __FILE__, __LINE__, #VAL); \
+      INFO("[%d] %s:%d %s", r.err()->rc, __FILE__, __LINE__, #VAL); \
       return r;                                                \
     }                                                          \
   }

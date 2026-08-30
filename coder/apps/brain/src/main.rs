@@ -109,8 +109,8 @@ async fn main() -> anyhow::Result<()> {
         brain_ref.clone(),
         router_ref.clone(),
     ));
-    let serial_usb0 = SerialActor::spawn(SerialActor::new("/dev/ttyUSB0", router_ref.clone()));
-    let serial_usb1 = SerialActor::spawn(SerialActor::new("/dev/ttyUSB1", router_ref.clone()));
+ //   let serial_usb0 = SerialActor::spawn(SerialActor::new("/dev/ttyUSB0", router_ref.clone()));
+ //   let serial_usb1 = SerialActor::spawn(SerialActor::new("/dev/ttyUSB1", router_ref.clone()));
     let udp_ref = UdpActor::spawn(UdpActor::new(router_ref.clone()));
     let uart_mux = UartMuxActor::spawn(UartMuxActor::new(router_ref.clone(), UartMuxConfig {
         vid: UART_MUX_VID,
@@ -160,8 +160,8 @@ async fn main() -> anyhow::Result<()> {
     brain_ref.link(&ps4_reader).await;
     brain_ref.link(&udp_ref).await;
     brain_ref.link(&mc_ref).await;
-    brain_ref.link(&serial_usb0).await;
-    brain_ref.link(&serial_usb1).await;
+ //   brain_ref.link(&serial_usb0).await;
+ //   brain_ref.link(&serial_usb1).await;
     brain_ref.link(&uart_mux).await;
 
     info!("Brain running. Press Ctrl+C to stop.");
@@ -177,8 +177,8 @@ async fn main() -> anyhow::Result<()> {
     ps4_reader.stop_gracefully().await.log_error("stop 1");
     udp_ref.stop_gracefully().await.log_error("stop 1");
     mc_ref.stop_gracefully().await.log_error("stop 1");
-    serial_usb0.stop_gracefully().await.log_error("stop 1");
-    serial_usb1.stop_gracefully().await.log_error("stop 1");
+//    serial_usb0.stop_gracefully().await.log_error("stop 1");
+//    serial_usb1.stop_gracefully().await.log_error("stop 1");
     info!("Shutdown complete.");
     Ok(())
 }

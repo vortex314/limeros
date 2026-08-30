@@ -4,7 +4,7 @@ use std::sync::Arc;
 
 use anyhow::Result;
 use common::fnv;
-use generated::generated::{CutterEvent, CutterReply, CutterRequest, Envelope};
+use generated::generated::{MotorEvent, MotorReply, MotorRequest, Envelope};
 use kameo::prelude::*;
 use log::{info, warn};
 
@@ -67,13 +67,13 @@ impl CutterActor {
             .as_ref()
             .ok_or_else(|| anyhow::anyhow!("CutterReply envelope missing payload"))?;
 
-        let _reply = CutterReply::from_bytes(reply)
+        let _reply = MotorReply::from_bytes(reply)
             .map_err(|e| anyhow::anyhow!("Failed to decode CutterReply: {e}"))?;
 
         // CutterReply carries error_code/message — log if error
-        if let Some(code) = _reply.error_code {
+        if let Some(code) = _reply.status_code {
             if code != 0 {
-                warn!("CutterReply error {}: {}", code, _reply.message.as_deref().unwrap_or(""));
+                warn!("MotorReply error {}: {}", code, _reply.message.as_deref().unwrap_or(""));
             }
         }
 
@@ -86,11 +86,11 @@ impl CutterActor {
             .as_ref()
             .ok_or_else(|| anyhow::anyhow!("CutterEvent envelope missing payload"))?;
 
-        let event = CutterEvent::from_bytes(event)
+        let event = MotorEvent::from_bytes(event)
             .map_err(|e| anyhow::anyhow!("Failed to decode CutterEvent: {e}"))?;
 
         event.enabled.map(|e| self.enabled = e);
-        event.rpm.map(|r| self.rpm = r);
+        event.rpm_measured.map(|r| self.rpm = r);
         event.current.map(|c| self.current = c);
         event.voltage.map(|v| self.voltage = v);
         event.temperature.map(|t| self.temperature = t);
@@ -100,26 +100,26 @@ impl CutterActor {
     }
 
     pub async fn handle_timer_tick(&mut self) {
-        let request = CutterRequest {
+        let request = MotorRequest {
             enabled: Some(self.enabled),
-            rpm: Some(self.rpm),
+            rpm_target: Some(self.rpm),
         };
         let payload = match request.to_bytes() {
             Ok(p) => p,
             Err(e) => {
-                warn!("Failed to encode CutterRequest: {}", e);
+                warn!("Failed to encode MotorRequest: {}", e);
                 return;
             }
         };
         let envelope = Envelope {
-            msg_type: Some(CutterRequest::MSG_ID),
+            msg_type: Some(MotorRequest::MSG_ID),
             payload: Some(payload),
             ..Default::default()
         };
         self.device.as_ref().map(async |device| {
             let _ = device
                 .tell(EnvelopeHandlerRequest::SendEnvelope {
-                    endpoint : fnv::fnv1a_32("cutter"),
+                    endpoint: fnv::fnv1a_32("cutter"),
                     envelope: Arc::new(envelope),
                 })
                 .await;
@@ -198,12 +198,12 @@ impl Message<BrainCmd> for CutterActor {
     ) -> Self::Reply {
         let envelope = msg.envelope;
         match envelope.msg_type {
-            Some(CutterReply::MSG_ID) => {
+            Some(MotorReply::MSG_ID) => {
                 if let Err(e) = self.handle_cutter_reply(envelope).await {
                     warn!("Failed to handle CutterReply: {}", e);
                 }
             }
-            Some(CutterEvent::MSG_ID) => {
+            Some(MotorEvent::MSG_ID) => {
                 if let Err(e) = self.handle_cutter_event(envelope).await {
                     warn!("Failed to handle CutterEvent: {}", e);
                 }

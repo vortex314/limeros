@@ -6,8 +6,7 @@ extern "C" bool capture_callback(
     const mcpwm_capture_event_data_t *capture_event,
     void *arg);
 
-MotorActor::MotorActor() : MotorActor("sys", 4096, 5, 5) {}
-MotorActor::MotorActor(const char *name, size_t stack_size, int priority, size_t queue_depth) : Actor(stack_size, name, priority, queue_depth)
+MotorActor::MotorActor(): Actor()
 {
     _timer_publish = timer_repetitive(300);
     _timer_watchdog = timer_repetitive(1000);
@@ -36,21 +35,33 @@ float MotorActor::pid_update(float delta_t, float error)
     return _p + _i + _d;
 }
 
-void MotorActor::on_cmd(MotorCmd &cmd)
-{
-    cmd.publish.inspect([&](auto msg)
-                         {
-                             INFO("Motor actor cmd ");
-                             msg.Kp.inspect([&](const float &v){_Kp = v; });
-                             msg.Ki.inspect([&](auto v){ _Ki = v; });
-                             msg.Kd.inspect([&](auto v){ _Kd = v; });
-                             msg.rpm_target.inspect([&](auto v){ _rpm_target = v; });
-                             publish_props(); });
 
-    if (cmd.isr_msg)
-    {
-        uint32_t sum = cmd.isr_msg->sum;
-        uint32_t count = cmd.isr_msg->count;
+void MotorActor::setup(void)
+{
+    INFO("MotorActor setup");
+    Res init_res = pwm_init()
+        .and_then([&](auto r)
+                  { return capture_init(); });
+    init_res.just([&](auto v)
+                  { INFO(" Motor Actor setup complete."); });
+    init_res.just_err([&](auto err)
+                      { ERROR("Motor Actor setup failed: %d %s", err.rc, err.msg); });
+}
+
+void MotorActor::receive(const ActorMessage &msg)
+{
+    msg.handle<MotorRequest>([&](const auto &cmd)
+                             {
+        INFO("Motor actor cmd ");
+        cmd.Kp.handle_if([&](const float &v) { _Kp = v; });
+        cmd.Ki.handle_if([&](auto v) { _Ki = v; });
+        cmd.Kd.handle_if([&](auto v) { _Kd = v; });
+        cmd.target_rpm.handle_if([&](auto v) { _rpm_target = v; });
+        publish_props(); });
+    msg.handle<IsrMsg>([&](const IsrMsg &isr_msg)
+                       {
+        uint32_t sum = isr_msg.sum;
+        uint32_t count = isr_msg.count;
         float sum_as_float = sum;
         float avg = sum_as_float / count;
 
@@ -59,7 +70,7 @@ void MotorActor::on_cmd(MotorCmd &cmd)
                                          //        INFO("Isr sum: %d count: %d freq : %f Hz. RPM = %f", sum, count, hz, rpm);
 
         float delta_t = sum_as_float / 80'000'000.0f; // sample time in seconds
-        this->_rpm_measured = rpm;
+        _rpm_measured = rpm;
 
         float pid = this->pid_update(delta_t, _rpm_target - _rpm_measured);
         this->_pwm_percent = MotorActor::clip(pid, 0, 100.0f);
@@ -79,23 +90,20 @@ void MotorActor::on_cmd(MotorCmd &cmd)
             ERROR("Failed to set compare value: %s", esp_err_to_name(err));
         }
 
-        _last_rpm_measured = esp_timer_get_time();
-    }
+        _last_rpm_measured = esp_timer_get_time(); });
 }
 
 void MotorActor::publish_props()
 {
-    _motor_msg.rpm_measured = _rpm_measured;
-    _motor_msg.rpm_target = _rpm_target;
-    _motor_msg.pwm = _pwm_percent;
-    _motor_msg.Kp = _Kp;
-    _motor_msg.Ki = _Ki;
-    _motor_msg.Kd = _Kd;
-    _motor_msg.p = _p;
-    _motor_msg.i = _i;
-    _motor_msg.d = _d;
+    MotorEvent *evt = new MotorEvent();
+    evt->rpm_measured = _rpm_measured;
+    evt->rpm_target = _rpm_target;
+    evt->pwm = _pwm_percent;
+    evt->Kp = _Kp;
+    evt->Ki = _Ki;
+    evt->Kd = _Kd;
 
-    emit(MotorEvent{.publish = _motor_msg});
+    emit(evt);
 }
 
 void MotorActor::on_timer(int id)
@@ -133,16 +141,7 @@ void MotorActor::on_timer(int id)
     }
 }
 
-void MotorActor::setup(void)
-{
-    capture_init()
-        .and_then([&](auto r)
-                  { return pwm_init(); })
-        .on_error([&](auto rc, auto msg)
-                  { ERROR("Motor Actor start failed."); })
-        .inspect([&](auto v)
-                 { INFO(" Motor Actor started."); });
-}
+
 
 MotorActor::~MotorActor()
 {
@@ -198,7 +197,6 @@ MotorActor::~MotorActor()
  */
 Res MotorActor::pwm_init()
 {
-
     mcpwm_timer_config_t timer_config = mcpwm_timer_config_t{
         group_id : 0,
         clk_src : MCPWM_TIMER_CLK_SRC_DEFAULT,          // 160MHz PLL
@@ -209,7 +207,7 @@ Res MotorActor::pwm_init()
         flags : {
             update_period_on_empty : 1, // change
             update_period_on_sync : 1,
-            allow_pd : 0, // set to allow power down. When this flag set, the driver will backup/restore the MCPWM registers before/after entering/exist sleep mode.
+        //    allow_pd : 0, // set to allow power down. When this flag set, the driver will backup/restore the MCPWM registers before/after entering/exist sleep mode.
         },                // when to change the value
     };
 
@@ -280,7 +278,7 @@ Res MotorActor::pwm_init()
     //  CHECK_ESP(mcpwm_timer_enable(self.timer_handle));
     CHECK_ESP(mcpwm_timer_start_stop(_timer, MCPWM_TIMER_START_NO_STOP));
 
-    return ResOk;
+    return Res::Ok(true);
 }
 
 /**
@@ -335,7 +333,7 @@ Res MotorActor::capture_init()
     CHECK_ESP(mcpwm_capture_timer_enable(_cap_timer));
     CHECK_ESP(mcpwm_capture_timer_start(_cap_timer));
 
-    return ResOk;
+    return Res::Ok(true);
 }
 
 Res config_gpio_to_value(gpio_num_t gpio_num, uint8_t value)
@@ -349,7 +347,7 @@ Res config_gpio_to_value(gpio_num_t gpio_num, uint8_t value)
     };
     CHECK_ESP(gpio_config(&io_conf));
     CHECK_ESP(gpio_set_level(gpio_num, value));
-    return ResOk;
+    return Res::Ok(true);
 }
 
 /**
@@ -390,10 +388,10 @@ extern "C" bool capture_callback(
 
     if (isr_data.sum > 8'000'000)
     { // 100 msec at 80 MHz
-        IsrMsg isr_msg;
-        isr_msg.sum = isr_data.sum;
-        isr_msg.count = isr_data.count;
-        ((MotorActor *)arg)->tellFromIsr(new MotorCmd{isr_msg : isr_msg});
+        IsrMsg* isr_msg = new IsrMsg();
+        isr_msg->sum = isr_data.sum;
+        isr_msg->count = isr_data.count;
+        ((MotorActor *)arg)->tellFromIsr(((MotorActor *)arg)->ref(), isr_msg);
         // Reset the sum and count for the next period
         isr_data.sum = 0;
         isr_data.count = 0;
@@ -429,7 +427,6 @@ Res MotorActor::pwm_stop()
 {
     this->_rpm_target = 0.0f;
     this->_pwm_value = 0;
-    return ResOk;
+    return Res::Ok(true);
 }
-
 

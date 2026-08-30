@@ -12,8 +12,6 @@ SysActor::SysActor() : Actor()
 
 void SysActor::setup()
 {
-
-    _sys_event = new SysEvent();
 }
 
 SysActor::~SysActor()
@@ -83,5 +81,5 @@ void SysActor::publish_info()
     struct timeval tv1;
     gettimeofday(&tv1, NULL);
     _sys_event->utc = tv1.tv_sec;
-    emit(_sys_event);
+    send(_sys_event);
 }

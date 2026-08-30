@@ -25,6 +25,12 @@ private:
   esp_event_handler_instance_t handler_any_id;
   esp_event_handler_instance_t handler_got_ip;
   bool _wifi_connected = false;
+  // Delayed reconnect: set by the event handler (esp_event task), consumed by
+  // the periodic timer in the EventBus loop task. Delaying the reconnect
+  // avoids a rapid connect/disconnect loop that an immediate
+  // esp_wifi_connect() inside the DISCONNECTED handler can cause.
+  volatile bool _reconnect_pending = false;
+  uint64_t _reconnect_at_ms = 0;
   int _timer_publish;
   int _timer_publish_props;
   int _prop_counter = 0;
@@ -32,7 +38,10 @@ private:
   std::string wifi_password;
   int channel;
   std::vector<std::string> ssid_list;
-
+  std::shared_ptr<WifiConnected> _wifi_connected_msg = std::make_shared<WifiConnected>();
+  std::shared_ptr<WifiDisconnected> _wifi_disconnected_msg = std::make_shared<WifiDisconnected>();
+  std::shared_ptr<WifiEvent> _wifi_event = std::make_shared<WifiEvent>();
+  
 
 public:
   WifiActor();

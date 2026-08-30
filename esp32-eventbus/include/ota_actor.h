@@ -34,6 +34,7 @@ class OtaActor : public Actor
 private:
 
     TaskHandle_t _ota_task_handle = nullptr;
+    volatile bool _running = false;
 
 public:
   OtaActor();

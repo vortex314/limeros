@@ -20,6 +20,15 @@ void MdnsActor::setup()
 
 void MdnsActor::init()
 {
+    // mDNS is initialized once; re-running mdns_init() on every reconnect
+    // would tear down and restart the service (and logs the noisy repeated
+    // "Initializing mDNS" lines).
+    if (_started)
+    {
+        return;
+    }
+    _started = true;
+
     esp_err_t err;
     INFO("Initializing mDNS with hostname: %s", _hostname.c_str());
 

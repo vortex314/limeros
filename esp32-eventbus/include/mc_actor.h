@@ -29,38 +29,24 @@
 #include <lwip/inet.h>
 #include <msgs.h>
 
-class RxdMsg : public Msg
+class RxdMsg : public ActorPayload
 {
-public:
-  static const uint32_t MSG_ID = FNV("RxdMsg");
-  static constexpr const char *MSG_NAME = "RxdMsg";
-
-  virtual uint32_t msg_id() const { return MSG_ID; };
-  virtual const char *msg_name() const { return MSG_NAME; };
+TYPED_MESSAGE(RxdMsg)
   RxdMsg(Envelope env) : env(env) {}
   Envelope env;
 };
 
-class TxdMsg : public Msg
+class TxdMsg : public ActorPayload
 {
-public:
-  static const uint32_t MSG_ID = FNV("TxdMsg");
-  static constexpr const char *MSG_NAME = "TxdMsg";
-
-  virtual uint32_t msg_id() const { return MSG_ID; };
-  virtual const char *msg_name() const { return MSG_NAME; };
+TYPED_MESSAGE(TxdMsg)
   TxdMsg(Envelope env) : env(env) {}
   Envelope env;
 };
 
-class Transmitting : public Msg
+class Transmitting : public ActorPayload
 {
-public:
-  static const uint32_t MSG_ID = FNV("Transmitting");
-  static constexpr const char *MSG_NAME = "Transmitting";
+TYPED_MESSAGE(Transmitting)
 
-  virtual uint32_t msg_id() const { return MSG_ID; };
-  virtual const char *msg_name() const { return MSG_NAME; };
 };
 
 class McActor : public Actor
@@ -73,7 +59,8 @@ private:
   int _multicast_socket;
   sockaddr_in _unicast_src_addr;
   sockaddr_in _multicast_addr;
-  bool _running = true;
+  bool _running = false;
+  bool _listeners_started = false;
   int _timer_publish;
   uint32_t _ping_counter = 0;
   bool _connected = false;

@@ -33,13 +33,12 @@ WifiActor::WifiActor() : Actor()
   //  _timer_publish_props = timer_repetitive(5000);
   wifi_ssid = "";
   wifi_password = STRINGIZE(WIFI_PASS);
-  esp_wifi_set_ps(WIFI_PS_NONE); // no power save
-                                 // esp_coex_preference_set(ESP_COEX_PREFER_BALANCE);
-  //  esp_wifi_set_ps(WIFI_PS_MIN_MODEM);
+  // esp_coex_preference_set(ESP_COEX_PREFER_BALANCE);
 }
 
 void WifiActor::setup()
 {
+
 
   while (true)
   {
@@ -76,13 +75,19 @@ void WifiActor::setup()
 void WifiActor::receive(const ActorMessage &msg)
 {
   msg.handle<TimerMsg>([&](const TimerMsg &msg)
-                            { handle_timer(msg.timer_id); });
+                       { handle_timer(msg.timer_id); });
 }
 
 void WifiActor::handle_timer(int timer_id)
 {
   if (timer_id == _timer_publish)
   {
+    if (_reconnect_pending && current_time() >= _reconnect_at_ms)
+    {
+      _reconnect_pending = false;
+      s_retry_count++;
+      esp_wifi_connect();
+    }
     if (_wifi_connected)
     {
       publish_info(esp_netif);
@@ -131,25 +136,29 @@ void WifiActor::event_handler(void *arg, esp_event_base_t event_base,
   else if (event_base == WIFI_EVENT &&
            event_id == WIFI_EVENT_STA_DISCONNECTED)
   {
-    INFO("WiFi STA disconnected");
-    actor->emit(new WifiDisconnected());
+    wifi_event_sta_disconnected_t *dis =
+        (wifi_event_sta_disconnected_t *)event_data;
+    WARN("WiFi STA disconnected, reason=%d",
+         dis ? (int)dis->reason : -1);
+    actor->send(actor->_wifi_disconnected_msg);
     actor->_wifi_connected = false;
     if (s_retry_count < ESP_MAXIMUM_RETRY)
     {
-      esp_wifi_connect();
-      s_retry_count++;
+      // Reconnect on the periodic timer (delayed) instead of immediately:
+      // calling esp_wifi_connect() here can race the driver and keep the
+      // connect/disconnect loop going.
+      actor->_reconnect_pending = true;
+      actor->_reconnect_at_ms = current_time() + 1000;
     }
   }
   else if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP)
   {
     INFO("WiFi STA got IP address ");
-    actor->emit(new WifiConnected());
+    actor->emit(actor->_wifi_connected_msg);
     actor->_wifi_connected = true;
     s_retry_count = 0;
   }
 }
-
-
 
 std::string ip4addr_to_str(esp_ip4_addr_t *ip)
 {
@@ -356,14 +365,20 @@ Res WifiActor::connect()
   wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
   CHECK_ESP(esp_wifi_init(&cfg));
 
+  // Disable power save (modem sleep) NOW that WiFi is initialized. Doing it in
+  // the constructor was a no-op (WiFi not initialized yet), which left the STA
+  // in modem-sleep and caused repeated connect/disconnect cycles.
+  esp_wifi_set_ps(WIFI_PS_NONE);
+
   wifi_config_t wifi_config;
   bzero(&wifi_config, sizeof(wifi_config));
   strcpy((char *)wifi_config.sta.ssid, wifi_ssid.c_str());
   strcpy((char *)wifi_config.sta.password, wifi_password.c_str());
   INFO("Setting WiFi configuration SSID '%s'", wifi_config.sta.ssid);
-  CHECK_ESP(esp_wifi_set_config(WIFI_IF_STA, &wifi_config));
 
+  // Correct ESP-IDF order: set the mode first, then the config.
   CHECK_ESP(esp_wifi_set_mode(WIFI_MODE_STA));
+  CHECK_ESP(esp_wifi_set_config(WIFI_IF_STA, &wifi_config));
   esp_event_handler_instance_register(
       WIFI_EVENT, ESP_EVENT_ANY_ID, &event_handler, this, &handler_any_id);
   esp_event_handler_instance_register(
@@ -375,7 +390,7 @@ Res WifiActor::connect()
 
 void WifiActor::publish_info(esp_netif_t *esp_netif)
 {
-  WifiEvent *wifi_info = new WifiEvent();
+  
   // get IP address and publish
   esp_netif_ip_info_t ip_info;
   if (esp_netif_get_ip_info(esp_netif, &ip_info) != ESP_OK)
@@ -386,23 +401,23 @@ void WifiActor::publish_info(esp_netif_t *esp_netif)
   uint8_t primary;
   wifi_second_chan_t second;
 
-  if ( esp_wifi_get_channel(&primary, &second) != ESP_OK)
+  if (esp_wifi_get_channel(&primary, &second) != ESP_OK)
   {
     ERROR("Failed to get WiFi channel");
     return;
   }
   channel = primary;
-  wifi_info->ip = ip4addr_to_str(&ip_info.ip);
-  wifi_info->gateway = ip4addr_to_str(&ip_info.gw);
-  wifi_info->netmask = ip4addr_to_str(&ip_info.netmask);
-  wifi_info->ssid = wifi_ssid;
-  wifi_info->channel = channel;
+  _wifi_event->ip = ip4addr_to_str(&ip_info.ip);
+  _wifi_event->gateway = ip4addr_to_str(&ip_info.gw);
+  _wifi_event->netmask = ip4addr_to_str(&ip_info.netmask);
+  _wifi_event->ssid = wifi_ssid;
+  _wifi_event->channel = channel;
   // get MAC address
   uint8_t mac[6];
   esp_read_mac(mac, ESP_MAC_WIFI_STA);
   char macStr[18];
   sprintf(macStr, "%02X:%02X:%02X:%02X:%02X:%02X", mac[0], mac[1], mac[2],
           mac[3], mac[4], mac[5]);
-  wifi_info->mac = macStr;
-  emit(wifi_info);
+  _wifi_event->mac = macStr;
+  emit(_wifi_event);
 }

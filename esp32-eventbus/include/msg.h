@@ -15,7 +15,7 @@ extern void print_cbor_diagnostic(const uint8_t *data, size_t size);
 
 // ---------------------- abstract class Msg ------------------
 
-class Msg : public TypedMsg
+class Msg : public TypedMessage
 {
 public:
     static const uint32_t MSG_ID = FNV("Msg");

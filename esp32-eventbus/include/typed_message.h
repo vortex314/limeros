@@ -3,13 +3,13 @@
 #include <stdint.h>
 #include <fnv.h>
 #include <atomic>
-class TypedMsg
+class TypedMessage
 {
 public:
     static const uint32_t MSG_ID = FNV("Message");
     static constexpr const char *MSG_NAME = "Message";
 
-    virtual ~TypedMsg() = default;
+    virtual ~TypedMessage() = default;
     virtual uint32_t msg_id() const = 0;
     virtual const char *msg_name() const = 0;
 };
@@ -17,9 +17,9 @@ public:
 #define TYPED_MESSAGE(MSG_TYPE) \
 public: \
     static const uint32_t MSG_ID = FNV(MSG_TYPE::MSG_NAME); \
-    static constexpr const char *MSG_NAME = MSG_TYPE::MSG_NAME; \
-    uint32_t msg_id() const override { return MSG_ID; }; \
-    const char *msg_name() const override { return MSG_NAME; };
+    static constexpr const char *MSG_NAME = #MSG_TYPE; \
+    uint32_t msg_id() const override { return MSG_ID; } \
+    const char *msg_name() const override { return MSG_NAME; }
 
 
 class AllocMessage {
