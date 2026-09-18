@@ -71,7 +71,7 @@ void Timer::make_repetitive(uint64_t period)
     _expires_at = current_time() + period;
 }
 
-bool Timer::is_expired(uint64_t now) const & { return now >= _expires_at; }
+bool Timer::is_expired(uint64_t now) const & { return now >= _expires_at && _active; }
 
 void Timer::refresh(uint64_t now)
 {
@@ -405,6 +405,10 @@ void EventBus::loop()
             }
             for (auto& it : _actors)
             {
+                if (pmsg.dst != 0 && pmsg.dst != it.first)
+                {
+                    continue;
+                }
                 Actor *actor = it.second;
                 actor->receive(pmsg);
             }

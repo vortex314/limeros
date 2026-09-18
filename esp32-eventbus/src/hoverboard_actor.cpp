@@ -1,5 +1,6 @@
 
 #include <hoverboard_actor.h>
+#include <cobs_codec.h>
 #include <sys/time.h>
 #include <time.h>
 #include <string.h>
@@ -118,50 +119,13 @@ void HoverboardActor::setup()
 Result<Buffer> HoverboardActor::cobs_decode(const Buffer &input)
 {
     Buffer output(input.size());
-    size_t read_index = 0;
-    uint8_t code = 0, i = 0;
-
-    while (read_index < input.size())
+    const int decoded_len = ::cobs_decode(input.data(), input.size(), output.data(), output.capacity());
+    if (decoded_len < 0)
     {
-        code = input[read_index];
-        if (read_index + code > input.size() && code != 1)
-        {
-            output.clear();
-            return Result<Buffer>::Err(-1, "COBS decode error");
-        }
-        read_index++;
-        for (i = 1; i < code; i++)
-        {
-            output.write(input[read_index++]);
-        }
-        if (code != 0xFF && read_index < input.size())
-        {
-            output.write(0);
-        }
+        return Result<Buffer>::Err(-1, "COBS decode error");
     }
-    // output.resize(write_index);
+    output.resize(static_cast<size_t>(decoded_len));
     return Result<Buffer>::Ok(output);
-}
-
-uint16_t crc16(const uint8_t *data, size_t length)
-{
-    uint16_t crc = 0xFFFF;
-    for (size_t i = 0; i < length; i++)
-    {
-        crc ^= data[i] << 8;
-        for (uint8_t j = 0; j < 8; j++)
-        {
-            if (crc & 0x8000)
-            {
-                crc = (crc << 1) ^ 0x1021;
-            }
-            else
-            {
-                crc <<= 1;
-            }
-        }
-    }
-    return crc;
 }
 /*
  * @brief Check CRC of the input data.
@@ -177,7 +141,7 @@ Result<Buffer> HoverboardActor::check_crc(const Buffer &input)
     }
     uint16_t received_crc = static_cast<uint16_t>(input[input.size() - 1]) |
                             (static_cast<uint16_t>(input[input.size() - 2]) << 8);
-    uint16_t calculated_crc = crc16(input.data(), input.size() - 2);
+    uint16_t calculated_crc = crc16_ccitt(input.data(), input.size() - 2);
     if (received_crc != calculated_crc)
     {
         return Result<Buffer>::Err(-2, "CRC mismatch");

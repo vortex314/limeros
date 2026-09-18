@@ -1,4 +1,5 @@
 #include "buffer.h"
+#include "cobs_codec.h"
 
 Buffer::Buffer(size_t capacity)
 {
@@ -85,23 +86,7 @@ int Buffer::write(const uint8_t *data, size_t len)
 
 uint16_t Buffer::calculate_crc() const
 {
-    uint16_t crc = 0xFFFF;
-    for (size_t i = 0; i < _index; ++i)
-    {
-        crc ^= static_cast<uint16_t>(_buffer[i]) << 8;
-        for (uint8_t bit = 0; bit < 8; ++bit)
-        {
-            if (crc & 0x8000)
-            {
-                crc = static_cast<uint16_t>((crc << 1) ^ 0x1021);
-            }
-            else
-            {
-                crc = static_cast<uint16_t>(crc << 1);
-            }
-        }
-    }
-    return crc;
+    return crc16_ccitt(_buffer, _index);
 }
 
 int Buffer::add_crc()
@@ -141,61 +126,17 @@ int Buffer::cobs_encode_inplace()
     size_t data_len = size();
     uint8_t *buffer = data();
 
-    if (data_len == 0)
-    {
-        buffer[0] = 0x00;
-        resize(1);
-        return 0;
-    }
-
-    // COBS output grows, so encode from a scratch copy of the input held in
-    // the tail of this buffer; writing the front would otherwise clobber the
-    // not-yet-read input. Worst case is one code byte per input byte plus the
-    // final code and delimiter, so 2*data_len+1 bytes must fit.
-    if (2 * data_len + 1 > _capacity)
+    const size_t encoded_capacity = data_len + (data_len / 254) + 1;
+    if (encoded_capacity + 1 > _capacity)
         return ENOSPC;
-    memcpy(buffer + data_len, buffer, data_len);
 
-    const uint8_t *src = buffer + data_len;
-    size_t write_pos = 0;
-    size_t read_pos = 0;
-    size_t block_start = 0;
-    uint8_t code = 1;
+    std::vector<uint8_t> input(buffer, buffer + data_len);
+    const size_t encoded_len = cobs_encode(input.data(), input.size(), buffer, encoded_capacity);
+    if (encoded_len == 0)
+        return ENOSPC;
 
-    buffer[write_pos++] = 0x00; // placeholder for the first code
-
-    while (read_pos < data_len)
-    {
-        if (src[read_pos] == 0x00)
-        {
-            // Found a zero - finalize previous block
-            buffer[block_start] = code;
-            block_start = write_pos;
-            code = 1;
-            buffer[write_pos++] = 0x00; // placeholder for next code
-            ++read_pos;
-        }
-        else
-        {
-            // Copy non-zero byte from the scratch copy
-            buffer[write_pos++] = src[read_pos++];
-            if (++code == 0xFF)
-            {
-                // Block full - finalize
-                buffer[block_start] = code;
-                block_start = write_pos;
-                code = 1;
-                buffer[write_pos++] = 0x00; // placeholder for next code
-            }
-        }
-    }
-
-    // Finalize last block
-    buffer[block_start] = code;
-
-    // Add final delimiter
-    buffer[write_pos++] = 0x00;
-    resize(write_pos);
+    buffer[encoded_len] = 0x00;
+    resize(encoded_len + 1);
 
     return 0;
 }
@@ -206,48 +147,17 @@ int Buffer::cobs_decode_inplace()
 {
     size_t encoded_len = size();
     uint8_t *buffer = data();
-    if (encoded_len == 0)
+    if (encoded_len == 0 || buffer[encoded_len - 1] != 0x00)
         return ENOSPC;
 
-    // Remove COBS encoding
-    size_t read_pos = 0;
-    size_t write_pos = 0;
-    size_t total_decoded = 0;
-
-    while (read_pos < encoded_len)
-    {
-        uint8_t code = buffer[read_pos++];
-        if (code == 0)
-            break; // End of frame
-
-        // Copy code-1 bytes
-        for (uint8_t i = 0; i < code - 1; ++i)
-        {
-            if (read_pos >= encoded_len)
-                return ENOSPC;
-            buffer[write_pos++] = buffer[read_pos++];
-            ++total_decoded;
-        }
-
-        // Insert zero if needed
-        if (code != 0xFF && read_pos < encoded_len && buffer[read_pos] != 0)
-        {
-            // But wait - if the next byte is not zero, this zero is implicit
-            // Only insert if we're not at the end and the next byte isn't a delimiter
-            // Actually, in COBS, if code != 0xFF, a zero is implicit
-            // UNLESS we're at the end of the frame
-            if (read_pos < encoded_len && buffer[read_pos] != 0x00)
-            {
-                buffer[write_pos++] = 0x00;
-                ++total_decoded;
-            }
-        }
-    }
+    const int decoded_len = cobs_decode(buffer, encoded_len - 1, buffer, _capacity);
+    if (decoded_len < 0)
+        return ENOSPC;
 
     // Remove CRC bytes (last 2 bytes of data)
-    if (total_decoded < 2)
+    if (decoded_len < 2)
         return ENOSPC;
-    resize(total_decoded - 2);
+    resize(static_cast<size_t>(decoded_len - 2));
 
     return 0;
 }

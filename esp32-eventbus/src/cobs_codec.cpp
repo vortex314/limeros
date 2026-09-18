@@ -1,5 +1,22 @@
 #include "cobs_codec.h"
 
+uint16_t crc16_ccitt(const uint8_t *data, size_t len)
+{
+  uint16_t crc = 0xFFFF;
+
+  for (size_t index = 0; index < len; ++index)
+  {
+    crc ^= static_cast<uint16_t>(data[index]) << 8;
+    for (uint8_t bit = 0; bit < 8; ++bit)
+    {
+      crc = (crc & 0x8000) ? static_cast<uint16_t>((crc << 1) ^ 0x1021)
+                            : static_cast<uint16_t>(crc << 1);
+    }
+  }
+
+  return crc;
+}
+
 size_t cobs_encode(const uint8_t *data,
                   size_t len,
                   uint8_t *out,

@@ -75,6 +75,8 @@ private:
   Buffer _txd_multicast_buffer;
   Buffer _rxd_multicast_buffer;
 
+  void listener_loop(int &socket, Buffer &buffer, size_t receive_capacity, const char *label);
+
 public:
   McActor( const char *hostname);
   ~McActor();

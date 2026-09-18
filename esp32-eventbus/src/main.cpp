@@ -46,6 +46,7 @@ void add_local_msgs() {
   id_to_name[UartRxd::MSG_ID] = "UartRxd";
   id_to_name[Transmitting::MSG_ID] = "Transmitting";
   id_to_name[Max31855Read::MSG_ID] = "Max31855Read";
+  id_to_name[MotorEvent::MSG_ID] = "MotorEvent";
 }
 
 
@@ -101,13 +102,19 @@ extern "C" void app_main()
   eventbus.register_actor(new Max31855Actor(hostname, 500)); // MAX31855 + PID + SSR heating control
 #endif
 #ifdef ENABLE_HOVERBOARD
-  eventbus.register_actor(new HoverboardActor("hb")); // hoverboard interface
+  eventbus.register_actor("hb", new HoverboardActor()); // hoverboard interface
 #endif
   // debugging handler to log all eventbus traffic, comment for beauty
   eventbus.register_handler([](const ActorMessage &am) // just log eventbus traffic
                             { 
-                              uint32_t msg_id = am.payload->msg_id() ? am.payload->msg_id() : 0;
-                              INFO("EventBus '%s' (%d) payload=%p heap=%ld", id_to_string(msg_id), msg_id, (void *)am.payload.get(), esp_get_free_heap_size());
+                              if ( am.payload->msg_id() != TimerMsg::MSG_ID) // skip timer messages
+                              INFO("EventBus '%s' (%u) src=%s dst=%s payload=%p heap=%ld",
+                                   am.payload ? am.payload->msg_name() : "null",
+                                   am.payload ? am.payload->msg_id() : 0U,
+                                   eventbus.find_actor_name(am.src),
+                                   eventbus.find_actor_name(am.dst),
+                                   (void *)am.payload.get(),
+                                   esp_get_free_heap_size());
                             });
   eventbus.loop();
 }

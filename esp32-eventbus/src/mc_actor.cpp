@@ -2,7 +2,7 @@
 #include "esp_netif.h"
 
 constexpr int MULTICAST_PORT = 50000;
-constexpr const char *MULTICAST_GROUP = "224.0.0.1";
+constexpr const char *MULTICAST_GROUP = "239.0.0.1";
 constexpr int UNICAST_PORT = 50001;
 constexpr int BUF_SIZE = 1024;
 constexpr const char *BROKER_IP = "192.168.0.148";
@@ -134,7 +134,7 @@ void McActor::init_event()
         setsockopt(_multicast_socket, IPPROTO_IP, IP_MULTICAST_IF, &sta_ip, sizeof(sta_ip));
     }
 
-    sockaddr_in _unicast_src_addr{};
+    _unicast_src_addr = {};
     _unicast_src_addr.sin_family = AF_INET;
     _unicast_src_addr.sin_addr.s_addr = INADDR_ANY;
     _unicast_src_addr.sin_port = htons(UNICAST_PORT); // any port
@@ -154,15 +154,20 @@ void McActor::init_event()
 
     struct ip_mreq imreq;
     imreq.imr_multiaddr.s_addr = inet_addr(MULTICAST_GROUP);
-    imreq.imr_interface.s_addr = sta_ip; // real interface IP, not INADDR_ANY
+    imreq.imr_interface.s_addr = INADDR_ANY; //  INADDR_ANY
+ //   imreq.imr_interface.s_addr = sta_ip; // real interface IP, not INADDR_ANY
     rc = setsockopt(_multicast_socket, IPPROTO_IP, IP_ADD_MEMBERSHIP, &imreq, sizeof(imreq));
     ERRNO_RET(rc);
 
     unsigned char loop = 0;
     setsockopt(_multicast_socket, IPPROTO_IP, IP_MULTICAST_LOOP, &loop, sizeof(loop));
 
-    // Wait for broker discovery via DeviceAliveEvent before sending unicast traffic.
-    _broker_addr = Option<sockaddr_in>();
+    sockaddr_in broker_addr{};
+    broker_addr.sin_family = AF_INET;
+    broker_addr.sin_port = htons(UNICAST_PORT);
+    inet_pton(AF_INET, BROKER_IP, &broker_addr.sin_addr);
+    _broker_addr = broker_addr;
+    INFO("Using fixed broker address %s", socketAddrToString(&broker_addr).c_str());
 }
 
 void McActor::stop_event()
@@ -196,13 +201,12 @@ void McActor::send_unicast(const Envelope &envelope)
     dst_addr = *_broker_addr;
     if (envelope.encode(_txd_unicast_buffer) == 0)
     {
-        DEBUG("Send message_type '%s' to %s @ %s", envelope.msg_type.has_value() ? std::to_string(*(envelope.msg_type)).c_str() : "-", socketAddrToString(&dst_addr).c_str(), socketAddrToString(&dst_addr).c_str());
+        DEBUG("Send message_type '%s' to %s", envelope.msg_type.has_value() ? std::to_string(*(envelope.msg_type)).c_str() : "-", socketAddrToString(&dst_addr).c_str());
 
         int sent = sendto(_unicast_socket, _txd_unicast_buffer.data(), _txd_unicast_buffer.size(), 0, (sockaddr *)&dst_addr, sizeof(dst_addr));
         if (sent < 0)
         {
-            ERROR("Failed to send unicast message to %s @ %s: %s (errno=%d, %u bytes)",
-                  "broker",
+            ERROR("Failed to send unicast message to %s: %s (errno=%d, %u bytes)",
                   socketAddrToString(&dst_addr).c_str(),
                   strerror(errno),
                   errno,
@@ -300,15 +304,15 @@ void McActor::send_event(const Msg &msg)
         if (sent < 0)
         {
             ERROR("Failed to send message to %s @ %s: %s (errno=%d, %u bytes)",
-                  "destination",
-                  socketAddrToString(&_unicast_src_addr).c_str(),
+                  "broker",
+                  socketAddrToString(&*_broker_addr).c_str(),
                   strerror(errno),
                   errno,
                   static_cast<unsigned>(_txd_unicast_buffer.size()));
         }
         else
         {
-            DEBUG("Sent message to %s (%d bytes)", socketAddrToString(&_unicast_src_addr).c_str(), sent);
+            DEBUG("Sent message to %s (%d bytes)", socketAddrToString(&*_broker_addr).c_str(), sent);
         }
     }
 }
@@ -344,63 +348,40 @@ void McActor::broadcast_event(const Msg &msg)
 
 void McActor::start_unicast_listener()
 {
-    xTaskCreatePinnedToCore(unicast_listener_task, "udp_listener_task", 8192, this, 5, NULL, 1);
+    xTaskCreatePinnedToCore(unicast_listener_task, "udp_unicast_listener", 8192, this, 5, NULL, 1);
 }
 
 void McActor::unicast_listener_task(void *pvParameters)
 {
     McActor *actor = static_cast<McActor *>(pvParameters);
-    while (true)
-    {
-        while (actor->_running)
-        {
-            sockaddr_in sender{};
-            socklen_t sender_len = sizeof(sender);
-            int len = recvfrom(actor->_unicast_socket, actor->_rxd_unicast_buffer.data(), actor->_rxd_unicast_buffer.capacity(), 0, (sockaddr *)&sender, &sender_len);
-            if (len < 0)
-            {
-                if (!actor->_running)
-                {
-                    break;
-                }
-                if (errno == EWOULDBLOCK || errno == EAGAIN)
-                {
-                    vTaskDelay(10 / portTICK_PERIOD_MS);
-                    continue;
-                }
-                if (errno == EBADF || errno == ENOTSOCK)
-                {
-                    break; // socket closed / replaced by a re-init
-                }
-                ERROR("recvfrom failed: %s", strerror(errno));
-                continue;
-            }
-            actor->_rxd_unicast_buffer.resize(len);
-            INFO("<== UDP  [%d] from %s", len, socketAddrToString(&sender).c_str());
-            actor->on_udp_raw(actor->_rxd_unicast_buffer, sender);
-        }
-        vTaskDelay(10 / portTICK_PERIOD_MS);
-    }
+    actor->listener_loop(actor->_unicast_socket, actor->_rxd_unicast_buffer,
+                         actor->_rxd_unicast_buffer.capacity(), "UDP");
 }
 
 void McActor::start_multicast_listener()
 {
-    xTaskCreatePinnedToCore(multicast_listener_task, "udp_listener_task", 8192, this, 5, NULL, 1);
+    xTaskCreatePinnedToCore(multicast_listener_task, "udp_multicast_listener", 8192, this, 5, NULL, 1);
 }
 
 void McActor::multicast_listener_task(void *pvParameters)
 {
     McActor *actor = static_cast<McActor *>(pvParameters);
+    actor->listener_loop(actor->_multicast_socket, actor->_rxd_multicast_buffer,
+                         actor->_rxd_multicast_buffer.capacity() - 1, "MC");
+}
+
+void McActor::listener_loop(int &socket, Buffer &buffer, size_t receive_capacity, const char *label)
+{
     while (true)
     {
-        while (actor->_running)
+        while (_running)
         {
             sockaddr_in sender{};
             socklen_t sender_len = sizeof(sender);
-            int len = recvfrom(actor->_multicast_socket, actor->_rxd_multicast_buffer.data(), actor->_rxd_multicast_buffer.capacity() - 1, 0, (sockaddr *)&sender, &sender_len);
+            int len = recvfrom(socket, buffer.data(), receive_capacity, 0, (sockaddr *)&sender, &sender_len);
             if (len < 0)
             {
-                if (!actor->_running)
+                if (!_running)
                 {
                     break;
                 }
@@ -413,12 +394,12 @@ void McActor::multicast_listener_task(void *pvParameters)
                 {
                     break; // socket closed / replaced by a re-init
                 }
-                ERROR("recvfrom failed: %s", strerror(errno));
+                ERROR("%s recvfrom failed: %s", label, strerror(errno));
                 continue;
             }
-            actor->_rxd_multicast_buffer.resize(len);
-            INFO("<== MC [%d] from %s", len, socketAddrToString(&sender).c_str());
-            actor->on_udp_raw(actor->_rxd_multicast_buffer, sender);
+            buffer.resize(len);
+            INFO("<== %s [%d] from %s", label, len, socketAddrToString(&sender).c_str());
+            on_udp_raw(buffer, sender);
         }
         vTaskDelay(10 / portTICK_PERIOD_MS);
     }
@@ -472,19 +453,10 @@ void McActor::on_udp_message(Envelope *env, const sockaddr_in &sender_addr)
         if (reply.decode(payload) == 0)
         {
             INFO("Received EndpointAnnounceReply from %s ", socketAddrToString(&sender_addr).c_str());
-            if (_broker_addr)
+            if (sender_addr.sin_addr.s_addr != inet_addr(BROKER_IP))
             {
-                if ((*_broker_addr).sin_addr.s_addr != sender_addr.sin_addr.s_addr)
-                {
-                    INFO("Setting (new) broker address to %s", socketAddrToString(&sender_addr).c_str());
-                    *_broker_addr = sender_addr;
-                }
-                // ignore otherwise, we already have a broker address
-            }
-            else
-            {
-                INFO("Setting broker address to %s", socketAddrToString(&sender_addr).c_str());
-                _broker_addr = sender_addr;
+                WARN("Ignoring discovered broker %s; using fixed broker %s:%d",
+                     socketAddrToString(&sender_addr).c_str(), BROKER_IP, UNICAST_PORT);
             }
         }
         delete env;

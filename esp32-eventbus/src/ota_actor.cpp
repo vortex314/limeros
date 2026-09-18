@@ -17,8 +17,16 @@ void OtaActor::setup()
 
 void OtaActor::receive(const ActorMessage &msg)
 {
-    msg.handle<WifiConnected>([&](const auto &msg){ start_task();});
-    msg.handle<WifiDisconnected>([&](const auto &msg) { stop_task(); });
+    msg.handle<WifiConnected>([&](const auto &wifi_msg) {
+        INFO("OTA received WifiConnected: src=%u dst=%u payload=%p",
+             msg.src, msg.dst, (void *)msg.payload.get());
+        start_task();
+    });
+    msg.handle<WifiDisconnected>([&](const auto &wifi_msg) {
+        INFO("OTA received WifiDisconnected: src=%u dst=%u payload=%p",
+             msg.src, msg.dst, (void *)msg.payload.get());
+        stop_task();
+    });
 }
 
 void OtaActor::start_task()
@@ -120,7 +128,7 @@ void OtaActor::tftp_ota_server_task(void *arg)
     // request, close its socket (freeing the TFTP port) and delete itself.
     struct timeval rcv_timeout;
     rcv_timeout.tv_sec = 0;
-    rcv_timeout.tv_usec = 200000; // 200 ms
+    rcv_timeout.tv_usec = 1000000; // 1 second
     setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, &rcv_timeout, sizeof(rcv_timeout));
 
     server.sin_family = AF_INET;
@@ -138,6 +146,7 @@ void OtaActor::tftp_ota_server_task(void *arg)
     while (actor->_running)
     {
         //   esp_task_wdt_reset();
+        INFO("Waiting for TFTP packet...");
 
         int len = recvfrom(sock, rx_buf, sizeof(rx_buf), 0,
                            (struct sockaddr *)&client, &client_len);

@@ -59,7 +59,7 @@ void SysActor::receive(const ActorMessage &msg)
                               { if ( sys_request.reboot) reboot(*sys_request.reboot);
                          if ( sys_request.set_time) set_utc(*sys_request.set_time); });
     msg.handle<TimerMsg>([&](const TimerMsg &msg)
-                            { on_timer(msg.timer_id); });
+                            { if (msg.timer_id==_timer_publish) on_timer(msg.timer_id); });
 }
 void SysActor::on_timer(int id)
 {
@@ -81,5 +81,5 @@ void SysActor::publish_info()
     struct timeval tv1;
     gettimeofday(&tv1, NULL);
     _sys_event->utc = tv1.tv_sec;
-    send(_sys_event);
+    emit(_sys_event);
 }

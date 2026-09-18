@@ -140,7 +140,7 @@ void WifiActor::event_handler(void *arg, esp_event_base_t event_base,
         (wifi_event_sta_disconnected_t *)event_data;
     WARN("WiFi STA disconnected, reason=%d",
          dis ? (int)dis->reason : -1);
-    actor->send(actor->_wifi_disconnected_msg);
+    actor->emit(actor->_wifi_disconnected_msg);
     actor->_wifi_connected = false;
     if (s_retry_count < ESP_MAXIMUM_RETRY)
     {
