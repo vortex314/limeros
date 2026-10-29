@@ -9,7 +9,6 @@ extern "C" bool capture_callback(
 MotorActor::MotorActor(): Actor()
 {
     _timer_publish = timer_repetitive(300);
-    _timer_watchdog = timer_repetitive(1000);
     _timer_pid = timer_repetitive(100);
     _Kd = 0.0f;
     _Kp = 0.05f;
@@ -24,9 +23,17 @@ MotorActor::MotorActor(): Actor()
 
 float MotorActor::pid_update(float delta_t, float error)
 {
+    if (delta_t <= 0.0f)
+    {
+        return _p + _i;
+    }
+
     _p = _Kp * error;
     _rpm_integral += error * delta_t;
-    _rpm_integral = clip(_rpm_integral, -50.0f / _Ki, 50.0f / _Ki); // Anti-windup: Clamp the integral term
+    if (_Ki != 0.0f)
+    {
+        _rpm_integral = clip(_rpm_integral, -50.0f / _Ki, 50.0f / _Ki);
+    }
     _i = _Ki * _rpm_integral;
     _d = _Kd * (error - _previous_error) / delta_t;
 
@@ -50,51 +57,19 @@ void MotorActor::setup(void)
 
 void MotorActor::receive(const ActorMessage &msg)
 {
+    msg.handle<TimerMsg>([&](const TimerMsg &timer_msg)
+                         { on_timer(timer_msg.timer_id); });
     msg.handle<MotorRequest>([&](const auto &cmd)
                              {
         INFO("Motor actor cmd ");
-        cmd.Kp.handle_if([&](const float &v) { _Kp = v; });
-        cmd.Ki.handle_if([&](auto v) { _Ki = v; });
-        cmd.Kd.handle_if([&](auto v) { _Kd = v; });
-        cmd.target_rpm.handle_if([&](auto v) { _rpm_target = v; });
+        cmd.rpm_target.handle_if([&](auto v) { _rpm_target = v; });
         publish_props(); });
-    msg.handle<IsrMsg>([&](const IsrMsg &isr_msg)
-                       {
-        uint32_t sum = isr_msg.sum;
-        uint32_t count = isr_msg.count;
-        float sum_as_float = sum;
-        float avg = sum_as_float / count;
-
-        float hz = 80'000'000.0f / avg;
-        float rpm = (hz * 60.0f) / 4.0f; // 4 polar tacho ?? maybe
-                                         //        INFO("Isr sum: %d count: %d freq : %f Hz. RPM = %f", sum, count, hz, rpm);
-
-        float delta_t = sum_as_float / 80'000'000.0f; // sample time in seconds
-        _rpm_measured = rpm;
-
-        float pid = this->pid_update(delta_t, _rpm_target - _rpm_measured);
-        this->_pwm_percent = MotorActor::clip(pid, 0, 100.0f);
-        this->_pwm_value = MotorActor::pwm_percent_to_ticks(_pwm_percent);
-
-        if (this->_pwm_value > TICKS_PER_PERIOD)
-        {
-            this->_pwm_value = TICKS_PER_PERIOD;
-        }
-
-        //        INFO("sum:%d count:%d rpm:%f/%f pid:%f pwm:%f pwm_value:%d",
-        //             sum, count, _rpm_measured, _rpm_target, pid, _pwm_percent, _pwm_value);
-
-        esp_err_t err = mcpwm_comparator_set_compare_value(_cmpr, _pwm_value);
-        if (err != ESP_OK)
-        {
-            ERROR("Failed to set compare value: %s", esp_err_to_name(err));
-        }
-
-        _last_rpm_measured = esp_timer_get_time(); });
 }
 
 void MotorActor::publish_props()
 {
+    INFO("Motor capture pulses=%u rpm=%f target=%f pwm=%f",
+         _last_capture_count, _rpm_measured, _rpm_target, _pwm_percent);
     MotorEvent *evt = new MotorEvent();
     evt->rpm_measured = _rpm_measured;
     evt->rpm_target = _rpm_target;
@@ -114,12 +89,34 @@ void MotorActor::on_timer(int id)
     }
     else if (id == _timer_pid)
     {
+        uint32_t capture_sum;
+        uint32_t capture_count;
+        portENTER_CRITICAL(&_capture_mux);
+        capture_sum = _capture_sum;
+        capture_count = _capture_count;
+        _capture_sum = 0;
+        _capture_count = 0;
+        portEXIT_CRITICAL(&_capture_mux);
+        _last_capture_count = capture_count;
 
         float delta_t = static_cast<float>(esp_timer_get_time() - _last_rpm_measured) / 1'000'000.0f; // Convert microseconds to seconds
-        if (delta_t > 0.2f)
+        if (capture_count > 0 && capture_sum > 0)
+        {
+            const float average_ticks = static_cast<float>(capture_sum) / capture_count;
+            const float hz = 80'000'000.0f / average_ticks;
+            _rpm_measured = (hz * 60.0f) / 4.0f;
+            delta_t = static_cast<float>(capture_sum) / 80'000'000.0f;
+            _last_rpm_measured = esp_timer_get_time();
+        }
+        else if (delta_t > 0.2f)
         {
             DEBUG("No recent rpm measurements, delta_t:%f sec", delta_t);
             _rpm_measured = 0.0f;
+        }
+
+        if (delta_t <= 0.0f)
+        {
+            return;
         }
 
         float pid = pid_update(delta_t, _rpm_target - _rpm_measured);
@@ -367,38 +364,26 @@ Res config_gpio_to_value(gpio_num_t gpio_num, uint8_t value)
  * @return Always returns true to indicate successful handling of the capture event.
  */
 
-static struct IsrData
-{
-    uint32_t last_capture;
-    uint32_t sum;
-    uint32_t count;
-} isr_data;
-
 extern "C" bool capture_callback(
     mcpwm_cap_channel_t *cap_channel,
     const mcpwm_capture_event_data_t *capture_event,
     void *arg)
 {
-    uint32_t cap_value = capture_event->cap_value;
-    uint32_t ticks_per_period = (cap_value >= isr_data.last_capture)
-                                    ? (cap_value - isr_data.last_capture)
-                                    : (cap_value + (0xFFFFFFFF - isr_data.last_capture) + 1);
-    isr_data.sum += ticks_per_period;
-    ++isr_data.count;
-
-    if (isr_data.sum > 8'000'000)
-    { // 100 msec at 80 MHz
-        IsrMsg* isr_msg = new IsrMsg();
-        isr_msg->sum = isr_data.sum;
-        isr_msg->count = isr_data.count;
-        ((MotorActor *)arg)->tellFromIsr(((MotorActor *)arg)->ref(), isr_msg);
-        // Reset the sum and count for the next period
-        isr_data.sum = 0;
-        isr_data.count = 0;
-    };
-
-    isr_data.last_capture = cap_value;
+    static_cast<MotorActor *>(arg)->record_capture_from_isr(capture_event->cap_value);
     return true;
+}
+
+void MotorActor::record_capture_from_isr(uint32_t capture_value)
+{
+    portENTER_CRITICAL_ISR(&_capture_mux);
+    const uint32_t ticks_per_period = capture_value - _last_capture;
+    _last_capture = capture_value;
+    if (ticks_per_period != 0)
+    {
+        _capture_sum += ticks_per_period;
+        ++_capture_count;
+    }
+    portEXIT_CRITICAL_ISR(&_capture_mux);
 }
 
 uint32_t MotorActor::pwm_percent_to_ticks(float percent)
@@ -425,8 +410,13 @@ float MotorActor::clip(float value, float min, float max)
 
 Res MotorActor::pwm_stop()
 {
-    this->_rpm_target = 0.0f;
-    this->_pwm_value = 0;
+    _rpm_target = 0.0f;
+    _pwm_percent = 0.0f;
+    _pwm_value = pwm_percent_to_ticks(_pwm_percent);
+    if (_cmpr != nullptr)
+    {
+        CHECK_ESP(mcpwm_comparator_set_compare_value(_cmpr, _pwm_value));
+    }
     return Res::Ok(true);
 }
 

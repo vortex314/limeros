@@ -5,7 +5,7 @@
 #include <driver/gpio.h>
 #include <soc/gpio_num.h>
 #include <msgs.h>
-#include <mc_actor.h>
+#include <serial_actor.h>
 #include <typed_message.h>
 
 #ifndef GPIO_LED

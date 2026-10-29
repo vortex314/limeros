@@ -43,6 +43,12 @@ robot "ronald" {
     replies     = [$ { message.GenericReply }, $ { message.SysReply }]
     description = "Hoverboard to drive the mower"
   }
+  endpoint "motor" {
+    services    = [$ { message.MotorRequest }, $ { message.SysRequest }]
+    events      = [$ { message.MotorEvent }, $ { message.SysEvent }]
+    replies     = [$ { message.MotorReply }, $ { message.SysReply }]
+    description = "Motor controller for the hoverboard"
+  }
 
   endpoint "logger" {
     description = "Logger interface for the hoverboard"
@@ -59,6 +65,24 @@ robot "ronald" {
   endpoint "mower" {
     services    = [$ { message.SystemRequest }]
     description = "System interface for the mower"
+  }
+
+  message "RegisterEndpoint" {
+    description = "Register a device with the router"
+    field "dst" { id = 0 type = "uint32" description = "Destination ID for the registration" }
+  }
+
+  message "ListenEndpoint" {
+    description = "Add a listener for a specific destination"
+    field "dsts" { id = 0 type = "uint32" repeated = true description = "Destination ID to listen to" }
+    field "srcs" { id = 1 type = "uint32" repeated = true description = "Filter for the envelopes to listen to" }
+    field "msg_types" { id = 2 type = "uint32" repeated = true description = "Filter for the destination envelopes to listen to" }
+  }
+
+  message "EnvelopeFilter" {
+    description = "Filter for envelopes, can be either an OR or AND filter"
+    field "or_filter" { id = 0 type = "EnvelopeOrFilter" description = "OR filter for envelopes" }
+    field "and_filter" { id = 1 type = "EnvelopeAndFilter" description = "AND filter for envelopes" }
   }
 
   message "HoverboardRequest" {

@@ -7,7 +7,7 @@
 
 SysActor::SysActor() : Actor()
 {
-    _timer_publish = timer_repetitive(1000);
+    _timer_publish = timer_repetitive(5000);
 }
 
 void SysActor::setup()

@@ -3,6 +3,8 @@
 // Every field is `Option<T>`; missing fields are omitted from encoded CBOR.
 // Messages are encoded as CBOR maps keyed by field id.
 // Uses TinyCBOR for CBOR encoding/decoding.
+// Generated on 2026-10-28 11:43:04 with template arduino_header.tera
+
 #ifndef HCL_CPP_TERA
 #define HCL_CPP_TERA
 #pragma once
@@ -142,6 +144,23 @@ public:
     Option<uint32_t> sequence;// Request ID for matching request/reply
     Option<uint32_t> instance_id;// Instance ID for matching request/reply
     Option<std::vector<uint8_t>> payload;// Serialized payload of the message
+
+    int encode(Buffer& buffer) const;
+    int decode(Buffer& buffer);
+};
+
+
+
+class EnvelopeFilter : public Msg {
+public:
+
+    static const uint32_t MSG_ID = FNV("EnvelopeFilter");
+    static constexpr const char *MSG_NAME ="EnvelopeFilter";
+
+    virtual uint32_t msg_id() const { return MSG_ID; };
+    virtual const char *msg_name() const { return MSG_NAME; };
+    Option<std::string> or_filter;// OR filter for envelopes
+    Option<std::string> and_filter;// AND filter for envelopes
 
     int encode(Buffer& buffer) const;
     int decode(Buffer& buffer);
@@ -327,6 +346,24 @@ public:
 
 
 
+class ListenEndpoint : public Msg {
+public:
+
+    static const uint32_t MSG_ID = FNV("ListenEndpoint");
+    static constexpr const char *MSG_NAME ="ListenEndpoint";
+
+    virtual uint32_t msg_id() const { return MSG_ID; };
+    virtual const char *msg_name() const { return MSG_NAME; };
+    Option<uint32_t> dsts;// Destination ID to listen to
+    Option<uint32_t> srcs;// Filter for the envelopes to listen to
+    Option<uint32_t> msg_types;// Filter for the destination envelopes to listen to
+
+    int encode(Buffer& buffer) const;
+    int decode(Buffer& buffer);
+};
+
+
+
 class Max31855Event : public Msg {
 public:
 
@@ -505,6 +542,22 @@ public:
     Option<int32_t> led_blue;
     Option<int32_t> led_flash_on;
     Option<int32_t> led_flash_off;
+
+    int encode(Buffer& buffer) const;
+    int decode(Buffer& buffer);
+};
+
+
+
+class RegisterEndpoint : public Msg {
+public:
+
+    static const uint32_t MSG_ID = FNV("RegisterEndpoint");
+    static constexpr const char *MSG_NAME ="RegisterEndpoint";
+
+    virtual uint32_t msg_id() const { return MSG_ID; };
+    virtual const char *msg_name() const { return MSG_NAME; };
+    Option<uint32_t> dst;// Destination ID for the registration
 
     int encode(Buffer& buffer) const;
     int decode(Buffer& buffer);

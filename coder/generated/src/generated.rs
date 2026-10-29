@@ -1,6 +1,8 @@
 // Auto-generated from robot.hcl — do not edit by hand.
 // Every field is `Option<T>`.
 // Messages are encoded as CBOR maps keyed by field id.
+// Generated on 2026-10-28 11:43:04 with template rust.tera
+
 use anyhow::Context;
 
 pub trait Msg: Sized + serde::Serialize + serde::de::DeserializeOwned {
@@ -34,6 +36,8 @@ pub const HOVERBOARD_ID: u32 = 1152836275;
 
 pub const LOGGER_ID: u32 = 2753177333;
 
+pub const MOTOR_ID: u32 = 3404760178;
+
 pub const MOWER_ID: u32 = 1092332049;
 
 pub const PINGER_ID: u32 = 1295055938;
@@ -58,6 +62,7 @@ lazy_static! {
         m.insert(2371693343, "EndpointAnnounce".to_string());
         m.insert(3238220441, "EndpointAnnounceReply".to_string());
         m.insert(1228864117, "Envelope".to_string());
+        m.insert(1911628039, "EnvelopeFilter".to_string());
         m.insert(2578784998, "GenericReply".to_string());
         m.insert(461737375, "HeatingEvent".to_string());
         m.insert(578653874, "HeatingRequest".to_string());
@@ -65,6 +70,7 @@ lazy_static! {
         m.insert(2095960949, "HoverboardReply".to_string());
         m.insert(2735870956, "HoverboardRequest".to_string());
         m.insert(1802836182, "ImuEvent".to_string());
+        m.insert(1361661643, "ListenEndpoint".to_string());
         m.insert(2831607083, "Max31855Event".to_string());
         m.insert(2506002638, "MotorEvent".to_string());
         m.insert(1863653678, "MotorReply".to_string());
@@ -73,6 +79,7 @@ lazy_static! {
         m.insert(31253678, "PingRequest".to_string());
         m.insert(4282593576, "Ps4Event".to_string());
         m.insert(1992038561, "Ps4Request".to_string());
+        m.insert(1736013937, "RegisterEndpoint".to_string());
         m.insert(924742914, "SysEvent".to_string());
         m.insert(2952492394, "SysReply".to_string());
         m.insert(2966412411, "SysRequest".to_string());
@@ -87,6 +94,8 @@ lazy_static! {
         m.insert(1152836275, "hoverboard".to_string());
         
         m.insert(2753177333, "logger".to_string());
+        
+        m.insert(3404760178, "motor".to_string());
         
         m.insert(1092332049, "mower".to_string());
         
@@ -437,6 +446,56 @@ impl Envelope {
 }
 
 impl Msg for Envelope {
+    fn id() -> u32 {
+        Self::id()
+    }
+
+    fn name() -> &'static str {
+        Self::name()
+    }
+}
+
+
+
+
+#[derive(Debug, Clone, PartialEq, cbor2::Cbor)]
+#[cbor(array)]
+pub struct EnvelopeFilter {
+    pub or_filter: Option<String>,// OR filter for envelopes
+    pub and_filter: Option<String>,// AND filter for envelopes
+}
+
+impl Default for EnvelopeFilter {
+    fn default() -> Self {
+        EnvelopeFilter {
+            or_filter: None,
+            and_filter: None,
+        }
+    }
+}
+
+impl EnvelopeFilter {
+    pub const MSG_ID : u32 = 1911628039;
+    pub const MSG_NAME: &'static str = "EnvelopeFilter";
+
+    pub const fn id() -> u32 {
+        1911628039
+    }
+
+    pub fn name() -> &'static str {
+        "EnvelopeFilter"
+    }
+
+    pub fn from_bytes(data: &[u8]) -> anyhow::Result<Self> {
+        cbor2::from_reader(data).context("Failed to deserialize from CBOR")
+    }
+
+    pub fn to_bytes(&self) -> anyhow::Result<Vec<u8>> {
+        cbor2::to_vec(self).context("Failed to serialize to CBOR")
+    }
+}
+
+impl Msg for EnvelopeFilter {
     fn id() -> u32 {
         Self::id()
     }
@@ -905,6 +964,58 @@ impl ImuEvent {
 }
 
 impl Msg for ImuEvent {
+    fn id() -> u32 {
+        Self::id()
+    }
+
+    fn name() -> &'static str {
+        Self::name()
+    }
+}
+
+
+
+
+#[derive(Debug, Clone, PartialEq, cbor2::Cbor)]
+#[cbor(array)]
+pub struct ListenEndpoint {
+    pub dsts: Option<u32>,// Destination ID to listen to
+    pub srcs: Option<u32>,// Filter for the envelopes to listen to
+    pub msg_types: Option<u32>,// Filter for the destination envelopes to listen to
+}
+
+impl Default for ListenEndpoint {
+    fn default() -> Self {
+        ListenEndpoint {
+            dsts: None,
+            srcs: None,
+            msg_types: None,
+        }
+    }
+}
+
+impl ListenEndpoint {
+    pub const MSG_ID : u32 = 1361661643;
+    pub const MSG_NAME: &'static str = "ListenEndpoint";
+
+    pub const fn id() -> u32 {
+        1361661643
+    }
+
+    pub fn name() -> &'static str {
+        "ListenEndpoint"
+    }
+
+    pub fn from_bytes(data: &[u8]) -> anyhow::Result<Self> {
+        cbor2::from_reader(data).context("Failed to deserialize from CBOR")
+    }
+
+    pub fn to_bytes(&self) -> anyhow::Result<Vec<u8>> {
+        cbor2::to_vec(self).context("Failed to serialize to CBOR")
+    }
+}
+
+impl Msg for ListenEndpoint {
     fn id() -> u32 {
         Self::id()
     }
@@ -1403,6 +1514,54 @@ impl Ps4Request {
 }
 
 impl Msg for Ps4Request {
+    fn id() -> u32 {
+        Self::id()
+    }
+
+    fn name() -> &'static str {
+        Self::name()
+    }
+}
+
+
+
+
+#[derive(Debug, Clone, PartialEq, cbor2::Cbor)]
+#[cbor(array)]
+pub struct RegisterEndpoint {
+    pub dst: Option<u32>,// Destination ID for the registration
+}
+
+impl Default for RegisterEndpoint {
+    fn default() -> Self {
+        RegisterEndpoint {
+            dst: None,
+        }
+    }
+}
+
+impl RegisterEndpoint {
+    pub const MSG_ID : u32 = 1736013937;
+    pub const MSG_NAME: &'static str = "RegisterEndpoint";
+
+    pub const fn id() -> u32 {
+        1736013937
+    }
+
+    pub fn name() -> &'static str {
+        "RegisterEndpoint"
+    }
+
+    pub fn from_bytes(data: &[u8]) -> anyhow::Result<Self> {
+        cbor2::from_reader(data).context("Failed to deserialize from CBOR")
+    }
+
+    pub fn to_bytes(&self) -> anyhow::Result<Vec<u8>> {
+        cbor2::to_vec(self).context("Failed to serialize to CBOR")
+    }
+}
+
+impl Msg for RegisterEndpoint {
     fn id() -> u32 {
         Self::id()
     }

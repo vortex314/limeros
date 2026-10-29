@@ -5,6 +5,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use anyhow::Result;
+use env_logger::Env;
 use generated::generated::{EndpointAnnounce, Envelope};
 use kameo::prelude::*;
 use log::{debug, error, info, warn};
@@ -12,9 +13,7 @@ use statig::awaitable::State;
 use tokio::{io, sync::Mutex};
 
 use crate::{
-    brain::ResultLog,
-    codec::{decode_cobs_frame, encode_frame},
-    router::{FromDevice, RegisterDevice, RouterActor, ToDevice},
+    brain::ResultLog, codec::{decode_cobs_frame, encode_frame}, router::{FromDevice, RegisterWithRouter, RouterActor, ToDevice},
 };
 
 // ── Messages ───────────────────────────────────────────────────────────────
@@ -186,6 +185,13 @@ impl Actor for SerialActor {
 }
 
 // ── Handle SerialReceivedFrame ────────────────────────────────────────────
+impl Message<Envelope> for SerialActor {
+    type Reply = ();
+
+    async fn handle(&mut self, envelope: Envelope, _ctx: &mut Context<Self, Self::Reply>) {
+        debug!("Serial: received envelope from {}", envelope.src.unwrap_or_default());
+    }
+}
 
 impl Message<SerialInternalEvent> for SerialActor {
     type Reply = ();
@@ -196,7 +202,7 @@ impl Message<SerialInternalEvent> for SerialActor {
                 debug!("Serial: received frame of {} bytes", raw.len());
                 let packet = &raw;
                 let envelope = match Envelope::from_bytes(packet) {
-                    Ok(e) => Arc::new(e),
+                    Ok(e) => e,
                     Err(e) => {
                         warn!("Failed to decode Envelope on {}: {}", self.port_path, e);
                         return;
@@ -206,18 +212,16 @@ impl Message<SerialInternalEvent> for SerialActor {
                     if self.registered_device != Some(src) {
                         self.registered_device = Some(src);
                         self.router
-                            .tell(RegisterDevice {
-                                id: src,
+                            .tell(RegisterWithRouter {
+                                dst: src,
                                 recipient: _ctx.actor_ref().clone().recipient(),
+                                url: format!("SERIAL:{}", self.port_path),
                             })
                             .await
                             .log_error("Failed to register device with router");
                     }
                     self.router
-                        .tell(FromDevice {
-                            id: src,
-                            envelope: envelope.clone(),
-                        })
+                        .tell(envelope)
                         .await
                         .log_error("Failed to send FromDevice message to router");
                 }

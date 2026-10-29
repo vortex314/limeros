@@ -15,16 +15,21 @@
 #include <wifi_actor.h>
 #include <sys_actor.h>
 #include <led_actor.h>
-#include <mc_actor.h>
+#include <udp_actor.h>
 #include <ota_actor.h>
 #include <mdns_actor.h>
 #include <hoverboard_actor.h>
 #include <max31855_actor.h>
+#include <motor_actor.h>
 #include <log.h>
 #include <cbor.h>
 
 #ifndef DEVICE_NAME
 #error "DEVICE_NAME not defined"
+#endif
+
+#ifdef ENABLE_HOVERBOARD
+#error "ENABLE_HOVERBOARD is not supported yet"
 #endif
 
 EventBus eventbus(200);
@@ -35,7 +40,6 @@ extern std::unordered_map<uint32_t, const char *> id_to_name;
 
 void add_local_msgs() {
   id_to_name[TxdMsg::MSG_ID] = "TxdMsg";
-  id_to_name[RxdMsg::MSG_ID] = "RxdMsg";
   id_to_name[WifiConnected::MSG_ID] = "WifiConnected";
   id_to_name[WifiDisconnected::MSG_ID] = "WifiDisconnected";
   id_to_name[LedBlink::MSG_ID] = "LedBlink";
@@ -94,7 +98,7 @@ extern "C" void app_main()
 
   eventbus.register_actor("wifi",new WifiActor());           // manage wifi connection, will block on start until connected
   eventbus.register_actor("sys", new SysActor());             // manage the system
-  eventbus.register_actor("mc", new McActor( hostname));     // multicast actor
+  eventbus.register_actor("udp", new UdpActor(hostname));
   eventbus.register_actor("led",new LedActor());             // blink the led
   eventbus.register_actor("ota",new OtaActor());             // ota via tftp
   eventbus.register_actor("mdns",new MdnsActor( hostname)); // mdns service
@@ -103,6 +107,9 @@ extern "C" void app_main()
 #endif
 #ifdef ENABLE_HOVERBOARD
   eventbus.register_actor("hb", new HoverboardActor()); // hoverboard interface
+#endif
+#ifdef ENABLE_MOTOR
+  eventbus.register_actor("motor", new MotorActor()); // motor control interface
 #endif
   // debugging handler to log all eventbus traffic, comment for beauty
   eventbus.register_handler([](const ActorMessage &am) // just log eventbus traffic

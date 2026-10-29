@@ -16,6 +16,13 @@ pub struct Endpoint {
     broker_addr: Arc<Mutex<Option<std::net::SocketAddr>>>,
 }
 
+pub fn check_envelope(envelope: &Envelope) -> Result<()> {
+    if envelope.src.is_none() || envelope.msg_type.is_none() {
+        return Err(anyhow::anyhow!("Envelope missing required fields"));
+    }
+    Ok(())
+}
+
 impl Endpoint {
 
 

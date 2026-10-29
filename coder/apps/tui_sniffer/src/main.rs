@@ -57,7 +57,7 @@ struct LogEntry {
     src: String,
     dst: String,
     msg_type: String,
-    req_id: String,
+    seq: String,
     payload: String,
 }
 
@@ -135,10 +135,7 @@ fn format_payload_typed(msg_type: Option<u32>, payload: Option<&[u8]>) -> String
 
 fn fmt_endpoint(name_map: &HashMap<u32, String>, id: Option<u32>) -> String {
     match id {
-        Some(v) => {
-            let id_hash = fnv1a_32(&v.to_string());
-            name_map.get(&id_hash).cloned().unwrap_or_else(|| v.to_string())
-        }
+        Some(v) => name_map.get(&v).cloned().unwrap_or_else(|| v.to_string()),
         None => "-".into(),
     }
 }
@@ -181,7 +178,7 @@ fn process_message(
         src: fmt_endpoint(name_map, msg.src),
         dst: fmt_endpoint(name_map, msg.dst),
         msg_type: msg.msg_type.map(|v| v.to_string()).unwrap_or_else(|| "-".to_string()),
-        req_id: msg.request_id.map(|v| v.to_string()).unwrap_or_default(),
+        seq: msg.sequence.map(|v| v.to_string()).unwrap_or_default(),
         payload: format_payload_typed(msg.msg_type, msg.payload.as_deref()),
     }
 }
@@ -214,7 +211,7 @@ async fn run_network(
             src: Some(endpoint_id),
             dst: None,
             msg_type: Some(msgs::BrokerSubscribeRequest::id()),
-            request_id: None,
+            sequence: None,
             instance_id: None,
             payload: Some(sub_req.to_bytes()?),
         })
@@ -291,7 +288,7 @@ fn render_ui(f: &mut Frame, app: &AppState) {
     let end = (start + visible_rows).min(total);
     let slice = &app.entries[start..end];
 
-    let header = Row::new(["  #", "Time", "Src", "Dst", "Type", "ReqID", "Payload"])
+    let header = Row::new(["  #", "Time", "Src", "Dst", "Type", "Seq", "Payload"])
         .style(Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD))
         .height(1);
 
@@ -311,7 +308,7 @@ fn render_ui(f: &mut Frame, app: &AppState) {
                 Cell::from(e.src.as_str()),
                 Cell::from(e.dst.as_str()),
                 Cell::from(e.msg_type.as_str()),
-                Cell::from(e.req_id.as_str()),
+                Cell::from(e.seq.as_str()),
                 Cell::from(e.payload.as_str()),
             ])
             .style(style)

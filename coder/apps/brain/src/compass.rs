@@ -9,7 +9,7 @@ use kameo::prelude::*;
 use log::{info, warn};
 
 use crate::{
-    brain::{BrainActor, EnvelopeHandlerEvent, EnvelopeHandlerRequest, ResultLog}, router::{FromDevice, RegisterTwin, RouterActor, },
+    brain::{BrainActor, EnvelopeHandlerEvent, EnvelopeHandlerRequest, ResultLog}, router::{AddListener, EnvelopeFilter, FromDevice, RegisterWithRouter, RouterActor, },
 };
 
 // ── CompassActor ───────────────────────────────────────────────────────────
@@ -90,10 +90,12 @@ impl Actor for CompassActor {
     ) -> Result<Self, Self::Error> {
         info!("CompassActor started");
         // Register with the router to receive CompassEvent messages
-        state.router.tell(RegisterTwin {
-            id: fnv::fnv1a_32("compass"),
+        state.router.tell(RegisterWithRouter {
+            dst: fnv::fnv1a_32("compass"),
             recipient: actor_ref.clone().recipient(),
+            url: "CompassActor".to_string(),
         }).await.log_error("Failed to register CompassActor with router");
+
         Ok(state)
     }
 }
@@ -103,6 +105,16 @@ impl Message<FromDevice> for CompassActor {
 
     async fn handle(&mut self, msg: FromDevice, _ctx: &mut Context<Self, Self::Reply>) {
         if let Err(e) = self.handle_compass_event(msg.envelope).await {
+            warn!("Failed to handle compass event: {}", e);
+        }
+    }
+}
+
+impl Message<Envelope> for CompassActor {
+    type Reply = ();
+
+    async fn handle(&mut self, msg: Envelope, _ctx: &mut Context<Self, Self::Reply>) {
+        if let Err(e) = self.handle_compass_event(Arc::new(msg)).await {
             warn!("Failed to handle compass event: {}", e);
         }
     }

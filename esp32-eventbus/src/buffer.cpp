@@ -111,6 +111,7 @@ bool Buffer::verify_crc_remove()
     uint16_t calculated_crc = temp_buffer.calculate_crc();
     if (stored_crc == calculated_crc)
     {
+        _index -= 2;
         return true;
     }
     else
@@ -154,10 +155,8 @@ int Buffer::cobs_decode_inplace()
     if (decoded_len < 0)
         return ENOSPC;
 
-    // Remove CRC bytes (last 2 bytes of data)
     if (decoded_len < 2)
         return ENOSPC;
-    resize(static_cast<size_t>(decoded_len - 2));
-
-    return 0;
+    resize(static_cast<size_t>(decoded_len));
+    return verify_crc_remove() ? 0 : EBADMSG;
 }

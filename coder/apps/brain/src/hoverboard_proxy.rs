@@ -3,14 +3,13 @@
 use std::sync::Arc;
 
 use anyhow::Result;
-use common::fnv;
+use common::{check_envelope, fnv};
 use generated::generated::{EndpointAnnounce, Envelope, HoverboardEvent, HoverboardReply, HoverboardRequest, id_to_string, opt_id_to_string};
 use kameo::prelude::*;
-use kameo_actors::message_bus::Register;
 use log::{info, warn};
 
 use crate::{
-    brain::{BrainActor, BrainCmd,  ResultLog}, router::{FromDevice, RegisterTwin, RouterActor, ToDevice},
+    brain::{BrainActor, BrainCmd,  ResultLog}, router::{AddListener, EnvelopeFilter, FromDevice, RegisterWithRouter, RouterActor, ToDevice},
 };
 
 // ── Messages ───────────────────────────────────────────────────────────────
@@ -62,7 +61,7 @@ impl HoverboardProxy {
             true
         }
     }
-    pub async fn handle_hoverboard_reply(&mut self, envelope: Arc<Envelope>) -> Result<()> {
+    pub async fn handle_hoverboard_reply(&mut self, envelope: &Envelope) -> Result<()> {
         let reply = envelope
             .payload
             .as_ref()
@@ -81,7 +80,7 @@ impl HoverboardProxy {
         Ok(())
     }
 
-    pub async fn handle_hoverboard_event(&mut self, envelope: Arc<Envelope>) -> Result<()> {
+    pub async fn handle_hoverboard_event(&mut self, envelope: &Envelope) -> Result<()> {
         let event = envelope
             .payload
             .as_ref()
@@ -116,10 +115,7 @@ impl HoverboardProxy {
             ..Default::default()
         };
         //      display_envelope(&envelope, "HoverboardActor");
-        self.router.tell(ToDevice {
-            id: fnv::fnv1a_32("hoverboard"),
-            envelope: Arc::new(envelope),
-        }).await.log_error("Failed to send ToDevice message to hoverboard");
+        self.router.tell(envelope).await.log_error("Failed to send ToDevice message to hoverboard");
     }
 }
 
@@ -128,11 +124,22 @@ impl Actor for HoverboardProxy {
     type Error = anyhow::Error;
 
     async fn on_start(state: Self::Args, actor_ref: ActorRef<Self>) -> Result<Self, Self::Error> {
-        info!("HoverboardActor started (2Hz command loop)");
-        state.router.tell(RegisterTwin {
-            id: fnv::fnv1a_32("hoverboard"),
+        info!("HoverboardProxy started (2Hz command loop)");
+        state.router.tell(RegisterWithRouter {
+            dst: fnv::fnv1a_32("hoverboard_proxy"),
             recipient: actor_ref.clone().recipient(),
+            url: "HoverboardProxy".to_string(),
         }).await.log_error("Failed to register HoverboardProxy with router");
+        
+        state.router.tell(AddListener {
+            dst: fnv::fnv1a_32("hoverboard_proxy"),
+            envelope_filter: EnvelopeFilter {
+                dst: None,
+                src: Some(fnv::fnv1a_32("hoverboard")),
+                msg_type: None,
+            }
+        }
+        ).await.log_error("Failed to add listen for HoverboardProxy with router");
         // 2Hz timer
         let tick_ref = actor_ref.clone();
         tokio::spawn(async move {
@@ -144,6 +151,38 @@ impl Actor for HoverboardProxy {
         });
 
         Ok(state)
+    }
+}
+
+impl Message<Envelope> for HoverboardProxy {
+    type Reply = ();
+
+    async fn handle(&mut self, msg: Envelope, _ctx: &mut Context<Self, Self::Reply>) {
+        if let Err(e) = check_envelope(&msg) {
+            warn!("HoverboardProxy received invalid envelope: {}", e);
+            return;
+        }
+        match msg.msg_type {
+            Some(HoverboardReply::MSG_ID) => {
+                if let Err(e) = self.handle_hoverboard_reply(&msg).await {
+                    warn!("Failed to handle HoverboardReply: {}", e);
+                }
+            }
+            Some(HoverboardEvent::MSG_ID) => {
+                if let Err(e) = self.handle_hoverboard_event(&msg).await {
+                    warn!("Failed to handle HoverboardEvent: {}", e);
+                }
+            }
+            Some(EndpointAnnounce::MSG_ID) => {
+            }
+            _ => {
+                warn!(
+                    "HoverboardActor received unexpected message type: {} {:?}",
+                    opt_id_to_string(msg.msg_type),
+                    msg.msg_type
+                );
+            }
+        }
     }
 }
 
@@ -165,7 +204,7 @@ impl Message<FromDevice> for HoverboardProxy {
         msg: FromDevice,
         _ctx: &mut Context<Self, Self::Reply>,
     ) -> Self::Reply {
-        let envelope = msg.envelope;
+        let envelope = &msg.envelope;
         match envelope.msg_type {
             Some(HoverboardReply::MSG_ID) => {
                 if let Err(e) = self.handle_hoverboard_reply(envelope).await {

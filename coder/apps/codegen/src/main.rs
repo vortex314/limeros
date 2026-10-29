@@ -11,6 +11,7 @@
 //!     -g rust.tera ../generated/src/generated.rs
 
 use anyhow::Context;
+use chrono::Local;
 use clap::Parser;
 use common::{fnv1a_32, load_robot_config, MessageConfig, RobotConfig, SubscribeConfig};
 use serde::Serialize;
@@ -88,7 +89,10 @@ fn render_template(
     template_name: &str,
     ctx: &TeraContext,
 ) -> anyhow::Result<String> {
-    tera.render(template_name, ctx)
+    let mut render_context = ctx.clone();
+    render_context.insert("template_name", template_name);
+
+    tera.render(template_name, &render_context)
         .with_context(|| format!("template rendering failed for {template_name}"))
 }
 
@@ -96,6 +100,7 @@ fn render_template(
 
 #[derive(Serialize)]
 struct TemplateCtx {
+    build_date: String,
     robot: RobotCtx,
     messages: Vec<MessageCtx>,
     endpoints: Vec<EndpointCtx>,
@@ -172,6 +177,7 @@ fn build_template_context(cfg: &RobotConfig) -> anyhow::Result<TeraContext> {
     endpoints.sort_by(|a, b| a.const_name.cmp(&b.const_name));
 
     let template_ctx = TemplateCtx {
+        build_date: Local::now().format("%Y-%m-%d %H:%M:%S").to_string(),
         robot: RobotCtx {
             name: cfg.name.clone(),
             id: fnv1a_32(&cfg.name),

@@ -2,6 +2,8 @@
 // Source file — method implementations for generated messages.
 // Messages are encoded as CBOR maps keyed by field id.
 // Uses TinyCBOR for CBOR encoding/decoding.
+// Generated on {{ build_date }} with template {{ template_name }}
+
 #include "msgs.h"
 #include "cbor_codec.h"
 

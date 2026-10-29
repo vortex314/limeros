@@ -91,7 +91,7 @@ public:
 class CborDecoder
 {
 public:
-  explicit CborDecoder(Buffer& buffer) : buf(buffer), _last_error(0) {};
+  explicit CborDecoder(Buffer& buffer) : pos(0), buf(buffer), _last_error(0) {};
 
   bool ok() const;
   int error() const;

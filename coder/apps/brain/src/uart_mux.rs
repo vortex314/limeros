@@ -23,7 +23,7 @@ use anyhow::{Context as ErrContext, Result};
 use crate::brain::ResultLog;
 use crate::codec::decode_cobs_frame;
 use crate::protocol::{build_frame, FrameParser};
-use crate::router::{self, FromDevice, RegisterDevice, RouterActor, ToDevice};
+use crate::router::{self, FromDevice, RegisterWithRouter, RouterActor, ToDevice};
 
 /// Error type for the actors. `Clone` so startup results can be inspected.
 #[derive(Debug, Clone)]
@@ -190,7 +190,9 @@ impl UartMuxActor {
                     warn!("endpoint announce from UART {} {} ", msg.uart, opt_id_to_string(envelope.src));
                     info!("EndpointAnnounce: {:?}", ep_an);
                     self.id_to_uart.insert(src, msg.uart);
-                    self.router_ref.tell(RegisterDevice{ recipient: ctx.actor_ref().clone().recipient(), id: src }).try_send().ok();
+                    self.router_ref.tell(RegisterWithRouter{ dst: src, recipient: ctx.actor_ref().clone().recipient() ,
+                    url: format!("uart:{}", msg.uart)
+                    }).try_send().ok();
                     // use ep_an fields as needed
                 } else {
                     info!("Found message {}", opt_id_to_string(envelope.msg_type));
@@ -389,6 +391,18 @@ impl UartMuxActor {
         writer.flush().await?;
         buf.clear();
         Ok(())
+    }
+}
+
+impl Message<Envelope> for UartMuxActor {
+    type Reply = ();
+
+    async fn handle(
+        &mut self,
+        _msg: Envelope,
+        _ctx: &mut Context<Self, Self::Reply>,
+    ) -> Self::Reply {
+        // Handle Envelope messages if needed
     }
 }
 

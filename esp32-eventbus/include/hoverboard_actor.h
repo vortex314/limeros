@@ -6,7 +6,7 @@
 #include <option.h>
 #include <msgs.h>
 #include <driver/uart.h>
-#include <mc_actor.h>
+#include <serial_actor.h>
 
 class UartRxd : public ActorPayload
 {

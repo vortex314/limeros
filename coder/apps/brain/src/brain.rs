@@ -1,9 +1,11 @@
 //! BrainActor — central coordinator owning all digital twins.
 
+use std::any;
 use std::sync::Arc;
 
 use anyhow::Result;
-use generated::generated::Envelope;
+use env_logger::Env;
+use generated::generated::{Envelope, HOVERBOARD_ID, HoverboardRequest, MotorEvent};
 use kameo::prelude::*;
 use log::{info, warn};
 use statig::blocking::StateMachine;
@@ -245,6 +247,25 @@ impl Message<BrainRequest> for BrainActor {
                     self.dispatch(&BrainEvent::StateIdle).await;
                 }
             },
+        }
+    }
+}
+
+
+impl Message<Envelope> for BrainActor {
+    type Reply = ();
+
+    async fn handle(
+        &mut self,
+        msg: Envelope,
+        _ctx: &mut Context<Self, Self::Reply>,
+    ) -> Self::Reply {
+        match msg.msg_type.unwrap() {
+            MotorEvent::MSG_ID => {
+            }
+            any => {
+                warn!("Unhandled message type: {}", any);
+            }
         }
     }
 }

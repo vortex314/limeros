@@ -40,6 +40,7 @@ public:
     Res pwm_set_duty(int duty);
     float pid_update(float delta_t, float error);
     void publish_props();
+    void record_capture_from_isr(uint32_t capture_value);
     static uint32_t pwm_percent_to_ticks(float percent);
     static float clip(float value,float min=0.0f, float max=100.0f);
     static uint32_t pwm_ticks_to_percent(uint32_t ticks);
@@ -49,7 +50,6 @@ public:
 private:
     EventBus *_eventbus = nullptr;
     int _timer_publish = -1;
-    int _timer_watchdog = -1;
     int _timer_pid = -1;
     bool _light = false;
     Bytes _image;
@@ -68,6 +68,11 @@ private:
     float _rpm_target = 0;
     float _rpm_integral = 0;
     float _previous_error = 0;
+    uint32_t _last_capture = 0;
+    uint32_t _capture_sum = 0;
+    uint32_t _capture_count = 0;
+    uint32_t _last_capture_count = 0;
+    portMUX_TYPE _capture_mux = portMUX_INITIALIZER_UNLOCKED;
 };
 
 // constexpr mcpwm_timer_clock_source_t MCPWM_TIMER_CLK_SRC_DEFAULT = (mcpwm_timer_clock_source_t)SOC_MOD_CLK_PLL_F160M;

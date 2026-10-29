@@ -8,7 +8,7 @@ use generated::generated::{MotorEvent, MotorReply, MotorRequest, Envelope};
 use kameo::prelude::*;
 use log::{info, warn};
 
-use crate::{brain::{BrainActor, BrainCmd, EnvelopeHandlerEvent, EnvelopeHandlerRequest, ResultLog}, router::{FromDevice, RegisterTwin, RouterActor, }};
+use crate::{brain::{BrainActor, BrainCmd, EnvelopeHandlerEvent, EnvelopeHandlerRequest, ResultLog}, router::{AddListener, EnvelopeFilter, FromDevice, RegisterWithRouter, RouterActor, }};
 
 // ── Messages ───────────────────────────────────────────────────────────────
 
@@ -150,9 +150,19 @@ impl Actor for CutterActor {
             }
         });
 
-        state.router.tell(RegisterTwin{
-            id: fnv::fnv1a_32("cutter"),
+        state.router.tell(RegisterWithRouter {
             recipient: actor_ref.clone().recipient(),
+            dst: fnv::fnv1a_32("cutter"),
+            url: "CutterActor".to_string(),
+        }).await.log_error("Failed to register CutterActor with router");
+
+        state.router.tell(AddListener {
+            dst: fnv::fnv1a_32("cutter"),
+            envelope_filter: EnvelopeFilter {
+                dst: Some(fnv::fnv1a_32("cutter")),
+                src: None,
+                msg_type: None,
+            }
         }).await.log_error("Failed to register CutterActor with router");
 
         Ok(state)
@@ -160,6 +170,36 @@ impl Actor for CutterActor {
 }
 
 // ── Handle TickCutter ─────────────────────────────────────────────────────
+
+impl Message<Envelope> for CutterActor {
+    type Reply = ();
+
+    async fn handle(&mut self, msg: Envelope, _ctx: &mut Context<Self, Self::Reply>) {
+        let envelope = Arc::new(msg);
+        if let Err(e) = self.check_envelope(&envelope) {
+            warn!("CutterActor received invalid envelope: {}", e);
+            return;
+        }
+        match envelope.msg_type {
+            Some(MotorReply::MSG_ID) => {
+                if let Err(e) = self.handle_cutter_reply(envelope).await {
+                    warn!("Failed to handle CutterReply: {}", e);
+                }
+            }
+            Some(MotorEvent::MSG_ID) => {
+                if let Err(e) = self.handle_cutter_event(envelope).await {
+                    warn!("Failed to handle CutterEvent: {}", e);
+                }
+            }
+            _ => {
+                warn!(
+                    "CutterActor received unexpected message type: {:?}",
+                    envelope.msg_type
+                );
+            }
+        }
+    }
+}
 
 impl Message<TickCutter> for CutterActor {
     type Reply = ();

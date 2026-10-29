@@ -3,16 +3,19 @@
 //! Architecture:
 //!   UdpEndpoint     — UDP transport with broker handshake
 //!   HoverboardActor — digital twin of hoverboard (2Hz command)
+//!   MotorActor      — digital twin of motor controller (2Hz command)
 //!   CutterActor     — digital twin of cutter (2Hz command)
 //!   CompassActor    — digital twin of compass sensor (event-only)
 //!   ImuActor        — digital twin of IMU sensor (event-only)
 
 mod brain;
+mod motor;
 mod codec;
 mod compass;
 mod cutter;
 mod hoverboard_proxy;
 mod imu;
+mod motor_proxy;
 mod multicast;
 mod ps4_proxy;
 mod ps4_reader;
@@ -25,22 +28,15 @@ mod protocol;
 use std::net::Ipv4Addr;
 
 use clap::Parser;
-use common::fnv;
 use generated::generated::{opt_id_to_string, Envelope};
 use kameo::prelude::*;
 use log::info;
+use router::EnvelopeFilter;
 
 use brain::BrainActor;
 
 use crate::{
-    brain::{BrainData, ResultLog},
-    compass::CompassActor,
-    cutter::CutterActor,
-    hoverboard_proxy::HoverboardProxy,
-    imu::ImuActor,
-    serial::SerialActor,
-    uart_mux::{UartMuxActor, UartMuxConfig},
-    udp::UdpActor,
+    brain::{ResultLog}, compass::CompassActor, cutter::CutterActor, hoverboard_proxy::HoverboardProxy, imu::ImuActor, motor_proxy::MotorProxy, uart_mux::{UartMuxActor, UartMuxConfig}, udp::{UdpActor, UdpConfig},
 };
 
 pub fn display_envelope(envelope: &Envelope, context: &str) {
@@ -64,12 +60,14 @@ struct Args {
     endpoint: String,
 
     /// Multicast group address.
-    #[arg(long, default_value = "224.0.0.1")]
+    #[arg(long, default_value = "239.0.0.23")]
     group: String,
 
     /// Multicast/unicast port.
     #[arg(long, default_value_t = 50000)]
-    port: u16,
+    mc_port: u16,
+    #[arg(long, default_value_t = 50001)]
+    uc_port: u16,
 }
 
 // ── Main ───────────────────────────────────────────────────────────────────
@@ -97,6 +95,10 @@ async fn main() -> anyhow::Result<()> {
         brain_ref.clone(),
         router_ref.clone(),
     ));
+    let motor_ref = MotorProxy::spawn(MotorProxy::new(
+        brain_ref.clone(),
+        router_ref.clone(),
+    ));
     let cutter_ref = CutterActor::spawn(CutterActor::new(
         brain_ref.clone(),
         router_ref.clone(),
@@ -109,9 +111,12 @@ async fn main() -> anyhow::Result<()> {
         brain_ref.clone(),
         router_ref.clone(),
     ));
- //   let serial_usb0 = SerialActor::spawn(SerialActor::new("/dev/ttyUSB0", router_ref.clone()));
+ //   let _serial_usb0 = SerialActor::spawn(SerialActor::new("/dev/ttyUSB0", router_ref.clone()));
  //   let serial_usb1 = SerialActor::spawn(SerialActor::new("/dev/ttyUSB1", router_ref.clone()));
-    let udp_ref = UdpActor::spawn(UdpActor::new(router_ref.clone()));
+    let udp_ref = UdpActor::spawn(UdpActor::new(router_ref.clone(),UdpConfig {
+        port: args.uc_port,
+        bind_addr: Ipv4Addr::UNSPECIFIED,
+    }   ));
     let uart_mux = UartMuxActor::spawn(UartMuxActor::new(router_ref.clone(), UartMuxConfig {
         vid: UART_MUX_VID,
         pid: UART_MUX_PID,
@@ -141,18 +146,14 @@ async fn main() -> anyhow::Result<()> {
     mc_ref
         .tell(multicast::StartMulticast {
             group,
-            port: args.port,
-            bind_addr: Ipv4Addr::UNSPECIFIED,
-        })
-        .await?;
-    udp_ref
-        .tell(udp::StartUnicast {
-            port: args.port,
+            port: args.mc_port,
             bind_addr: Ipv4Addr::UNSPECIFIED,
         })
         .await?;
 
+
     brain_ref.link(&hb_ref).await;
+    brain_ref.link(&motor_ref).await;
     brain_ref.link(&cutter_ref).await;
     brain_ref.link(&compass_ref).await;
     brain_ref.link(&imu_ref).await;
@@ -170,6 +171,7 @@ async fn main() -> anyhow::Result<()> {
     // Stop actors
     brain_ref.stop_gracefully().await.log_error("stop 1");
     hb_ref.stop_gracefully().await.log_error("stop 1");
+    motor_ref.stop_gracefully().await.log_error("stop 1");
     cutter_ref.stop_gracefully().await.log_error("stop 1");
     compass_ref.stop_gracefully().await.log_error("stop 1");
     imu_ref.stop_gracefully().await.log_error("stop 1");

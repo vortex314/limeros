@@ -2,6 +2,8 @@
 // Source file — method implementations for generated messages.
 // Messages are encoded as CBOR maps keyed by field id.
 // Uses TinyCBOR for CBOR encoding/decoding.
+// Generated on 2026-10-28 11:43:04 with template arduino_source.tera
+
 #include "msgs.h"
 #include "cbor_codec.h"
 
@@ -15,6 +17,7 @@ std::unordered_map<uint32_t, const char*> id_to_name = {
     { 2371693343, "EndpointAnnounce" },
     { 3238220441, "EndpointAnnounceReply" },
     { 1228864117, "Envelope" },
+    { 1911628039, "EnvelopeFilter" },
     { 2578784998, "GenericReply" },
     { 461737375, "HeatingEvent" },
     { 578653874, "HeatingRequest" },
@@ -22,6 +25,7 @@ std::unordered_map<uint32_t, const char*> id_to_name = {
     { 2095960949, "HoverboardReply" },
     { 2735870956, "HoverboardRequest" },
     { 1802836182, "ImuEvent" },
+    { 1361661643, "ListenEndpoint" },
     { 2831607083, "Max31855Event" },
     { 2506002638, "MotorEvent" },
     { 1863653678, "MotorReply" },
@@ -30,6 +34,7 @@ std::unordered_map<uint32_t, const char*> id_to_name = {
     { 31253678, "PingRequest" },
     { 4282593576, "Ps4Event" },
     { 1992038561, "Ps4Request" },
+    { 1736013937, "RegisterEndpoint" },
     { 924742914, "SysEvent" },
     { 2952492394, "SysReply" },
     { 2966412411, "SysRequest" },
@@ -40,6 +45,7 @@ std::unordered_map<uint32_t, const char*> id_to_name = {
     { 2753264687, "compass" },
     { 1152836275, "hoverboard" },
     { 2753177333, "logger" },
+    { 3404760178, "motor" },
     { 1092332049, "mower" },
     { 1295055938, "pinger" },
     { 360195552, "ps4" },
@@ -190,6 +196,23 @@ int Envelope::decode(Buffer& buffer) {
     .read(sequence)
     .read(instance_id)
     .read(payload)
+    .err();
+}
+
+
+
+int EnvelopeFilter::encode(Buffer& buffer) const {
+    return CborEncoder(buffer)
+    .beginArray(2)
+    .write(or_filter)
+    .write(and_filter).err();
+}
+
+int EnvelopeFilter::decode(Buffer& buffer) {
+    return CborDecoder(buffer)
+    .beginArray(2)
+    .read(or_filter)
+    .read(and_filter)
     .err();
 }
 
@@ -432,6 +455,25 @@ int ImuEvent::decode(Buffer& buffer) {
 
 
 
+int ListenEndpoint::encode(Buffer& buffer) const {
+    return CborEncoder(buffer)
+    .beginArray(3)
+    .write(dsts)
+    .write(srcs)
+    .write(msg_types).err();
+}
+
+int ListenEndpoint::decode(Buffer& buffer) {
+    return CborDecoder(buffer)
+    .beginArray(3)
+    .read(dsts)
+    .read(srcs)
+    .read(msg_types)
+    .err();
+}
+
+
+
 int Max31855Event::encode(Buffer& buffer) const {
     return CborEncoder(buffer)
     .beginArray(6)
@@ -661,6 +703,21 @@ int Ps4Request::decode(Buffer& buffer) {
     .read(led_blue)
     .read(led_flash_on)
     .read(led_flash_off)
+    .err();
+}
+
+
+
+int RegisterEndpoint::encode(Buffer& buffer) const {
+    return CborEncoder(buffer)
+    .beginArray(1)
+    .write(dst).err();
+}
+
+int RegisterEndpoint::decode(Buffer& buffer) {
+    return CborDecoder(buffer)
+    .beginArray(1)
+    .read(dst)
     .err();
 }
 

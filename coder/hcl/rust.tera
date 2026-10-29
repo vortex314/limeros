@@ -1,6 +1,8 @@
 // Auto-generated from robot.hcl — do not edit by hand.
 // Every field is `Option<T>`.
 // Messages are encoded as CBOR maps keyed by field id.
+// Generated on {{ build_date }} with template {{ template_name }}
+
 use anyhow::Context;
 
 pub trait Msg: Sized + serde::Serialize + serde::de::DeserializeOwned {
