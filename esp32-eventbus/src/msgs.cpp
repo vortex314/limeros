@@ -2,7 +2,7 @@
 // Source file — method implementations for generated messages.
 // Messages are encoded as CBOR maps keyed by field id.
 // Uses TinyCBOR for CBOR encoding/decoding.
-// Generated on 2026-10-28 11:43:04 with template arduino_source.tera
+// Generated on 2026-10-30 10:18:17 with template arduino_source.tera
 
 #include "msgs.h"
 #include "cbor_codec.h"
@@ -551,16 +551,22 @@ int MotorReply::decode(Buffer& buffer) {
 
 int MotorRequest::encode(Buffer& buffer) const {
     return CborEncoder(buffer)
-    .beginArray(2)
+    .beginArray(5)
     .write(enabled)
-    .write(rpm_target).err();
+    .write(rpm_target)
+    .write(Kp)
+    .write(Ki)
+    .write(Kd).err();
 }
 
 int MotorRequest::decode(Buffer& buffer) {
     return CborDecoder(buffer)
-    .beginArray(2)
+    .beginArray(5)
     .read(enabled)
     .read(rpm_target)
+    .read(Kp)
+    .read(Ki)
+    .read(Kd)
     .err();
 }
 

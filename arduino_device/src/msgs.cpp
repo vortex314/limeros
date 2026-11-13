@@ -2,7 +2,7 @@
 // Source file — method implementations for generated messages.
 // Messages are encoded as CBOR maps keyed by field id.
 // Uses TinyCBOR for CBOR encoding/decoding.
-// Generated on 2026-10-28 11:43:04 with template arduino_source.tera
+// Generated on 2026-11-13 21:32:59 with template arduino_source.tera
 
 #include "msgs.h"
 #include "cbor_codec.h"
@@ -13,11 +13,14 @@
 std::unordered_map<uint32_t, const char*> id_to_name = {
     { 3190208493, "BrokerSubscribeRequest" },
     { 3197332525, "CompassEvent" },
+    { 2956482452, "DW1000AnchorEvent" },
+    { 2171962953, "DW1000TagEvent" },
     { 2637772092, "DeviceAliveEvent" },
+    { 2151086721, "DeviceEvent" },
+    { 440412972, "DeviceRequest" },
     { 2371693343, "EndpointAnnounce" },
     { 3238220441, "EndpointAnnounceReply" },
     { 1228864117, "Envelope" },
-    { 1911628039, "EnvelopeFilter" },
     { 2578784998, "GenericReply" },
     { 461737375, "HeatingEvent" },
     { 578653874, "HeatingRequest" },
@@ -25,7 +28,6 @@ std::unordered_map<uint32_t, const char*> id_to_name = {
     { 2095960949, "HoverboardReply" },
     { 2735870956, "HoverboardRequest" },
     { 1802836182, "ImuEvent" },
-    { 1361661643, "ListenEndpoint" },
     { 2831607083, "Max31855Event" },
     { 2506002638, "MotorEvent" },
     { 1863653678, "MotorReply" },
@@ -34,7 +36,6 @@ std::unordered_map<uint32_t, const char*> id_to_name = {
     { 31253678, "PingRequest" },
     { 4282593576, "Ps4Event" },
     { 1992038561, "Ps4Request" },
-    { 1736013937, "RegisterEndpoint" },
     { 924742914, "SysEvent" },
     { 2952492394, "SysReply" },
     { 2966412411, "SysRequest" },
@@ -115,6 +116,42 @@ int CompassEvent::decode(Buffer& buffer) {
 
 
 
+int DW1000AnchorEvent::encode(Buffer& buffer) const {
+    return CborEncoder(buffer)
+    .beginArray(1)
+    .write(uwb_mac_address).err();
+}
+
+int DW1000AnchorEvent::decode(Buffer& buffer) {
+    return CborDecoder(buffer)
+    .beginArray(1)
+    .read(uwb_mac_address)
+    .err();
+}
+
+
+
+int DW1000TagEvent::encode(Buffer& buffer) const {
+    return CborEncoder(buffer)
+    .beginArray(4)
+    .write(uwb_mac_address)
+    .write(anchor)
+    .write(distance_m)
+    .write(rx_power_db).err();
+}
+
+int DW1000TagEvent::decode(Buffer& buffer) {
+    return CborDecoder(buffer)
+    .beginArray(4)
+    .read(uwb_mac_address)
+    .read(anchor)
+    .read(distance_m)
+    .read(rx_power_db)
+    .err();
+}
+
+
+
 int DeviceAliveEvent::encode(Buffer& buffer) const {
     return CborEncoder(buffer)
     .beginArray(3)
@@ -129,6 +166,44 @@ int DeviceAliveEvent::decode(Buffer& buffer) {
     .read(device)
     .read(endpoint)
     .read(timestamp)
+    .err();
+}
+
+
+
+int DeviceEvent::encode(Buffer& buffer) const {
+    return CborEncoder(buffer)
+    .beginArray(3)
+    .write(device_name)
+    .write(request_types)
+    .write(event_types).err();
+}
+
+int DeviceEvent::decode(Buffer& buffer) {
+    return CborDecoder(buffer)
+    .beginArray(3)
+    .read(device_name)
+    .read(request_types)
+    .read(event_types)
+    .err();
+}
+
+
+
+int DeviceRequest::encode(Buffer& buffer) const {
+    return CborEncoder(buffer)
+    .beginArray(3)
+    .write(ip_address)
+    .write(port)
+    .write(device_name).err();
+}
+
+int DeviceRequest::decode(Buffer& buffer) {
+    return CborDecoder(buffer)
+    .beginArray(3)
+    .read(ip_address)
+    .read(port)
+    .read(device_name)
     .err();
 }
 
@@ -196,23 +271,6 @@ int Envelope::decode(Buffer& buffer) {
     .read(sequence)
     .read(instance_id)
     .read(payload)
-    .err();
-}
-
-
-
-int EnvelopeFilter::encode(Buffer& buffer) const {
-    return CborEncoder(buffer)
-    .beginArray(2)
-    .write(or_filter)
-    .write(and_filter).err();
-}
-
-int EnvelopeFilter::decode(Buffer& buffer) {
-    return CborDecoder(buffer)
-    .beginArray(2)
-    .read(or_filter)
-    .read(and_filter)
     .err();
 }
 
@@ -455,25 +513,6 @@ int ImuEvent::decode(Buffer& buffer) {
 
 
 
-int ListenEndpoint::encode(Buffer& buffer) const {
-    return CborEncoder(buffer)
-    .beginArray(3)
-    .write(dsts)
-    .write(srcs)
-    .write(msg_types).err();
-}
-
-int ListenEndpoint::decode(Buffer& buffer) {
-    return CborDecoder(buffer)
-    .beginArray(3)
-    .read(dsts)
-    .read(srcs)
-    .read(msg_types)
-    .err();
-}
-
-
-
 int Max31855Event::encode(Buffer& buffer) const {
     return CborEncoder(buffer)
     .beginArray(6)
@@ -551,16 +590,22 @@ int MotorReply::decode(Buffer& buffer) {
 
 int MotorRequest::encode(Buffer& buffer) const {
     return CborEncoder(buffer)
-    .beginArray(2)
+    .beginArray(5)
     .write(enabled)
-    .write(rpm_target).err();
+    .write(rpm_target)
+    .write(Kp)
+    .write(Ki)
+    .write(Kd).err();
 }
 
 int MotorRequest::decode(Buffer& buffer) {
     return CborDecoder(buffer)
-    .beginArray(2)
+    .beginArray(5)
     .read(enabled)
     .read(rpm_target)
+    .read(Kp)
+    .read(Ki)
+    .read(Kd)
     .err();
 }
 
@@ -703,21 +748,6 @@ int Ps4Request::decode(Buffer& buffer) {
     .read(led_blue)
     .read(led_flash_on)
     .read(led_flash_off)
-    .err();
-}
-
-
-
-int RegisterEndpoint::encode(Buffer& buffer) const {
-    return CborEncoder(buffer)
-    .beginArray(1)
-    .write(dst).err();
-}
-
-int RegisterEndpoint::decode(Buffer& buffer) {
-    return CborDecoder(buffer)
-    .beginArray(1)
-    .read(dst)
     .err();
 }
 

@@ -5,6 +5,7 @@ members = [
     "apps/broker_kameo",
     "apps/brain",
     "apps/codegen",
+    "apps/codegen_rs",
     "apps/pinger",
     "apps/ps4_bridge",
     "apps/serial_bridge",

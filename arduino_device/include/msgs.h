@@ -3,7 +3,7 @@
 // Every field is `Option<T>`; missing fields are omitted from encoded CBOR.
 // Messages are encoded as CBOR maps keyed by field id.
 // Uses TinyCBOR for CBOR encoding/decoding.
-// Generated on 2026-10-28 11:43:04 with template arduino_header.tera
+// Generated on 2026-11-13 21:32:59 with template arduino_header.tera
 
 #ifndef HCL_CPP_TERA
 #define HCL_CPP_TERA
@@ -41,8 +41,8 @@ public:
 
     virtual uint32_t msg_id() const { return MSG_ID; };
     virtual const char *msg_name() const { return MSG_NAME; };
-    Option<uint32_t> src;
-    Option<uint32_t> msg_type;
+    Option<uint32_t> src;// if no field is set, then subscribe to all sources
+    Option<uint32_t> msg_type;// if no field is set, then subscribe to all message types
 
     int encode(Buffer& buffer) const;
     int decode(Buffer& buffer);
@@ -74,6 +74,41 @@ public:
 
 
 
+class DW1000AnchorEvent : public Msg {
+public:
+
+    static const uint32_t MSG_ID = FNV("DW1000AnchorEvent");
+    static constexpr const char *MSG_NAME ="DW1000AnchorEvent";
+
+    virtual uint32_t msg_id() const { return MSG_ID; };
+    virtual const char *msg_name() const { return MSG_NAME; };
+    Option<std::vector<uint8_t>> uwb_mac_address;// UWB Mac Address of Tag
+
+    int encode(Buffer& buffer) const;
+    int decode(Buffer& buffer);
+};
+
+
+
+class DW1000TagEvent : public Msg {
+public:
+
+    static const uint32_t MSG_ID = FNV("DW1000TagEvent");
+    static constexpr const char *MSG_NAME ="DW1000TagEvent";
+
+    virtual uint32_t msg_id() const { return MSG_ID; };
+    virtual const char *msg_name() const { return MSG_NAME; };
+    Option<std::vector<uint8_t>> uwb_mac_address;// UWB Mac Address of Tag
+    Option<uint32_t> anchor;// Short address of anchor
+    Option<float> distance_m;// Distance from anchor to Tag
+    Option<float> rx_power_db;// Reception strength of tag from anchor
+
+    int encode(Buffer& buffer) const;
+    int decode(Buffer& buffer);
+};
+
+
+
 class DeviceAliveEvent : public Msg {
 public:
 
@@ -85,6 +120,42 @@ public:
     Option<std::string> device;
     Option<std::string> endpoint;
     Option<uint64_t> timestamp;// Timestamp in milliseconds since epoch
+
+    int encode(Buffer& buffer) const;
+    int decode(Buffer& buffer);
+};
+
+
+
+class DeviceEvent : public Msg {
+public:
+
+    static const uint32_t MSG_ID = FNV("DeviceEvent");
+    static constexpr const char *MSG_NAME ="DeviceEvent";
+
+    virtual uint32_t msg_id() const { return MSG_ID; };
+    virtual const char *msg_name() const { return MSG_NAME; };
+    Option<std::string> device_name;// Device Name
+    Option<std::vector<uint32_t>> request_types;// Requests supported
+    Option<std::vector<uint32_t>> event_types;// Requests supported
+
+    int encode(Buffer& buffer) const;
+    int decode(Buffer& buffer);
+};
+
+
+
+class DeviceRequest : public Msg {
+public:
+
+    static const uint32_t MSG_ID = FNV("DeviceRequest");
+    static constexpr const char *MSG_NAME ="DeviceRequest";
+
+    virtual uint32_t msg_id() const { return MSG_ID; };
+    virtual const char *msg_name() const { return MSG_NAME; };
+    Option<std::vector<uint8_t>> ip_address;// Broker Ip Address
+    Option<uint32_t> port;// Broker UDP port
+    Option<std::string> device_name;// Device Name
 
     int encode(Buffer& buffer) const;
     int decode(Buffer& buffer);
@@ -144,23 +215,6 @@ public:
     Option<uint32_t> sequence;// Request ID for matching request/reply
     Option<uint32_t> instance_id;// Instance ID for matching request/reply
     Option<std::vector<uint8_t>> payload;// Serialized payload of the message
-
-    int encode(Buffer& buffer) const;
-    int decode(Buffer& buffer);
-};
-
-
-
-class EnvelopeFilter : public Msg {
-public:
-
-    static const uint32_t MSG_ID = FNV("EnvelopeFilter");
-    static constexpr const char *MSG_NAME ="EnvelopeFilter";
-
-    virtual uint32_t msg_id() const { return MSG_ID; };
-    virtual const char *msg_name() const { return MSG_NAME; };
-    Option<std::string> or_filter;// OR filter for envelopes
-    Option<std::string> and_filter;// AND filter for envelopes
 
     int encode(Buffer& buffer) const;
     int decode(Buffer& buffer);
@@ -346,24 +400,6 @@ public:
 
 
 
-class ListenEndpoint : public Msg {
-public:
-
-    static const uint32_t MSG_ID = FNV("ListenEndpoint");
-    static constexpr const char *MSG_NAME ="ListenEndpoint";
-
-    virtual uint32_t msg_id() const { return MSG_ID; };
-    virtual const char *msg_name() const { return MSG_NAME; };
-    Option<uint32_t> dsts;// Destination ID to listen to
-    Option<uint32_t> srcs;// Filter for the envelopes to listen to
-    Option<uint32_t> msg_types;// Filter for the destination envelopes to listen to
-
-    int encode(Buffer& buffer) const;
-    int decode(Buffer& buffer);
-};
-
-
-
 class Max31855Event : public Msg {
 public:
 
@@ -437,6 +473,9 @@ public:
     virtual const char *msg_name() const { return MSG_NAME; };
     Option<bool> enabled;// Enable or disable the cutter
     Option<int32_t> rpm_target;// Speed command for the cutter in RPM
+    Option<float> Kp;// Proportional gain for the cutter motor controller
+    Option<float> Ki;// Integral gain for the cutter motor controller
+    Option<float> Kd;// Derivative gain for the cutter motor controller
 
     int encode(Buffer& buffer) const;
     int decode(Buffer& buffer);
@@ -542,22 +581,6 @@ public:
     Option<int32_t> led_blue;
     Option<int32_t> led_flash_on;
     Option<int32_t> led_flash_off;
-
-    int encode(Buffer& buffer) const;
-    int decode(Buffer& buffer);
-};
-
-
-
-class RegisterEndpoint : public Msg {
-public:
-
-    static const uint32_t MSG_ID = FNV("RegisterEndpoint");
-    static constexpr const char *MSG_NAME ="RegisterEndpoint";
-
-    virtual uint32_t msg_id() const { return MSG_ID; };
-    virtual const char *msg_name() const { return MSG_NAME; };
-    Option<uint32_t> dst;// Destination ID for the registration
 
     int encode(Buffer& buffer) const;
     int decode(Buffer& buffer);

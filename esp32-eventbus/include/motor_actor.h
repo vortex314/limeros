@@ -78,6 +78,19 @@ private:
 // constexpr mcpwm_timer_clock_source_t MCPWM_TIMER_CLK_SRC_DEFAULT = (mcpwm_timer_clock_source_t)SOC_MOD_CLK_PLL_F160M;
 constexpr uint32_t BLDC_MCPWM_TIMER_RESOLUTION_HZ = 10000000; // 10MHz, 1 tick = 0.1us
 constexpr uint32_t TICKS_PER_PERIOD = 500;                    // 50us, 20KHz
+constexpr uint64_t PID_PERIOD_MS = 50;                        // 20 Hz control loop
+constexpr float PID_PERIOD_SECONDS = PID_PERIOD_MS / 1000.0f;
+
+// Tachometer limits. The capture timer runs at 80 MHz and yields four pulses
+// per revolution, so interval ticks = 1.2e9 / rpm. Anything outside this band
+// is treated as noise rather than a speed measurement.
+constexpr float MIN_MEASURED_RPM = 30.0f;
+constexpr float MAX_MEASURED_RPM = 3500.0f;
+constexpr uint32_t CAPTURE_TICKS_PER_RPM = 1'200'000'000u;
+constexpr uint32_t CAPTURE_MIN_INTERVAL_TICKS =
+    static_cast<uint32_t>(CAPTURE_TICKS_PER_RPM / MAX_MEASURED_RPM);
+constexpr uint32_t CAPTURE_MAX_INTERVAL_TICKS =
+    static_cast<uint32_t>(CAPTURE_TICKS_PER_RPM / MIN_MEASURED_RPM);
 constexpr gpio_num_t GPIO_CAPTURE = (gpio_num_t)14;           // gpio14
 constexpr gpio_num_t GPIO_PWM_1 = (gpio_num_t)13;             // gpio13
 constexpr gpio_num_t GPIO_PWM_2 = (gpio_num_t)12;             // gpio12

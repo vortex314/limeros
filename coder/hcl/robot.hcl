@@ -4,11 +4,11 @@ robot "ronald" {
   multicast_port = 50000
   broker_port    = 50001
   multicast_addr = "224.0.0.1"
-  serial_ports = ["/dev/ttyUSB0", "/dev/ttyUSB1"]
+  serial_ports   = ["/dev/ttyUSB0", "/dev/ttyUSB1"]
 
   endpoint "brain" {
     description = "Brain of the hoverboard"
-    subscribes = [[$ { message.HoverboardEvent },$ { message.SysEvent }, $ { message.CompassEvent }, ${ message.ImuEvent }, $ { message.UsEvent }, $ { message.Ps4Event }, $ { message.WifiEvent }, $ { message.DeviceAliveEvent }, $ { message.Max31855Event }, $ { message.HeatingEvent }]]
+    subscribes  = [[$ { message.HoverboardEvent },$ { message.SysEvent }, $ { message.CompassEvent }, ${ message.ImuEvent }, $ { message.UsEvent }, $ { message.Ps4Event }, $ { message.WifiEvent }, $ { message.DeviceAliveEvent }, $ { message.Max31855Event }, $ { message.HeatingEvent }]]
   }
 
   endpoint "broker" {
@@ -62,27 +62,40 @@ robot "ronald" {
     replies     = [$ { message.GenericReply }, $ { message.SysReply }]
   }
 
+
+
   endpoint "mower" {
     services    = [$ { message.SystemRequest }]
     description = "System interface for the mower"
   }
 
-  message "RegisterEndpoint" {
-    description = "Register a device with the router"
-    field "dst" { id = 0 type = "uint32" description = "Destination ID for the registration" }
+  message "DeviceEvent" {
+    field "device_name" { id=0  type="string" desccription="Device Name" }
+    field "request_types" { id=1 type="uint32" repeated="true" description="Requests supported"}
+    field "event_types" { id=1 type="uint32" repeated="true" description="Requests supported"}
   }
 
-  message "ListenEndpoint" {
-    description = "Add a listener for a specific destination"
-    field "dsts" { id = 0 type = "uint32" repeated = true description = "Destination ID to listen to" }
-    field "srcs" { id = 1 type = "uint32" repeated = true description = "Filter for the envelopes to listen to" }
-    field "msg_types" { id = 2 type = "uint32" repeated = true description = "Filter for the destination envelopes to listen to" }
+  message "DeviceRequest" {
+    field "ip_address"  { id=0  type="bytes" description="Broker Ip Address" }
+    field "port" { id=0  type="uint32" description="Broker UDP port" }
+    field "device_name" { id=0  type="string" description="Device Name" }
   }
 
-  message "EnvelopeFilter" {
-    description = "Filter for envelopes, can be either an OR or AND filter"
-    field "or_filter" { id = 0 type = "EnvelopeOrFilter" description = "OR filter for envelopes" }
-    field "and_filter" { id = 1 type = "EnvelopeAndFilter" description = "AND filter for envelopes" }
+  message "BrokerSubscribeRequest" {
+    field "dsts" { id=0  type="uint32" repeated = true description="Destination match" }
+    field "srcs" { id=1  type="uint32" repeated = true description="Source match" }
+    field "msg_types" { id=2 type="uint32" repeated="true" description="Requests supported"}
+  }
+
+  message "DW1000TagEvent" {
+    field "uwb_mac_address" { id=0 type="bytes" description ="UWB Mac Address of Tag " }
+    field "anchor" { id=1 type="uint16" description="Short address of anchor"}
+    field "distance_m"  { id=2 type="float" description="Distance from anchor to Tag"}
+    field "rx_power_db"  { id=3 type="float" description="Reception strength of tag from anchor"}
+  }
+
+  message "DW1000AnchorEvent" {
+    field "uwb_mac_address" { id=0 type="bytes" description ="UWB Mac Address of Tag " }
   }
 
   message "HoverboardRequest" {
@@ -169,6 +182,9 @@ robot "ronald" {
     description = "Request command for cutter"
     field "enabled" { id = 0 type = "bool" description = "Enable or disable the cutter" }
     field "rpm_target" { id = 1 type = "int32" unit = "RPM" description = "Speed command for the cutter in RPM" }
+    field "Kp" { id = 5 type = "float" description = "Proportional gain for the cutter motor controller" }
+    field "Ki" { id = 6 type = "float" description = "Integral gain for the cutter motor controller" }
+    field "Kd" { id = 7 type = "float" description = "Derivative gain for the cutter motor controller" }
   }
 
   message MotorReply {

@@ -9,6 +9,7 @@ cbor2 = { version = "1.1", features = ["derive"] }
 clap = { version = "4.5", features = ["derive"] }
 dashmap = "6.1"
 eframe = { version = "0.31.1", features = ["accesskit", "glow"] }
+egui_plot = "0.32"
 kameo = "0.22.2"
 lazy_static = "1.5"
 serde = { version = "1.0", features = ["derive"] }

@@ -581,10 +581,60 @@ CborDecoder &CborDecoder::read(uint64_t &out)
   return *this;
 }
 
+static float cborHalfToFloat(uint16_t half)
+{
+  const uint32_t sign = (static_cast<uint32_t>(half & 0x8000u)) << 16;
+  uint32_t exponent = (half >> 10) & 0x1Fu;
+  uint32_t mantissa = half & 0x3FFu;
+  uint32_t bits = 0;
+
+  if (exponent == 0)
+  {
+    if (mantissa == 0)
+    {
+      bits = sign; // +/- zero
+    }
+    else
+    {
+      // Subnormal half: renormalize into a normal float32.
+      exponent = 127 - 15 + 1;
+      while ((mantissa & 0x400u) == 0)
+      {
+        mantissa <<= 1;
+        --exponent;
+      }
+      mantissa &= 0x3FFu;
+      bits = sign | (exponent << 23) | (mantissa << 13);
+    }
+  }
+  else if (exponent == 0x1Fu)
+  {
+    bits = sign | 0x7F800000u | (mantissa << 13); // infinity / NaN
+  }
+  else
+  {
+    bits = sign | ((exponent + (127 - 15)) << 23) | (mantissa << 13);
+  }
+
+  float result = 0.0f;
+  memcpy(&result, &bits, sizeof(result));
+  return result;
+}
+
 CborDecoder &CborDecoder::read(float &out)
 {
   if (_last_error != 0)
     return *this;
+  if (pos >= buf.size())
+  {
+    _last_error = CborError::InvalidTypeError;
+    return *this;
+  }
+
+  // CBOR preferred serialization writes the shortest float width, so peers
+  // may send float16 (0xF9), float32 (0xFA) or float64 (0xFB).
+  const uint8_t ai = buf.data()[pos] & 0x1F;
+
   uint8_t major = 0;
   uint32_t value = 0;
   if (!readHeader(major, value))
@@ -594,8 +644,35 @@ CborDecoder &CborDecoder::read(float &out)
     _last_error = CborError::InvalidTypeError;
     return *this;
   }
-  memcpy(&out, &value, sizeof(out));
-  return *this;
+
+  switch (ai)
+  {
+  case 25: // float16
+    out = cborHalfToFloat(static_cast<uint16_t>(value));
+    return *this;
+
+  case 26: // float32
+    memcpy(&out, &value, sizeof(out));
+    return *this;
+
+  case 27: // float64 - payload bytes are just behind the cursor now.
+  {
+    uint64_t wide_bits = 0;
+    const size_t start = pos - 8;
+    for (size_t i = 0; i < 8; ++i)
+    {
+      wide_bits = (wide_bits << 8) | static_cast<uint64_t>(buf.data()[start + i]);
+    }
+    double wide = 0.0;
+    memcpy(&wide, &wide_bits, sizeof(wide));
+    out = static_cast<float>(wide);
+    return *this;
+  }
+
+  default:
+    _last_error = CborError::InvalidTypeError;
+    return *this;
+  }
 }
 
 CborDecoder &CborDecoder::read(char *out, size_t maxLen)

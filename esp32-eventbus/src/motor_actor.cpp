@@ -6,14 +6,22 @@ extern "C" bool capture_callback(
     const mcpwm_capture_event_data_t *capture_event,
     void *arg);
 
-MotorActor::MotorActor(): Actor()
+MotorActor::MotorActor() : Actor()
 {
     _timer_publish = timer_repetitive(300);
-    _timer_pid = timer_repetitive(100);
+    _timer_pid = timer_repetitive(PID_PERIOD_MS);
+    // Measured on the rig with a step test: the plant delivers ~34 RPM per
+    // percent of duty, with a 20 Hz loop and ~100 ms of measurement lag.
+    // Kp targets a loop gain of ~0.5 (0.5 / 34) and Ti is 0.3 s, so
+    // Ki = Kp / 0.3. Kd stays zero because the tachometer already averages
+    // and a derivative term would amplify outlier samples.
+    _Kp = 0.014f;
+    _Ki = 0.047f;
     _Kd = 0.0f;
-    _Kp = 0.05f;
-    _Ki = 0.003f;
-    _rpm_target = 2000.0f;
+    _p = 0.0f;
+    _i = 0.0f;
+    _d = 0.0f;
+    _rpm_target = 100.0f;
     _rpm_measured = 0.0f;
     _pwm_value = 350;
     _pwm_percent = 20.0f;
@@ -29,26 +37,40 @@ float MotorActor::pid_update(float delta_t, float error)
     }
 
     _p = _Kp * error;
-    _rpm_integral += error * delta_t;
+    _d = _Kd * (error - _previous_error) / delta_t;
+
+    // Conditional integration (anti-windup): stop accumulating once the output
+    // is saturated and the error would push it further out of range.
+    const float candidate_integral = _rpm_integral + error * delta_t;
+    const float candidate_output = _p + _Ki * candidate_integral + _d;
+    const bool winding_up = candidate_output >= 100.0f && error > 0.0f;
+    const bool winding_down = candidate_output <= 0.0f && error < 0.0f;
+    if (!winding_up && !winding_down)
+    {
+        _rpm_integral = candidate_integral;
+    }
+
     if (_Ki != 0.0f)
     {
-        _rpm_integral = clip(_rpm_integral, -50.0f / _Ki, 50.0f / _Ki);
+        // The integrator must be able to supply the whole 0..100% duty range,
+        // otherwise it can never reach the operating point for high targets.
+        const float integral_limit = 100.0f / _Ki;
+        _rpm_integral = clip(_rpm_integral, -integral_limit, integral_limit);
     }
+
     _i = _Ki * _rpm_integral;
-    _d = _Kd * (error - _previous_error) / delta_t;
 
     DEBUG("error:%f p:%f i:%f d:%f", error, _p, _i, _d);
     _previous_error = error;
     return _p + _i + _d;
 }
 
-
 void MotorActor::setup(void)
 {
     INFO("MotorActor setup");
     Res init_res = pwm_init()
-        .and_then([&](auto r)
-                  { return capture_init(); });
+                       .and_then([&](auto r)
+                                 { return capture_init(); });
     init_res.just([&](auto v)
                   { INFO(" Motor Actor setup complete."); });
     init_res.just_err([&](auto err)
@@ -63,6 +85,9 @@ void MotorActor::receive(const ActorMessage &msg)
                              {
         INFO("Motor actor cmd ");
         cmd.rpm_target.handle_if([&](auto v) { _rpm_target = v; });
+        cmd.Kp.handle_if([&](auto v) { _Kp = v; });
+        cmd.Ki.handle_if([&](auto v) { _Ki = v; });
+        cmd.Kd.handle_if([&](auto v) { _Kd = v; }); 
         publish_props(); });
 }
 
@@ -105,6 +130,11 @@ void MotorActor::on_timer(int id)
             const float average_ticks = static_cast<float>(capture_sum) / capture_count;
             const float hz = 80'000'000.0f / average_ticks;
             _rpm_measured = (hz * 60.0f) / 4.0f;
+            // Too few pulses in the window to be trustworthy: report standstill.
+            if (_rpm_measured < MIN_MEASURED_RPM || _rpm_measured > MAX_MEASURED_RPM)
+            {
+                _rpm_measured = 0.0f;
+            }
             delta_t = static_cast<float>(capture_sum) / 80'000'000.0f;
             _last_rpm_measured = esp_timer_get_time();
         }
@@ -119,13 +149,23 @@ void MotorActor::on_timer(int id)
             return;
         }
 
-        float pid = pid_update(delta_t, _rpm_target - _rpm_measured);
-        _pwm_percent = MotorActor::clip(pid, 0, 100.0f);
-        _pwm_value = MotorActor::pwm_percent_to_ticks(_pwm_percent);
-
-        if (_pwm_value > TICKS_PER_PERIOD)
+        if (_rpm_target <= 0.0f)
         {
-            _pwm_value = TICKS_PER_PERIOD;
+            // The driver input is active low, so a full-period compare value is
+            // the only safe "off" state (compare 0 would mean 100% duty).
+            _pwm_percent = 0.0f;
+            _pwm_value = pwm_percent_to_ticks(0.0f);
+        }
+        else
+        {
+            float pid = pid_update(PID_PERIOD_SECONDS, _rpm_target - _rpm_measured);
+            _pwm_percent = MotorActor::clip(pid, 0, 100.0f);
+            _pwm_value = MotorActor::pwm_percent_to_ticks(_pwm_percent);
+
+            if (_pwm_value > TICKS_PER_PERIOD)
+            {
+                _pwm_value = TICKS_PER_PERIOD;
+            }
         }
 
         DEBUG("pid:%f pwm:%f pwm_value:%d", pid, _pwm_percent, _pwm_value);
@@ -137,8 +177,6 @@ void MotorActor::on_timer(int id)
         }
     }
 }
-
-
 
 MotorActor::~MotorActor()
 {
@@ -204,8 +242,8 @@ Res MotorActor::pwm_init()
         flags : {
             update_period_on_empty : 1, // change
             update_period_on_sync : 1,
-        //    allow_pd : 0, // set to allow power down. When this flag set, the driver will backup/restore the MCPWM registers before/after entering/exist sleep mode.
-        },                // when to change the value
+            //    allow_pd : 0, // set to allow power down. When this flag set, the driver will backup/restore the MCPWM registers before/after entering/exist sleep mode.
+        }, // when to change the value
     };
 
     CHECK_ESP(mcpwm_new_timer(&timer_config, &_timer));
@@ -378,7 +416,10 @@ void MotorActor::record_capture_from_isr(uint32_t capture_value)
     portENTER_CRITICAL_ISR(&_capture_mux);
     const uint32_t ticks_per_period = capture_value - _last_capture;
     _last_capture = capture_value;
-    if (ticks_per_period != 0)
+    // Only accumulate intervals that correspond to a plausible speed. Shorter
+    // intervals are glitches, longer ones mean the motor is barely turning.
+    if (ticks_per_period >= CAPTURE_MIN_INTERVAL_TICKS &&
+        ticks_per_period <= CAPTURE_MAX_INTERVAL_TICKS)
     {
         _capture_sum += ticks_per_period;
         ++_capture_count;
@@ -419,4 +460,3 @@ Res MotorActor::pwm_stop()
     }
     return Res::Ok(true);
 }
-

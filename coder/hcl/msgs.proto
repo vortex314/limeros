@@ -1,0 +1,10 @@
+message UwbAnchorEvent {
+    bool alive =0;
+    bytes address = 1;
+    uint64 uptime =2 ;
+    }
+
+message UwbTagEvent {
+    bytes chip_id=0;
+    
+}

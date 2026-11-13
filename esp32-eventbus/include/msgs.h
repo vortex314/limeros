@@ -3,7 +3,7 @@
 // Every field is `Option<T>`; missing fields are omitted from encoded CBOR.
 // Messages are encoded as CBOR maps keyed by field id.
 // Uses TinyCBOR for CBOR encoding/decoding.
-// Generated on 2026-10-28 11:43:04 with template arduino_header.tera
+// Generated on 2026-10-30 10:18:17 with template arduino_header.tera
 
 #ifndef HCL_CPP_TERA
 #define HCL_CPP_TERA
@@ -437,6 +437,9 @@ public:
     virtual const char *msg_name() const { return MSG_NAME; };
     Option<bool> enabled;// Enable or disable the cutter
     Option<int32_t> rpm_target;// Speed command for the cutter in RPM
+    Option<float> Kp;// Proportional gain for the cutter motor controller
+    Option<float> Ki;// Integral gain for the cutter motor controller
+    Option<float> Kd;// Derivative gain for the cutter motor controller
 
     int encode(Buffer& buffer) const;
     int decode(Buffer& buffer);

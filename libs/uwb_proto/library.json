@@ -1,0 +1,7 @@
+{
+  "name": "uwb_proto",
+  "version": "1.0.0",
+  "description": "Shared UWB UDP transport + protobuf wire codec for dwm1000 devices",
+  "frameworks": "arduino",
+  "platforms": ["espressif8266", "espressif32"]
+}

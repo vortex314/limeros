@@ -1,7 +1,7 @@
 // Auto-generated from robot.hcl — do not edit by hand.
 // Every field is `Option<T>`.
 // Messages are encoded as CBOR maps keyed by field id.
-// Generated on 2026-10-28 11:43:04 with template rust.tera
+// Generated on 2026-11-13 21:32:59 with template rust.tera
 
 use anyhow::Context;
 
@@ -58,11 +58,14 @@ lazy_static! {
         let m = DashMap::new();
         m.insert(3190208493, "BrokerSubscribeRequest".to_string());
         m.insert(3197332525, "CompassEvent".to_string());
+        m.insert(2956482452, "DW1000AnchorEvent".to_string());
+        m.insert(2171962953, "DW1000TagEvent".to_string());
         m.insert(2637772092, "DeviceAliveEvent".to_string());
+        m.insert(2151086721, "DeviceEvent".to_string());
+        m.insert(440412972, "DeviceRequest".to_string());
         m.insert(2371693343, "EndpointAnnounce".to_string());
         m.insert(3238220441, "EndpointAnnounceReply".to_string());
         m.insert(1228864117, "Envelope".to_string());
-        m.insert(1911628039, "EnvelopeFilter".to_string());
         m.insert(2578784998, "GenericReply".to_string());
         m.insert(461737375, "HeatingEvent".to_string());
         m.insert(578653874, "HeatingRequest".to_string());
@@ -70,7 +73,6 @@ lazy_static! {
         m.insert(2095960949, "HoverboardReply".to_string());
         m.insert(2735870956, "HoverboardRequest".to_string());
         m.insert(1802836182, "ImuEvent".to_string());
-        m.insert(1361661643, "ListenEndpoint".to_string());
         m.insert(2831607083, "Max31855Event".to_string());
         m.insert(2506002638, "MotorEvent".to_string());
         m.insert(1863653678, "MotorReply".to_string());
@@ -79,7 +81,6 @@ lazy_static! {
         m.insert(31253678, "PingRequest".to_string());
         m.insert(4282593576, "Ps4Event".to_string());
         m.insert(1992038561, "Ps4Request".to_string());
-        m.insert(1736013937, "RegisterEndpoint".to_string());
         m.insert(924742914, "SysEvent".to_string());
         m.insert(2952492394, "SysReply".to_string());
         m.insert(2966412411, "SysRequest".to_string());
@@ -128,8 +129,8 @@ pub fn opt_id_to_string(msg_id: Option<u32>) -> String {
 #[derive(Debug, Clone, PartialEq, cbor2::Cbor)]
 #[cbor(array)]
 pub struct BrokerSubscribeRequest {
-    pub src: Option<u32>,
-    pub msg_type: Option<u32>,
+    pub src: Option<u32>,// if no field is set, then subscribe to all sources
+    pub msg_type: Option<u32>,// if no field is set, then subscribe to all message types
 }
 
 impl Default for BrokerSubscribeRequest {
@@ -241,6 +242,110 @@ impl Msg for CompassEvent {
 
 #[derive(Debug, Clone, PartialEq, cbor2::Cbor)]
 #[cbor(array)]
+pub struct DW1000AnchorEvent {
+    #[serde(with = "serde_bytes")]
+    pub uwb_mac_address: Option<Vec<u8>>,// UWB Mac Address of Tag
+}
+
+impl Default for DW1000AnchorEvent {
+    fn default() -> Self {
+        DW1000AnchorEvent {
+            uwb_mac_address: None,
+        }
+    }
+}
+
+impl DW1000AnchorEvent {
+    pub const MSG_ID : u32 = 2956482452;
+    pub const MSG_NAME: &'static str = "DW1000AnchorEvent";
+
+    pub const fn id() -> u32 {
+        2956482452
+    }
+
+    pub fn name() -> &'static str {
+        "DW1000AnchorEvent"
+    }
+
+    pub fn from_bytes(data: &[u8]) -> anyhow::Result<Self> {
+        cbor2::from_reader(data).context("Failed to deserialize from CBOR")
+    }
+
+    pub fn to_bytes(&self) -> anyhow::Result<Vec<u8>> {
+        cbor2::to_vec(self).context("Failed to serialize to CBOR")
+    }
+}
+
+impl Msg for DW1000AnchorEvent {
+    fn id() -> u32 {
+        Self::id()
+    }
+
+    fn name() -> &'static str {
+        Self::name()
+    }
+}
+
+
+
+
+#[derive(Debug, Clone, PartialEq, cbor2::Cbor)]
+#[cbor(array)]
+pub struct DW1000TagEvent {
+    #[serde(with = "serde_bytes")]
+    pub uwb_mac_address: Option<Vec<u8>>,// UWB Mac Address of Tag
+    pub anchor: Option<u16>,// Short address of anchor
+    pub distance_m: Option<f32>,// Distance from anchor to Tag
+    pub rx_power_db: Option<f32>,// Reception strength of tag from anchor
+}
+
+impl Default for DW1000TagEvent {
+    fn default() -> Self {
+        DW1000TagEvent {
+            uwb_mac_address: None,
+            anchor: None,
+            distance_m: None,
+            rx_power_db: None,
+        }
+    }
+}
+
+impl DW1000TagEvent {
+    pub const MSG_ID : u32 = 2171962953;
+    pub const MSG_NAME: &'static str = "DW1000TagEvent";
+
+    pub const fn id() -> u32 {
+        2171962953
+    }
+
+    pub fn name() -> &'static str {
+        "DW1000TagEvent"
+    }
+
+    pub fn from_bytes(data: &[u8]) -> anyhow::Result<Self> {
+        cbor2::from_reader(data).context("Failed to deserialize from CBOR")
+    }
+
+    pub fn to_bytes(&self) -> anyhow::Result<Vec<u8>> {
+        cbor2::to_vec(self).context("Failed to serialize to CBOR")
+    }
+}
+
+impl Msg for DW1000TagEvent {
+    fn id() -> u32 {
+        Self::id()
+    }
+
+    fn name() -> &'static str {
+        Self::name()
+    }
+}
+
+
+
+
+#[derive(Debug, Clone, PartialEq, cbor2::Cbor)]
+#[cbor(array)]
 pub struct DeviceAliveEvent {
     pub device: Option<String>,
     pub endpoint: Option<String>,
@@ -279,6 +384,111 @@ impl DeviceAliveEvent {
 }
 
 impl Msg for DeviceAliveEvent {
+    fn id() -> u32 {
+        Self::id()
+    }
+
+    fn name() -> &'static str {
+        Self::name()
+    }
+}
+
+
+
+
+#[derive(Debug, Clone, PartialEq, cbor2::Cbor)]
+#[cbor(array)]
+pub struct DeviceEvent {
+    pub device_name: Option<String>,// Device Name
+    pub request_types: Option<Vec<u32>>,// Requests supported
+    pub event_types: Option<Vec<u32>>,// Requests supported
+}
+
+impl Default for DeviceEvent {
+    fn default() -> Self {
+        DeviceEvent {
+            device_name: None,
+            request_types: None,
+            event_types: None,
+        }
+    }
+}
+
+impl DeviceEvent {
+    pub const MSG_ID : u32 = 2151086721;
+    pub const MSG_NAME: &'static str = "DeviceEvent";
+
+    pub const fn id() -> u32 {
+        2151086721
+    }
+
+    pub fn name() -> &'static str {
+        "DeviceEvent"
+    }
+
+    pub fn from_bytes(data: &[u8]) -> anyhow::Result<Self> {
+        cbor2::from_reader(data).context("Failed to deserialize from CBOR")
+    }
+
+    pub fn to_bytes(&self) -> anyhow::Result<Vec<u8>> {
+        cbor2::to_vec(self).context("Failed to serialize to CBOR")
+    }
+}
+
+impl Msg for DeviceEvent {
+    fn id() -> u32 {
+        Self::id()
+    }
+
+    fn name() -> &'static str {
+        Self::name()
+    }
+}
+
+
+
+
+#[derive(Debug, Clone, PartialEq, cbor2::Cbor)]
+#[cbor(array)]
+pub struct DeviceRequest {
+    #[serde(with = "serde_bytes")]
+    pub ip_address: Option<Vec<u8>>,// Broker Ip Address
+    pub port: Option<u32>,// Broker UDP port
+    pub device_name: Option<String>,// Device Name
+}
+
+impl Default for DeviceRequest {
+    fn default() -> Self {
+        DeviceRequest {
+            ip_address: None,
+            port: None,
+            device_name: None,
+        }
+    }
+}
+
+impl DeviceRequest {
+    pub const MSG_ID : u32 = 440412972;
+    pub const MSG_NAME: &'static str = "DeviceRequest";
+
+    pub const fn id() -> u32 {
+        440412972
+    }
+
+    pub fn name() -> &'static str {
+        "DeviceRequest"
+    }
+
+    pub fn from_bytes(data: &[u8]) -> anyhow::Result<Self> {
+        cbor2::from_reader(data).context("Failed to deserialize from CBOR")
+    }
+
+    pub fn to_bytes(&self) -> anyhow::Result<Vec<u8>> {
+        cbor2::to_vec(self).context("Failed to serialize to CBOR")
+    }
+}
+
+impl Msg for DeviceRequest {
     fn id() -> u32 {
         Self::id()
     }
@@ -446,56 +656,6 @@ impl Envelope {
 }
 
 impl Msg for Envelope {
-    fn id() -> u32 {
-        Self::id()
-    }
-
-    fn name() -> &'static str {
-        Self::name()
-    }
-}
-
-
-
-
-#[derive(Debug, Clone, PartialEq, cbor2::Cbor)]
-#[cbor(array)]
-pub struct EnvelopeFilter {
-    pub or_filter: Option<String>,// OR filter for envelopes
-    pub and_filter: Option<String>,// AND filter for envelopes
-}
-
-impl Default for EnvelopeFilter {
-    fn default() -> Self {
-        EnvelopeFilter {
-            or_filter: None,
-            and_filter: None,
-        }
-    }
-}
-
-impl EnvelopeFilter {
-    pub const MSG_ID : u32 = 1911628039;
-    pub const MSG_NAME: &'static str = "EnvelopeFilter";
-
-    pub const fn id() -> u32 {
-        1911628039
-    }
-
-    pub fn name() -> &'static str {
-        "EnvelopeFilter"
-    }
-
-    pub fn from_bytes(data: &[u8]) -> anyhow::Result<Self> {
-        cbor2::from_reader(data).context("Failed to deserialize from CBOR")
-    }
-
-    pub fn to_bytes(&self) -> anyhow::Result<Vec<u8>> {
-        cbor2::to_vec(self).context("Failed to serialize to CBOR")
-    }
-}
-
-impl Msg for EnvelopeFilter {
     fn id() -> u32 {
         Self::id()
     }
@@ -978,58 +1138,6 @@ impl Msg for ImuEvent {
 
 #[derive(Debug, Clone, PartialEq, cbor2::Cbor)]
 #[cbor(array)]
-pub struct ListenEndpoint {
-    pub dsts: Option<u32>,// Destination ID to listen to
-    pub srcs: Option<u32>,// Filter for the envelopes to listen to
-    pub msg_types: Option<u32>,// Filter for the destination envelopes to listen to
-}
-
-impl Default for ListenEndpoint {
-    fn default() -> Self {
-        ListenEndpoint {
-            dsts: None,
-            srcs: None,
-            msg_types: None,
-        }
-    }
-}
-
-impl ListenEndpoint {
-    pub const MSG_ID : u32 = 1361661643;
-    pub const MSG_NAME: &'static str = "ListenEndpoint";
-
-    pub const fn id() -> u32 {
-        1361661643
-    }
-
-    pub fn name() -> &'static str {
-        "ListenEndpoint"
-    }
-
-    pub fn from_bytes(data: &[u8]) -> anyhow::Result<Self> {
-        cbor2::from_reader(data).context("Failed to deserialize from CBOR")
-    }
-
-    pub fn to_bytes(&self) -> anyhow::Result<Vec<u8>> {
-        cbor2::to_vec(self).context("Failed to serialize to CBOR")
-    }
-}
-
-impl Msg for ListenEndpoint {
-    fn id() -> u32 {
-        Self::id()
-    }
-
-    fn name() -> &'static str {
-        Self::name()
-    }
-}
-
-
-
-
-#[derive(Debug, Clone, PartialEq, cbor2::Cbor)]
-#[cbor(array)]
 pub struct Max31855Event {
     pub thermocouple_temp: Option<f32>,// Thermocouple temperature in Celsius
     pub internal_temp: Option<f32>,// Internal temperature in Celsius
@@ -1090,7 +1198,7 @@ impl Msg for Max31855Event {
 #[cbor(array)]
 pub struct MotorEvent {
     pub enabled: Option<bool>,// Cutter enabled or disabled
-    pub rpm_actual: Option<i32>,// Current speed of the cutter in RPM
+    pub rpm_measured: Option<i32>,// Current speed of the cutter in RPM
     pub rpm_target: Option<i32>,// Commanded speed of the cutter in RPM
     pub pwm: Option<f32>,// PWM duty cycle for the cutter motor in percent
     pub current: Option<f32>,// Current drawn by the cutter in Amperes
@@ -1105,7 +1213,7 @@ impl Default for MotorEvent {
     fn default() -> Self {
         MotorEvent {
             enabled: None,
-            rpm_actual: None,
+            rpm_measured: None,
             rpm_target: None,
             pwm: None,
             current: None,
@@ -1207,6 +1315,9 @@ impl Msg for MotorReply {
 pub struct MotorRequest {
     pub enabled: Option<bool>,// Enable or disable the cutter
     pub rpm_target: Option<i32>,// Speed command for the cutter in RPM
+    pub Kp: Option<f32>,// Proportional gain for the cutter motor controller
+    pub Ki: Option<f32>,// Integral gain for the cutter motor controller
+    pub Kd: Option<f32>,// Derivative gain for the cutter motor controller
 }
 
 impl Default for MotorRequest {
@@ -1214,6 +1325,9 @@ impl Default for MotorRequest {
         MotorRequest {
             enabled: None,
             rpm_target: None,
+            Kp: None,
+            Ki: None,
+            Kd: None,
         }
     }
 }
@@ -1514,54 +1628,6 @@ impl Ps4Request {
 }
 
 impl Msg for Ps4Request {
-    fn id() -> u32 {
-        Self::id()
-    }
-
-    fn name() -> &'static str {
-        Self::name()
-    }
-}
-
-
-
-
-#[derive(Debug, Clone, PartialEq, cbor2::Cbor)]
-#[cbor(array)]
-pub struct RegisterEndpoint {
-    pub dst: Option<u32>,// Destination ID for the registration
-}
-
-impl Default for RegisterEndpoint {
-    fn default() -> Self {
-        RegisterEndpoint {
-            dst: None,
-        }
-    }
-}
-
-impl RegisterEndpoint {
-    pub const MSG_ID : u32 = 1736013937;
-    pub const MSG_NAME: &'static str = "RegisterEndpoint";
-
-    pub const fn id() -> u32 {
-        1736013937
-    }
-
-    pub fn name() -> &'static str {
-        "RegisterEndpoint"
-    }
-
-    pub fn from_bytes(data: &[u8]) -> anyhow::Result<Self> {
-        cbor2::from_reader(data).context("Failed to deserialize from CBOR")
-    }
-
-    pub fn to_bytes(&self) -> anyhow::Result<Vec<u8>> {
-        cbor2::to_vec(self).context("Failed to serialize to CBOR")
-    }
-}
-
-impl Msg for RegisterEndpoint {
     fn id() -> u32 {
         Self::id()
     }

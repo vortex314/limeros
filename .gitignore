@@ -19,3 +19,7 @@
 # MAVLink codegen virtualenv
 **/.venv-mavlink/
 
+# Motor dashboard telemetry captures
+**/motor-log.csv
+**/motor-log-*.csv
+
