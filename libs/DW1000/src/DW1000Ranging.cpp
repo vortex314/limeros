@@ -72,6 +72,7 @@ uint8_t   DW1000RangingClass::_SS;
 // watchdog and reset period
 uint32_t  DW1000RangingClass::_lastActivity;
 uint32_t  DW1000RangingClass::_resetPeriod;
+uint32_t  DW1000RangingClass::_irqRecoveries = 0;
 // reply times (same on both sides for symm. ranging)
 uint32_t  DW1000RangingClass::_replyDelayTimeUS;
 
@@ -135,6 +136,13 @@ void DW1000RangingClass::generalStart() {
 	// attach callback for (successfully) sent and received messages
 	DW1000.attachSentHandler(handleSent);
 	DW1000.attachReceivedHandler(handleReceived);
+	// RX errors (CRC/PHY header/Reed-Solomon/LDE) and RX timeouts are enabled
+	// in the interrupt mask. Without a handler DW1000::handleInterrupt() leaves
+	// those status bits latched and does not restart the receiver: the IRQ line
+	// stays high, no new rising edge arrives and the node is deaf until reset.
+	// With a handler attached, the status is cleared and RX restarts.
+	DW1000.attachReceiveFailedHandler(handleReceiveError);
+	DW1000.attachReceiveTimeoutHandler(handleReceiveError);
 	// anchor starts in receiving mode, awaiting a ranging poll message
 	
 	
@@ -388,6 +396,7 @@ int16_t DW1000RangingClass::detectMessageType(byte datas[]) {
 }
 
 void DW1000RangingClass::loop() {
+	checkStuckIrq();
 	//we check if needed to reset !
 	checkForReset();
 	uint32_t time = millis(); // TODO other name - too close to "timer"
@@ -729,6 +738,43 @@ void DW1000RangingClass::setRangeFilterValue(uint16_t newValue) {
 void IRAM_ATTR DW1000RangingClass::handleSent() {
 	// status change on sent success
 	_sentAck = true;
+}
+
+void IRAM_ATTR DW1000RangingClass::handleReceiveError() {
+	// nothing to do: DW1000::handleInterrupt() clears the RX status and, in
+	// permanent receive mode, restarts the receiver after calling us
+}
+
+void DW1000RangingClass::checkStuckIrq() {
+	// The IRQ pin is edge triggered. If an event is latched in SYS_STATUS that
+	// nobody clears, the line stays high and the node never hears anything
+	// again. Normally the ISR clears it within microseconds, so a line that is
+	// high for IRQ_STUCK_MS is stuck: service it here, and if that does not
+	// release it, clear everything and restart reception.
+	static uint32_t highSince = 0;
+	if(digitalRead(DW1000._irq) != HIGH) {
+		highSince = 0;
+		return;
+	}
+	uint32_t now = millis();
+	if(highSince == 0) {
+		highSince = now | 1;
+		return;
+	}
+	if(now - highSince < IRQ_STUCK_MS) {
+		return;
+	}
+	highSince = 0;
+	_irqRecoveries++;
+	noInterrupts();
+	DW1000.handleInterrupt();
+	interrupts();
+	if(digitalRead(DW1000._irq) == HIGH) {
+		DW1000.clearAllStatus();
+		_expectedMsgId = (_type == ANCHOR) ? POLL : POLL_ACK;
+		receiver();
+	}
+	noteActivity();
 }
 
 void IRAM_ATTR DW1000RangingClass::handleReceived() {

@@ -215,4 +215,7 @@ void loop() {
       proto.sendUwbAnchorEvent();
     }
   }
+  if (now - lastSysEventMs == 0 && DW1000Ranging.getIrqRecoveries()) {
+    Serial.printf("UWB: stuck IRQ recovered %lu times\n", (unsigned long)DW1000Ranging.getIrqRecoveries());
+  }
 }

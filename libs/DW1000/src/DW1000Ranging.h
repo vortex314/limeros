@@ -57,6 +57,9 @@
 //Default value
 //in ms
 #define DEFAULT_RESET_PERIOD 200
+// if the DW1000 IRQ line stays high this long, an event was left latched and
+// no new rising edge will ever arrive: service it from loop() instead
+#define IRQ_STUCK_MS 20
 //in us
 #define DEFAULT_REPLY_DELAY_TIME 15000
 // POLL carries each anchor's reply delay as uint16 in units of REPLY_TIME_UNIT_US
@@ -112,6 +115,8 @@ public:
 	static byte* getCurrentShortAddress() { return _currentShortAddress; };
 	
 	static uint8_t getNetworkDevicesNumber() { return _networkDevicesNumber; };
+	// how often loop() had to rescue a stuck DW1000 IRQ line (diagnostics)
+	static uint32_t getIrqRecoveries() { return _irqRecoveries; }
 	
 	//ranging functions
 	static int16_t detectMessageType(byte datas[]); // TODO check return type
@@ -172,6 +177,7 @@ private:
 	// watchdog and reset period
 	static uint32_t    _lastActivity;
 	static uint32_t    _resetPeriod;
+	static uint32_t    _irqRecoveries;
 	// reply times (same on both sides for symm. ranging)
 	static uint32_t     _replyDelayTimeUS;
 	//timer Tick delay
@@ -193,6 +199,8 @@ private:
 	//methods
 	static void handleSent();
 	static void handleReceived();
+	static void handleReceiveError();
+	static void checkStuckIrq();
 	static void noteActivity();
 	static void resetInactive();
 	
