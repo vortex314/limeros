@@ -60,6 +60,11 @@
 // if the DW1000 IRQ line stays high this long, an event was left latched and
 // no new rising edge will ever arrive: service it from loop() instead
 #define IRQ_STUCK_MS 20
+// No valid frame received for this long: the DW1000 is assumed deaf (receiver
+// wedged, or the chip reset itself and lost its configuration) and is
+// re-initialised. The tag blinks every ~1 s and polls each anchor several
+// times per second, so a healthy node never gets near this.
+#define RADIO_SILENCE_MS 5000
 //in us
 #define DEFAULT_REPLY_DELAY_TIME 15000
 // POLL carries each anchor's reply delay as uint16 in units of REPLY_TIME_UNIT_US
@@ -117,6 +122,8 @@ public:
 	static uint8_t getNetworkDevicesNumber() { return _networkDevicesNumber; };
 	// how often loop() had to rescue a stuck DW1000 IRQ line (diagnostics)
 	static uint32_t getIrqRecoveries() { return _irqRecoveries; }
+	// how often the radio was re-initialised after RADIO_SILENCE_MS of silence
+	static uint32_t getRadioReinits() { return _radioReinits; }
 	
 	//ranging functions
 	static int16_t detectMessageType(byte datas[]); // TODO check return type
@@ -178,6 +185,9 @@ private:
 	static uint32_t    _lastActivity;
 	static uint32_t    _resetPeriod;
 	static uint32_t    _irqRecoveries;
+	static uint32_t    _radioReinits;
+	static uint32_t    _lastRxMs;
+	static const byte* _mode;
 	// reply times (same on both sides for symm. ranging)
 	static uint32_t     _replyDelayTimeUS;
 	//timer Tick delay
@@ -201,6 +211,8 @@ private:
 	static void handleReceived();
 	static void handleReceiveError();
 	static void checkStuckIrq();
+	static void checkRadioSilence();
+	static void reinitRadio();
 	static void noteActivity();
 	static void resetInactive();
 	

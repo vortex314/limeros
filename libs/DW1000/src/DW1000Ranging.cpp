@@ -73,6 +73,9 @@ uint8_t   DW1000RangingClass::_SS;
 uint32_t  DW1000RangingClass::_lastActivity;
 uint32_t  DW1000RangingClass::_resetPeriod;
 uint32_t  DW1000RangingClass::_irqRecoveries = 0;
+uint32_t  DW1000RangingClass::_radioReinits = 0;
+uint32_t  DW1000RangingClass::_lastRxMs = 0;
+const byte* DW1000RangingClass::_mode = nullptr;
 // reply times (same on both sides for symm. ranging)
 uint32_t  DW1000RangingClass::_replyDelayTimeUS;
 
@@ -123,6 +126,7 @@ void DW1000RangingClass::initCommunication(uint8_t myRST, uint8_t mySS, uint8_t 
 
 void DW1000RangingClass::configureNetwork(uint16_t deviceAddress, uint16_t networkId, const byte mode[]) {
 	// general configuration
+	_mode = mode;
 	DW1000.newConfiguration();
 	DW1000.setDefaults();
 	DW1000.setDeviceAddress(deviceAddress);
@@ -179,6 +183,7 @@ void DW1000RangingClass::generalStart() {
 	receiver();
 	// for first time ranging frequency computation
 	_rangingCountPeriod = millis();
+	_lastRxMs = millis();
 }
 
 
@@ -397,6 +402,7 @@ int16_t DW1000RangingClass::detectMessageType(byte datas[]) {
 
 void DW1000RangingClass::loop() {
 	checkStuckIrq();
+	checkRadioSilence();
 	//we check if needed to reset !
 	checkForReset();
 	uint32_t time = millis(); // TODO other name - too close to "timer"
@@ -471,6 +477,7 @@ void DW1000RangingClass::loop() {
 	//check for new received message
 	if(_receivedAck) {
 		_receivedAck = false;
+		_lastRxMs = millis();  // any good frame: the radio is alive
 		
 		//we read the datas from the modules:
 		// get message and parse
@@ -741,8 +748,49 @@ void IRAM_ATTR DW1000RangingClass::handleSent() {
 }
 
 void IRAM_ATTR DW1000RangingClass::handleReceiveError() {
-	// nothing to do: DW1000::handleInterrupt() clears the RX status and, in
-	// permanent receive mode, restarts the receiver after calling us
+	// Reset the receiver after an RX error, like Decawave's dwt_rxreset():
+	// some errors leave the RX/LDE blocks in a state where later frames are
+	// not received. DW1000::handleInterrupt() then clears the RX status and,
+	// in permanent receive mode, restarts the receiver.
+	byte b = 0xE0;  // PMSC_CTRL0 SOFTRESET: RX reset asserted
+	DW1000.writeBytes(PMSC, PMSC_CTRL0_SUB + 3, &b, 1);
+	b = 0xF0;       // released
+	DW1000.writeBytes(PMSC, PMSC_CTRL0_SUB + 3, &b, 1);
+}
+
+void DW1000RangingClass::checkRadioSilence() {
+	if(_mode == nullptr || millis() - _lastRxMs < RADIO_SILENCE_MS) {
+		return;
+	}
+	reinitRadio();
+}
+
+void DW1000RangingClass::reinitRadio() {
+	// Log what the chip looks like before resetting it, to tell a wedged
+	// receiver (config intact) from a chip that reset itself (CHAN_CTRL and
+	// SYS_CFG back at power-on values) or a dead SPI link (DEV_ID not DECA0130).
+	byte devid[4], syscfg[4], chan[4], status[5];
+	DW1000.readBytes(DEV_ID, NO_SUB, devid, 4);
+	DW1000.readBytes(SYS_CFG, NO_SUB, syscfg, 4);
+	DW1000.readBytes(CHAN_CTRL, NO_SUB, chan, 4);
+	DW1000.readBytes(SYS_STATUS, NO_SUB, status, 5);
+	_radioReinits++;
+	Serial.printf("UWB: no frame for %lu ms, re-init #%lu  devid=%02X%02X%02X%02X syscfg=%02X%02X%02X%02X chan=%02X%02X%02X%02X status=%02X%02X%02X%02X%02X irq=%d\n",
+		(unsigned long)(millis() - _lastRxMs), (unsigned long)_radioReinits,
+		devid[3], devid[2], devid[1], devid[0], syscfg[3], syscfg[2], syscfg[1], syscfg[0],
+		chan[3], chan[2], chan[1], chan[0], status[4], status[3], status[2], status[1], status[0],
+		digitalRead(DW1000._irq));
+	// hard reset + full configuration, as at start-up; the antenna delay is
+	// kept in DW1000 and written again by commitConfiguration()
+	DW1000.select(_SS);
+	DW1000.setEUI(_currentAddress);
+	configureNetwork(_currentShortAddress[0]*256+_currentShortAddress[1], 0xDECA, _mode);
+	DW1000.clearAllStatus();
+	_sentAck = false;
+	_receivedAck = false;
+	_expectedMsgId = (_type == ANCHOR) ? POLL : POLL_ACK;
+	generalStart();  // re-attaches handlers, starts RX, resets _lastRxMs
+	noteActivity();
 }
 
 void DW1000RangingClass::checkStuckIrq() {
