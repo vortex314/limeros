@@ -348,6 +348,11 @@ void DW1000Class::enableMode(const byte mode[]) {
 	setDataRate(mode[0]);
 	setPulseFrequency(mode[1]);
 	setPreambleLength(mode[2]);
+	// The preamble code must match the PRF (user manual 10.5, table 61: codes
+	// 1-8 for 16 MHz, 9-24 for 64 MHz). setDefaults() picks it for its 16 MHz
+	// default mode, so without this a 64 MHz mode kept the 16 MHz code 4 (poor
+	// sensitivity, short range). Re-select it for the new PRF.
+	setChannel(_channel);
 }
 
 void DW1000Class::tune() {
