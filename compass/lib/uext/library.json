@@ -1,0 +1,7 @@
+{
+  "name": "uext",
+  "version": "1.0.0",
+  "description": "C++ interface for UEXT1/UEXT2 connectors (Olimex pinout) over Arduino Wire/SPI/Serial",
+  "frameworks": "arduino",
+  "platforms": ["espressif32"]
+}

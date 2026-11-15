@@ -1,0 +1,7 @@
+{
+  "name": "compass_sensors",
+  "version": "1.0.0",
+  "description": "HMC5883L magnetometer + MPU6050 IMU drivers and tilt-compensated compass fusion (Arduino)",
+  "frameworks": "arduino",
+  "platforms": ["espressif32"]
+}

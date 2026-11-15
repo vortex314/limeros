@@ -1,0 +1,7 @@
+{
+  "name": "compass_proto",
+  "version": "1.0.0",
+  "description": "Shared compass UDP transport over the limeros CBOR msgs.h envelope",
+  "frameworks": "arduino",
+  "platforms": ["espressif32"]
+}

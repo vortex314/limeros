@@ -1,0 +1,9 @@
+use the same logic as used in the dwm1000 tag to create a compass
+create the project in the compass folder
+the logic can be based on these sources /home/lieven/workspace/akkaEsp32 with the component DigitalCompass 
+the hmc5883 and mpu6050 are connected on uext1 of esp32 
+create compassEvent , IMUEVent after reading data from chips
+create a C++ interface for UEXT1 and UEXT2 
+the compass data shopuld combine with the IMU to make compass orientation tilt independent
+Use also Arduino
+ask if in doubt
