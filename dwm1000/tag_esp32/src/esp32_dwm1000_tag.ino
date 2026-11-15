@@ -94,8 +94,11 @@ unsigned long lastReportMs = 0;
 
 #define MAX_ANCHORS 6
 #define MIN_DISTANCE_M (-1.0f)
-#define MAX_DISTANCE_M (20.0f)
+#define MAX_DISTANCE_M (120.0f)  // field up to 100 m + margin; beyond = glitch
 #define JUMP_THRESHOLD_M (2.0f)
+// accept a 'jump' after this many consecutive rejections (the old value was
+// the outlier, or the tag really moved while the anchor was out of reach)
+#define JUMP_ACCEPT_COUNT 3
 #define STALE_TIMEOUT_MS 10000
 struct AnchorDist
 {
@@ -103,6 +106,7 @@ struct AnchorDist
   float distanceM;
   float rxPowerDbm;
   unsigned long lastRangeMs;
+  uint8_t rejected;  // consecutive jump-filter rejections
   bool valid;
 };
 AnchorDist anchors[MAX_ANCHORS];
@@ -152,10 +156,12 @@ void newRange()
     float delta = d - anchors[slot].distanceM;
     if (delta < 0)
       delta = -delta;
-    if (anchors[slot].valid && delta > JUMP_THRESHOLD_M)
+    if (anchors[slot].valid && delta > JUMP_THRESHOLD_M &&
+        ++anchors[slot].rejected < JUMP_ACCEPT_COUNT)
     {
       return; // keep the previous valid value
     }
+    anchors[slot].rejected = 0;
     anchors[slot].shortAddr = addr;
     anchors[slot].distanceM = d;
     anchors[slot].rxPowerDbm = rx;

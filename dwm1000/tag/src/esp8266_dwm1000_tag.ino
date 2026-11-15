@@ -92,13 +92,17 @@ unsigned long lastReportMs    = 0;
 // Reject obviously-bogus range readings (occasional ±100 m glitches from
 // timestamp errors / multipath). Adjust to your setup.
 #define MIN_DISTANCE_M (-1.0f)
-#define MAX_DISTANCE_M (20.0f)
+#define MAX_DISTANCE_M (120.0f)  // field up to 100 m + margin
 // Reject a reading that jumps more than this from the anchor's last valid value.
 #define JUMP_THRESHOLD_M (2.0f)
+// accept a 'jump' after this many consecutive rejections (the old value was
+// the outlier, or the tag really moved while the anchor was out of reach)
+#define JUMP_ACCEPT_COUNT 3
 struct AnchorDist {
   uint16_t shortAddr;
   float distanceM;
   float rxPowerDbm;
+  uint8_t rejected;  // consecutive jump-filter rejections
   bool valid;
 };
 AnchorDist anchors[MAX_ANCHORS];
@@ -134,9 +138,11 @@ void newRange() {
     // Jump filter: ignore a reading that deviates wildly from the last valid one.
     float delta = d - anchors[slot].distanceM;
     if (delta < 0) delta = -delta;
-    if (anchors[slot].valid && delta > JUMP_THRESHOLD_M) {
+    if (anchors[slot].valid && delta > JUMP_THRESHOLD_M &&
+        ++anchors[slot].rejected < JUMP_ACCEPT_COUNT) {
       return;  // keep the previous valid value
     }
+    anchors[slot].rejected = 0;
     anchors[slot].shortAddr = addr;
     anchors[slot].distanceM = d;
     anchors[slot].rxPowerDbm = rx;
