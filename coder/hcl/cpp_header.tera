@@ -30,6 +30,17 @@
 extern std::unordered_map<uint32_t, const char*> id_to_name;
 const char *id_to_string(uint32_t msg_id);
 
+// ── Enums ─────────────────────────────────────────────────────────────────
+
+{% for e in enums %}
+typedef enum {{ e.name }} {
+{%- for v in e.variants %}
+    {{ v.name }} = {{ v.value }},
+{%- endfor %}
+} {{ e.name }};
+
+{% endfor %}
+
 // ── Messages ───────────────────────────────────────────────────────────────
 
 {% for msg in messages %}

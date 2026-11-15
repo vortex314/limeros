@@ -143,7 +143,7 @@ void setup() {
   DW1000Ranging.attachNewRange(newRange);
   DW1000Ranging.attachNewDevice(newBlink);
   DW1000Ranging.attachInactiveDevice(inactiveDevice);
-  DW1000.setAntennaDelay(16422);
+  DW1000.setAntennaDelay(16456);
   DW1000Ranging.startAsAnchor(ANCHOR_ADDR, DW1000.MODE_LONGDATA_RANGE_ACCURACY, false);
   Serial.println("Anchor started and listening for ranging tags...");
 }

@@ -155,7 +155,7 @@ void setup() {
   DW1000Ranging.attachInactiveDevice(inactiveDevice);
 
   // Antenna delay calibration
-  DW1000.setAntennaDelay(16422);  // calibrated: 16436 read ~-13cm, 16381 read ~+37cm @10cm
+  DW1000.setAntennaDelay(16456);  // reads ~1.82m at 1.75m (was 16422 @10cm)
 
   // Start as Anchor in high-accuracy mode
   DW1000Ranging.startAsAnchor(ANCHOR_ADDR, DW1000.MODE_LONGDATA_RANGE_ACCURACY, false);

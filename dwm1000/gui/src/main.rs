@@ -346,6 +346,16 @@ impl eframe::App for UwbApp {
             self.handle(ev);
         }
 
+        // Keep repainting even without mouse input so live data stays fresh.
+        ctx.request_repaint_after(std::time::Duration::from_secs(1));
+
+        // Drop ranging entries that haven't refreshed recently (stale anchors).
+        let prune_now = Instant::now();
+        self.ranges.retain(|_, anchors| {
+            anchors.retain(|_, r| prune_now.duration_since(r.last_seen) < std::time::Duration::from_secs(5));
+            !anchors.is_empty()
+        });
+
         egui::TopBottomPanel::top("status").show(ctx, |ui| {
             ui.add_space(4.0);
             ui.horizontal(|ui| {

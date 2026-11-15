@@ -13,6 +13,19 @@ struct DeviceRequest {
     device_name: Option<String>, // Device Name
 }
 
+enum LogLevel {
+    Debug=0,
+    INFO,
+    WARN,
+    ERROR,
+} 
+
+
+struct LogEvent {
+    message : String,
+    level :  LogLevel,
+}
+
 struct DW1000TagEvent {
     uwb_mac_address: Option<Vec<u8>>, // UWB Mac Address of Tag
     anchor: Option<u16>,              // Short address of anchor

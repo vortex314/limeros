@@ -57,6 +57,18 @@ pub fn opt_id_to_string(msg_id: Option<u32>) -> String {
     }
 }
 
+{% for e in enums %}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[repr(i32)]
+pub enum {{ e.name }} {
+{%- for v in e.variants %}
+    {{ v.name }} = {{ v.value }},
+{%- endfor %}
+}
+
+{% endfor %}
+
 {% for msg in messages %}
 
 

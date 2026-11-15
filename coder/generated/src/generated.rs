@@ -1,7 +1,7 @@
 // Auto-generated from robot.hcl — do not edit by hand.
 // Every field is `Option<T>`.
 // Messages are encoded as CBOR maps keyed by field id.
-// Generated on 2026-11-13 21:32:59 with template rust.tera
+// Generated on 2026-11-14 22:24:22 with template rust.tera
 
 use anyhow::Context;
 
@@ -73,6 +73,7 @@ lazy_static! {
         m.insert(2095960949, "HoverboardReply".to_string());
         m.insert(2735870956, "HoverboardRequest".to_string());
         m.insert(1802836182, "ImuEvent".to_string());
+        m.insert(1963762699, "LogEvent".to_string());
         m.insert(2831607083, "Max31855Event".to_string());
         m.insert(2506002638, "MotorEvent".to_string());
         m.insert(1863653678, "MotorReply".to_string());
@@ -122,6 +123,19 @@ pub fn opt_id_to_string(msg_id: Option<u32>) -> String {
         None => "None".to_string(),
     }
 }
+
+
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[repr(i32)]
+pub enum LogLevel {
+    Debug = 0,
+    INFO = 1,
+    WARN = 2,
+    ERROR = 3,
+}
+
+
 
 
 
@@ -1124,6 +1138,56 @@ impl ImuEvent {
 }
 
 impl Msg for ImuEvent {
+    fn id() -> u32 {
+        Self::id()
+    }
+
+    fn name() -> &'static str {
+        Self::name()
+    }
+}
+
+
+
+
+#[derive(Debug, Clone, PartialEq, cbor2::Cbor)]
+#[cbor(array)]
+pub struct LogEvent {
+    pub message: Option<String>,
+    pub level: Option<LogLevel>,
+}
+
+impl Default for LogEvent {
+    fn default() -> Self {
+        LogEvent {
+            message: None,
+            level: None,
+        }
+    }
+}
+
+impl LogEvent {
+    pub const MSG_ID : u32 = 1963762699;
+    pub const MSG_NAME: &'static str = "LogEvent";
+
+    pub const fn id() -> u32 {
+        1963762699
+    }
+
+    pub fn name() -> &'static str {
+        "LogEvent"
+    }
+
+    pub fn from_bytes(data: &[u8]) -> anyhow::Result<Self> {
+        cbor2::from_reader(data).context("Failed to deserialize from CBOR")
+    }
+
+    pub fn to_bytes(&self) -> anyhow::Result<Vec<u8>> {
+        cbor2::to_vec(self).context("Failed to serialize to CBOR")
+    }
+}
+
+impl Msg for LogEvent {
     fn id() -> u32 {
         Self::id()
     }

@@ -3,7 +3,7 @@
 // Every field is `Option<T>`; missing fields are omitted from encoded CBOR.
 // Messages are encoded as CBOR maps keyed by field id.
 // Uses TinyCBOR for CBOR encoding/decoding.
-// Generated on 2026-11-13 21:32:59 with template arduino_header.tera
+// Generated on 2026-11-14 22:24:22 with template arduino_header.tera
 
 #ifndef HCL_CPP_TERA
 #define HCL_CPP_TERA
@@ -28,6 +28,18 @@
 
 extern std::unordered_map<uint32_t, const char*> id_to_name;
 const char *id_to_string(uint32_t msg_id);
+
+// ── Enums ─────────────────────────────────────────────────────────────────
+
+
+typedef enum LogLevel {
+    Debug = 0,
+    INFO = 1,
+    WARN = 2,
+    ERROR = 3,
+} LogLevel;
+
+
 
 // ── Messages ───────────────────────────────────────────────────────────────
 
@@ -393,6 +405,23 @@ public:
     Option<float> accel_x;// Accelerometer X axis in m/s^2
     Option<float> accel_y;// Accelerometer Y axis in m/s^2
     Option<float> accel_z;// Accelerometer Z axis in m/s^2
+
+    int encode(Buffer& buffer) const;
+    int decode(Buffer& buffer);
+};
+
+
+
+class LogEvent : public Msg {
+public:
+
+    static const uint32_t MSG_ID = FNV("LogEvent");
+    static constexpr const char *MSG_NAME ="LogEvent";
+
+    virtual uint32_t msg_id() const { return MSG_ID; };
+    virtual const char *msg_name() const { return MSG_NAME; };
+    Option<std::string> message;
+    Option<int32_t> level;
 
     int encode(Buffer& buffer) const;
     int decode(Buffer& buffer);

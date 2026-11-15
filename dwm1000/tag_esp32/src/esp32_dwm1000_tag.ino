@@ -96,11 +96,13 @@ unsigned long lastReportMs = 0;
 #define MIN_DISTANCE_M (-1.0f)
 #define MAX_DISTANCE_M (20.0f)
 #define JUMP_THRESHOLD_M (2.0f)
+#define STALE_TIMEOUT_MS 10000
 struct AnchorDist
 {
   uint16_t shortAddr;
   float distanceM;
   float rxPowerDbm;
+  unsigned long lastRangeMs;
   bool valid;
 };
 AnchorDist anchors[MAX_ANCHORS];
@@ -146,6 +148,7 @@ void newRange()
   }
   if (slot >= 0)
   {
+    anchors[slot].lastRangeMs = millis(); // fresh range received (regardless of jump filter)
     float delta = d - anchors[slot].distanceM;
     if (delta < 0)
       delta = -delta;
@@ -251,7 +254,7 @@ void setup()
   DW1000Ranging.attachInactiveDevice(inactiveDevice);
 
   // Antenna delay calibration (tune per hardware board)
-  DW1000.setAntennaDelay(16422); // calibrated: 16436 read ~-13cm, 16381 read ~+37cm @10cm
+  DW1000.setAntennaDelay(16456); // reads ~1.82m at 1.75m (was 16422 @10cm)
 
   // Start ranging as Tag (Initiator) in high-accuracy long-data mode
   DW1000Ranging.startAsTag(TAG_ADDR, DW1000.MODE_LONGDATA_RANGE_ACCURACY, false);
@@ -305,7 +308,7 @@ void loop()
       lastReportMs = now;
       for (uint8_t i = 0; i < MAX_ANCHORS; i++)
       {
-        if (anchors[i].valid)
+        if (anchors[i].valid && (now - anchors[i].lastRangeMs < STALE_TIMEOUT_MS))
         {
           uint8_t as[2] = {
               (uint8_t)(anchors[i].shortAddr >> 8),

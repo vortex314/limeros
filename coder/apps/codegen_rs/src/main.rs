@@ -20,6 +20,7 @@ use chrono::Local;
 use clap::Parser;
 use common::{fnv1a_32, load_robot_config, RobotConfig, SubscribeConfig};
 use serde::Serialize;
+use std::collections::HashSet;
 use std::fs;
 use std::path::Path;
 use tera::{Context as TeraContext, Tera};
@@ -59,6 +60,7 @@ struct TemplateCtx {
     build_date: String,
     robot: RobotCtx,
     messages: Vec<MessageCtx>,
+    enums: Vec<EnumCtx>,
     endpoints: Vec<EndpointCtx>,
 }
 
@@ -107,6 +109,18 @@ struct FieldCtx {
     index: usize,
 }
 
+#[derive(Serialize)]
+struct EnumCtx {
+    name: String,
+    variants: Vec<EnumVariantCtx>,
+}
+
+#[derive(Serialize)]
+struct EnumVariantCtx {
+    name: String,
+    value: i32,
+}
+
 // ── robot.rs parser ────────────────────────────────────────────────────────
 
 /// A message struct parsed from `robot.rs`.
@@ -124,13 +138,28 @@ struct RsField {
     description: String,
 }
 
+/// An enum parsed from `robot.rs`.
+struct RsEnum {
+    name: String,
+    variants: Vec<RsVariant>,
+}
+
+/// A single enum variant with its resolved integer value.
+struct RsVariant {
+    name: String,
+    value: i32,
+}
+
 /// Parse `robot.rs` source into message structs.
 ///
 /// Assumes the hand-written layout: `struct Name {` on its own line, one field
 /// per line, closing `}` on its own line.
-fn parse_robot_rs(src: &str) -> Vec<RsMessage> {
+fn parse_robot_rs(src: &str) -> (Vec<RsMessage>, Vec<RsEnum>) {
     let mut messages = Vec::new();
-    let mut current: Option<RsMessage> = None;
+    let mut enums = Vec::new();
+    let mut current_msg: Option<RsMessage> = None;
+    let mut current_enum: Option<RsEnum> = None;
+    let mut next_variant_value: i32 = 0;
 
     for line in src.lines() {
         let trimmed = line.trim();
@@ -139,10 +168,20 @@ fn parse_robot_rs(src: &str) -> Vec<RsMessage> {
             continue;
         }
 
+        // Closing brace terminates whichever block is open.
+        if trimmed.starts_with('}') {
+            if let Some(msg) = current_msg.take() {
+                messages.push(msg);
+            } else if let Some(e) = current_enum.take() {
+                enums.push(e);
+            }
+            continue;
+        }
+
         if let Some(rest) = trimmed.strip_prefix("struct ") {
             let name = rest.split('{').next().unwrap_or("").trim().to_string();
             if !name.is_empty() {
-                current = Some(RsMessage {
+                current_msg = Some(RsMessage {
                     name,
                     fields: Vec::new(),
                 });
@@ -150,24 +189,41 @@ fn parse_robot_rs(src: &str) -> Vec<RsMessage> {
             continue;
         }
 
-        if trimmed.starts_with('}') {
-            if let Some(msg) = current.take() {
-                messages.push(msg);
+        if let Some(rest) = trimmed.strip_prefix("enum ") {
+            let name = rest.split('{').next().unwrap_or("").trim().to_string();
+            if !name.is_empty() {
+                current_enum = Some(RsEnum {
+                    name,
+                    variants: Vec::new(),
+                });
+                next_variant_value = 0;
             }
             continue;
         }
 
-        if let Some(msg) = current.as_mut() {
+        if let Some(msg) = current_msg.as_mut() {
             if let Some(field) = parse_field(trimmed) {
                 msg.fields.push(field);
+            }
+            continue;
+        }
+
+        if let Some(e) = current_enum.as_mut() {
+            if let Some(variant) = parse_variant(trimmed, next_variant_value) {
+                next_variant_value = variant.value + 1;
+                e.variants.push(variant);
             }
         }
     }
 
-    if let Some(msg) = current.take() {
+    if let Some(msg) = current_msg.take() {
         messages.push(msg);
     }
-    messages
+    if let Some(e) = current_enum.take() {
+        enums.push(e);
+    }
+
+    (messages, enums)
 }
 
 /// Parse a single `name: Type, // comment` field line.
@@ -195,6 +251,27 @@ fn parse_field(line: &str) -> Option<RsField> {
     })
 }
 
+/// Parse a single enum variant line: `Name` or `Name=value` (trailing comma
+/// and `//` comment stripped). A variant without an explicit value continues
+/// the previous value + 1.
+fn parse_variant(line: &str, implicit_value: i32) -> Option<RsVariant> {
+    let decl = line.trim().split_once("//").map(|(d, _)| d).unwrap_or(line);
+    let decl = decl.trim().trim_end_matches(',').trim();
+    if decl.is_empty() {
+        return None;
+    }
+
+    let (name, value) = match decl.split_once('=') {
+        Some((n, v)) => (n.trim().to_string(), v.trim().parse::<i32>().ok()?),
+        None => (decl.to_string(), implicit_value),
+    };
+    if name.is_empty() {
+        return None;
+    }
+
+    Some(RsVariant { name, value })
+}
+
 // ── Type mapping ───────────────────────────────────────────────────────────
 
 /// The templates wrap every field in `Option<T>` themselves, so return the
@@ -207,14 +284,19 @@ fn inner_rust_type(ty: &str) -> String {
 }
 
 /// Map an inner Rust type to the C++ type used by the cpp templates.
-fn rust_to_cpp(rust: &str) -> anyhow::Result<String> {
+fn rust_to_cpp(rust: &str, enum_names: &HashSet<String>) -> anyhow::Result<String> {
     if let Some(inner) = rust.strip_prefix("Vec<").and_then(|s| s.strip_suffix('>')) {
-        return Ok(format!("std::vector<{}>", rust_scalar_to_cpp(inner)?));
+        return Ok(format!("std::vector<{}>", rust_scalar_to_cpp(inner, enum_names)?));
     }
-    rust_scalar_to_cpp(rust)
+    rust_scalar_to_cpp(rust, enum_names)
 }
 
-fn rust_scalar_to_cpp(rust: &str) -> anyhow::Result<String> {
+fn rust_scalar_to_cpp(rust: &str, enum_names: &HashSet<String>) -> anyhow::Result<String> {
+    // Named enums are transmitted as CBOR integers. The Rust side keeps the
+    // type-safe enum name, but the C++ wire type is int32_t.
+    if enum_names.contains(rust) {
+        return Ok("int32_t".to_string());
+    }
     let cpp = match rust {
         "bool" => "bool",
         "i8" => "int8_t",
@@ -237,7 +319,7 @@ fn rust_scalar_to_cpp(rust: &str) -> anyhow::Result<String> {
 
 // ── Context building ───────────────────────────────────────────────────────
 
-fn build_message_ctx(msg: RsMessage) -> anyhow::Result<MessageCtx> {
+fn build_message_ctx(msg: RsMessage, enum_names: &HashSet<String>) -> anyhow::Result<MessageCtx> {
     let id = fnv1a_32(&msg.name);
     let fields = msg
         .fields
@@ -245,7 +327,7 @@ fn build_message_ctx(msg: RsMessage) -> anyhow::Result<MessageCtx> {
         .enumerate()
         .map(|(i, f)| {
             let rust_type = inner_rust_type(&f.rust_type);
-            let cpp_type = rust_to_cpp(&rust_type)?;
+            let cpp_type = rust_to_cpp(&rust_type, enum_names)?;
             Ok(FieldCtx {
                 name: f.name,
                 id: i as u32,
@@ -264,21 +346,42 @@ fn build_message_ctx(msg: RsMessage) -> anyhow::Result<MessageCtx> {
     })
 }
 
+fn enum_to_ctx(e: RsEnum) -> EnumCtx {
+    EnumCtx {
+        name: e.name,
+        variants: e
+            .variants
+            .into_iter()
+            .map(|v| EnumVariantCtx {
+                name: v.name,
+                value: v.value,
+            })
+            .collect(),
+    }
+}
+
 fn build_template_context(
     rs_messages: Vec<RsMessage>,
+    rs_enums: Vec<RsEnum>,
     robot: RobotCtx,
     endpoints: Vec<EndpointCtx>,
 ) -> anyhow::Result<TeraContext> {
+    let enum_names: HashSet<String> = rs_enums.iter().map(|e| e.name.clone()).collect();
+
     let mut messages = rs_messages
         .into_iter()
-        .map(build_message_ctx)
+        .map(|m| build_message_ctx(m, &enum_names))
         .collect::<anyhow::Result<Vec<_>>>()?;
     messages.sort_by(|a, b| a.name.cmp(&b.name));
+
+    let mut enums = rs_enums.into_iter().map(enum_to_ctx).collect::<Vec<_>>();
+    enums.sort_by(|a, b| a.name.cmp(&b.name));
 
     let template_ctx = TemplateCtx {
         build_date: Local::now().format("%Y-%m-%d %H:%M:%S").to_string(),
         robot,
         messages,
+        enums,
         endpoints,
     };
     Ok(TeraContext::from_serialize(&template_ctx)?)
@@ -374,14 +477,19 @@ fn main() -> anyhow::Result<()> {
     // 1. Parse robot.rs for message definitions.
     let rs_src = fs::read_to_string(&args.input)
         .with_context(|| format!("failed to read {}", args.input))?;
-    let rs_messages = parse_robot_rs(&rs_src);
+    let (rs_messages, rs_enums) = parse_robot_rs(&rs_src);
     if rs_messages.is_empty() {
         anyhow::bail!(
             "no message structs found in {} — expected a robot.rs file with `struct` definitions, not an HCL file",
             args.input
         );
     }
-    eprintln!("parsed {} messages from {}", rs_messages.len(), args.input);
+    eprintln!(
+        "parsed {} messages and {} enums from {}",
+        rs_messages.len(),
+        rs_enums.len(),
+        args.input
+    );
 
     // 2. Load robot.hcl for endpoint + robot config (best effort).
     let (robot, endpoints) = match load_robot_config(&args.config) {
@@ -393,7 +501,7 @@ fn main() -> anyhow::Result<()> {
     };
 
     // 3. Build template context.
-    let tera_context = build_template_context(rs_messages, robot, endpoints)?;
+    let tera_context = build_template_context(rs_messages, rs_enums, robot, endpoints)?;
 
     // 4. Render each template → output pair.
     let tera = Tera::new(&format!("{}/{}", &args.template_dir, "*.tera"))

@@ -2,7 +2,7 @@
 // Source file — method implementations for generated messages.
 // Messages are encoded as CBOR maps keyed by field id.
 // Uses TinyCBOR for CBOR encoding/decoding.
-// Generated on 2026-11-13 21:32:59 with template arduino_source.tera
+// Generated on 2026-11-14 22:24:22 with template arduino_source.tera
 
 #include "msgs.h"
 #include "cbor_codec.h"
@@ -28,6 +28,7 @@ std::unordered_map<uint32_t, const char*> id_to_name = {
     { 2095960949, "HoverboardReply" },
     { 2735870956, "HoverboardRequest" },
     { 1802836182, "ImuEvent" },
+    { 1963762699, "LogEvent" },
     { 2831607083, "Max31855Event" },
     { 2506002638, "MotorEvent" },
     { 1863653678, "MotorReply" },
@@ -508,6 +509,23 @@ int ImuEvent::decode(Buffer& buffer) {
     .read(accel_x)
     .read(accel_y)
     .read(accel_z)
+    .err();
+}
+
+
+
+int LogEvent::encode(Buffer& buffer) const {
+    return CborEncoder(buffer)
+    .beginArray(2)
+    .write(message)
+    .write(level).err();
+}
+
+int LogEvent::decode(Buffer& buffer) {
+    return CborDecoder(buffer)
+    .beginArray(2)
+    .read(message)
+    .read(level)
     .err();
 }
 
