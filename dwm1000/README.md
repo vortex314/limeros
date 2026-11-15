@@ -269,6 +269,20 @@ cd anchor && pio run -e anchor2 -t upload --upload-port /dev/ttyUSB2
 # ... anchor3..anchor5; `pio run` in anchor/ builds all of them
 ```
 
+To flash every connected board without working out which `/dev/ttyUSBn` is
+which, use `./flash_by_mac.py`. It reads each port's ESP chip MAC (one reset
+per board), looks it up in the `custom_mac` of the envs in
+`anchor/platformio.ini` and `tag_esp32/platformio.ini`, and uploads the matching
+env. A port whose MAC is unknown (or an env found on two ports) is refused.
+
+```bash
+./flash_by_mac.py --dry-run         # show port -> MAC -> env, flash nothing
+./flash_by_mac.py                   # flash all recognised boards
+./flash_by_mac.py anchor2 esp32_tag # only these envs
+```
+
+A new board: run `--dry-run`, copy its MAC into `custom_mac` of its env.
+
 PlatformIO Core 6.x is used — the system `pio` 4.x from apt is broken under
 Python 3.12. Use `~/.platformio/penv/bin/pio` (add it to `PATH`).
 
