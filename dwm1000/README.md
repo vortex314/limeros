@@ -48,15 +48,18 @@ Independent PlatformIO projects:
   `82:17:5B:D5:A9:9A:E2:<0x9B+N>` (anchor1 = `…:9C`, anchor5 = `…:A0`)
 - `gui/`       — Rust UDP server + egui dashboard (the central server)
 
-Each project has its own `platformio.ini`, `src/` sketch and a vendored
-`lib/DW1000`.
+Each project has its own `platformio.ini` and `src/` sketch. `anchor/` and
+`tag_esp32/` share the patched DW1000 library in `../libs/DW1000` (found via
+`lib_extra_dirs = ../../libs`); `tag/` still pulls the
+`vortex314/arduino-dw1000#all-fixes` fork via `lib_deps`, which does not have the
+multi-anchor fixes (Patch 7) yet.
 
 ## DWM1000 library — IMPORTANT
 
 The project uses [thotro/arduino-dw1000](https://github.com/thotro/arduino-dw1000),
-but it is **vendored** (copied into `lib/DW1000` in each project) rather than
-pulled from `lib_deps`, because the stock library needs three patches to run on
-the ESP8266. The patched copy is already in place — you do **not** need to
+but a patched copy lives in **`../libs/DW1000`** (one copy, tracked in git)
+rather than being pulled from `lib_deps`, because the stock library needs several
+patches to run on the ESP8266/ESP32 and to range with more than two anchors. The patched copy is already in place — you do **not** need to
 re-apply the patches to rebuild. They are documented here so the library can be
 reproduced from a clean clone.
 
@@ -99,23 +102,15 @@ SPI reads from interrupt context hang the ESP8266. Hard-reset the chip first:
  	// attach interrupt
 ```
 
-### Patch 4 — random backoff on the blink reply (`DW1000Ranging.cpp`)
+### Patch 4 — slotted blink reply (`DW1000Ranging.cpp`)
 
-All anchors answer the tag's discovery blink immediately, so their replies
-collide in the air and some anchors never get discovered. Add a random delay
-before replying:
-
-```diff
- 			if(addNetworkDevices(&myTag)) {
- 				if(_handleBlinkDevice != 0) {
- 					(*_handleBlinkDevice)(&myTag);
- 				}
-+				delay(random(0, 50));  // random backoff so anchors don't collide on the blink reply
- 				//we reply by the transmit ranging init message
- 				transmitRangingInit(&myTag);
- 				noteActivity();
- 			}
-```
+All anchors answer the tag's discovery blink at the same time, so their
+RANGING_INIT replies collide and the weakest anchor never gets discovered.
+Each anchor now answers **every** blink (also when it still thinks it knows the
+tag — the tag may have dropped it) with a *delayed TX* in one of
+`BLINK_REPLY_SLOTS` (16) random 4 ms slots, starting `BLINK_REPLY_BASE_US`
+(2 ms) after the blink. No blocking `delay()` in the loop; a lost reply is
+retried at the next blink (~every 6 s).
 
 ### Patch 5 — fixed short address (`DW1000Ranging.cpp`)
 
@@ -146,15 +141,13 @@ DW1000Ranging.startAsTag(TAG_ADDR, DW1000.MODE_LONGDATA_RANGE_ACCURACY, false);
 `tag_esp32/` needs two extra ESP32-specific changes on top of Patches 1-5:
 
 1. Custom SPI pins — the ESP32 uses SCK=17, MISO=34, MOSI=23, not the default
-   VSPI pins:
+   VSPI pins. The library calls `SPI.begin(DW1000_SPI_SCK, DW1000_SPI_MISO,
+   DW1000_SPI_MOSI)` when those are defined, so `tag_esp32/platformio.ini` sets:
 
-```diff
--	SPI.begin();
-+	#ifdef ESP32
-+		SPI.begin(17, 34, 23);  // SCK, MISO, MOSI (custom ESP32 pins)
-+	#else
-+		SPI.begin();
-+	#endif
+```ini
+    -DDW1000_SPI_SCK=17
+    -DDW1000_SPI_MISO=34
+    -DDW1000_SPI_MOSI=23
 ```
 
 2. `SPI.usingInterrupt()` does not exist on ESP32 — delete that call.
@@ -187,6 +180,33 @@ build_flags = -DCONFIG_DISABLE_HAL_LOCKS
    `_fastSPI` to `SPISettings(8000000L, MSBFIRST, SPI_MODE0)`. This gives a
    clean `DECA` device-ID read.
 
+### Patch 7 — multi-anchor ranging (`DW1000Ranging.*`, `DW1000Device.h`)
+
+With 3+ anchors the stock protocol kept dropping anchors (the tag's list
+oscillated between 2 and 4). Fixes — tag and anchors must run the same version:
+
+- **Reply-slot overflow.** The POLL gave anchor *i* a reply delay of
+  `(2i+1)*15000 us` in a `uint16_t`, which wraps from the 3rd anchor on
+  (75000 → 9464 us), so the "last" anchor replied first and the tag sent RANGE
+  before the others answered. Slots are now `(i+1)*DEFAULT_REPLY_DELAY_TIME`
+  (15, 30, 45 … ms), sent on the wire in `REPLY_TIME_UNIT_US` (10 us) units and
+  held as `uint32_t`.
+- **RANGE frame overflow.** RANGE needs `9 + 2 + 17*N` bytes but `LEN_DATA` was
+  90 (N=5 → 96: buffer overrun, truncated frame). `LEN_DATA` is now 120,
+  `MAX_DEVICES` 6, guarded by `static_assert`s.
+- **Variable frame length.** Every frame used to be sent as `LEN_DATA` bytes
+  (~10 ms air time); each is now sent with its real length (POLL_ACK ~3.5 ms).
+- **RANGE deadline.** The tag only sent RANGE after the *last* device's
+  POLL_ACK, so one lost ack cancelled the round for every anchor. If it has not
+  arrived by the end of the last reply slot (+10 ms), RANGE goes out to the
+  anchors that did answer.
+- **Activity.** Any frame from a known anchor (also a late POLL_ACK) counts as
+  activity, and `INACTIVITY_TIME` is 3000 ms (was 1000) on both sides.
+- **Debug.** Build the tag with `-DDW1000_CYCLE_DEBUG` to print one line per
+  ranging cycle, e.g. `CYC n=5 range=1 9DE2:AR 9CE2:-- …` (`A` = POLL_ACK
+  received, `R` = RANGE_REPORT received):
+  `PLATFORMIO_BUILD_FLAGS=-DDW1000_CYCLE_DEBUG pio run -t upload`
+
 ### Build flag (`platformio.ini`)
 
 The ESP8266 Arduino core compiles with `-Werror=return-type`, but the library's
@@ -197,15 +217,16 @@ without a return. Downgrade that one warning (present in every `platformio.ini`)
 build_unflags = -Werror=return-type
 ```
 
-### Reproducing the vendored library from a clean clone
+### Reproducing the patched library from a clean clone
+
+The patched library is tracked in git at `../libs/DW1000`; to rebuild it from
+upstream:
 
 ```bash
 git clone --depth 1 https://github.com/thotro/arduino-dw1000.git DW1000
-# apply Patches 1-5 (and Patch 6 for the ESP32 project)
+# apply Patches 1-7
 rm -rf DW1000/.git
-cp -r DW1000 tag/lib/
-cp -r DW1000 anchor/lib/
-cp -r DW1000 tag_esp32/lib/
+cp -r DW1000 ../libs/
 ```
 
 ## Antenna delay calibration
