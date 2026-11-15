@@ -193,6 +193,7 @@ void setupWiFi()
   WiFi.mode(WIFI_STA);
   Serial.println("WiFi: begin");
   WiFi.begin(WIFI_SSID, WIFI_PASS);
+  WiFi.setSleep(false);
   Serial.println("WiFi: waiting");
 
   int attempts = 0;
