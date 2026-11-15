@@ -307,22 +307,25 @@ pio run -t upload --upload-port uwb-tag2.local
 
 ## UDP protocol
 
-Devices speak a protobuf-over-UDP protocol (see `msgs.proto` and `protocol.md`).
-Every message is an `Envelope { src, dst, msg_type, payload }` where `src` is the
-FNV-1a 32-bit hash of the device name and `msg_type` selects the payload layout:
+Devices speak a CBOR-over-UDP protocol. Message types and their layouts are
+generated from `../coder/hcl/robot.hcl` into `libs/protocol/src/msgs.{h,cpp}`
+(C++, TinyCBOR) and `coder/generated/src/generated.rs` (Rust, cbor2). Every
+datagram is an `Envelope { src, dst, msg_type, sequence, instance_id, payload }`
+serialized as a positional CBOR array (absent fields are `null`). `src` is the
+FNV-1a 32-bit hash of the device name, and `msg_type` is the FNV-1a 32-bit hash
+of the message name, which selects the payload layout:
 
-- `1 ANNOUNCE` — every 5 s, multicast to `239.0.0.23:50000` *and* unicast to the
-  server; carries device name, capabilities, IP and UDP port.
-- `2 SET_BROKER` — an incoming message that switches a device's server address.
-- `3 SYS_EVENT` — every 30 s: uptime, WiFi MAC/IP and RSSI.
-- `4 UWB_ANCHOR_EVENT` — on boot and every 30 s: the anchor's 8-byte EUI.
-- `5 UWB_TAG_EVENT` — 4 Hz per anchor: the tag's EUI, the anchor short address,
+- `DeviceEvent` (announce) — every 5 s, multicast to `239.0.0.23:50000` *and*
+  unicast to the server; carries the device name and its supported message types.
+- `DeviceRequest` (set-broker) — an incoming message that switches a device's
+  server address.
+- `SysEvent` — every 30 s: uptime.
+- `DW1000AnchorEvent` — on boot and every 30 s: the anchor's 8-byte EUI.
+- `DW1000TagEvent` — 4 Hz per anchor: the tag's EUI, the anchor short address,
   distance and RX power.
 
-The firmware encoder/decoder lives in the shared `uwb_proto/uwb_proto.h`
-(copied into each project's `src/`), and the matching decoder lives in
-`gui/src/main.rs`. Field numbers were re-based to 1 (protobuf forbids 0) and
-`wifi_rssi` is `int32` so negative dBm round-trips.
+The firmware encoder/decoder lives in the shared `uwb_proto/uwb_proto.h` (found
+via `lib_extra_dirs`), and the matching decoder lives in `gui/src/main.rs`.
 
 ## Dashboard
 
