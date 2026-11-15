@@ -39,14 +39,13 @@ See `esp32_pinout_uext.md` for the wiring used by `tag_esp32/`:
 
 ## Layout
 
-Six independent PlatformIO projects, one per board:
+Independent PlatformIO projects:
 
 - `tag/`       — ESP8266 initiator, reports UWB tag events over UDP
 - `tag_esp32/` — ESP32 initiator, reports UWB tag events over UDP
-- `anchor/`    — responder 1, UWB address `82:17:5B:D5:A9:9A:E2:9C`
-- `anchor2/`   — responder 2, UWB address `82:17:5B:D5:A9:9A:E2:9D`
-- `anchor3/`   — responder 3, UWB address `82:17:5B:D5:A9:9A:E2:9E`
-- `anchor4/`   — responder 4, UWB address `82:17:5B:D5:A9:9A:E2:9F`
+- `anchor/`    — all responders, one PlatformIO env per anchor (`anchor1`..`anchor5`).
+  `ANCHOR_ID` N gives name `uwb_anchor_N`, OTA host `uwb-anchorN` and UWB address
+  `82:17:5B:D5:A9:9A:E2:<0x9B+N>` (anchor1 = `…:9C`, anchor5 = `…:A0`)
 - `gui/`       — Rust UDP server + egui dashboard (the central server)
 
 Each project has its own `platformio.ini`, `src/` sketch and a vendored
@@ -206,9 +205,6 @@ git clone --depth 1 https://github.com/thotro/arduino-dw1000.git DW1000
 rm -rf DW1000/.git
 cp -r DW1000 tag/lib/
 cp -r DW1000 anchor/lib/
-cp -r DW1000 anchor2/lib/
-cp -r DW1000 anchor3/lib/
-cp -r DW1000 anchor4/lib/
 cp -r DW1000 tag_esp32/lib/
 ```
 
@@ -227,10 +223,9 @@ distance, and adjust the value (empirically ≈9 mm per unit) until it reads
 ```bash
 cd tag && pio run -t upload --upload-port /dev/ttyUSB0
 cd tag_esp32 && pio run -t upload --upload-port /dev/ttyUSB0
-cd anchor && pio run -t upload --upload-port /dev/ttyUSB1
-cd anchor2 && pio run -t upload --upload-port /dev/ttyUSB2
-cd anchor3 && pio run -t upload --upload-port /dev/ttyUSB3
-cd anchor4 && pio run -t upload --upload-port /dev/ttyUSB4
+cd anchor && pio run -e anchor1 -t upload --upload-port /dev/ttyUSB1
+cd anchor && pio run -e anchor2 -t upload --upload-port /dev/ttyUSB2
+# ... anchor3..anchor5; `pio run` in anchor/ builds all of them
 ```
 
 PlatformIO Core 6.x is used — the system `pio` 4.x from apt is broken under
@@ -244,7 +239,7 @@ Every device runs ArduinoOTA with an mDNS hostname:
 |--------------------------|----------|
 | `uwb-tag1`               | ESP8266 tag |
 | `uwb-tag2`               | ESP32 tag   |
-| `uwb-anchor1` .. `uwb-anchor4` | anchors |
+| `uwb-anchor1` .. `uwb-anchor5` | anchors |
 
 An optional OTA password comes from the `OTA_PASS` build-time env var (same
 mechanism as `WIFI_SSID`/`WIFI_PASS`); when set, the device requires it for OTA.
@@ -297,5 +292,5 @@ WIFI_SSID="MyNetwork" WIFI_PASS="secret" \
 ```
 
 The device name (and therefore the `src` hash) is set at the top of each
-sketch (`tag/`, `tag_esp32/`, and `anchor/`..`anchor4/`). All of them use the
+sketch (`tag/`, `tag_esp32/`; for anchors it is derived from `ANCHOR_ID`). All of them use the
 `WIFI_SSID`/`WIFI_PASS` build flags (and optionally `OTA_PASS` for OTA).

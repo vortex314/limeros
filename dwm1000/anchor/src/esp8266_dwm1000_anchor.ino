@@ -68,10 +68,22 @@ void setupOTA(const char* hostname) {
 // ==========================================
 // DEVICE IDENTITY
 // ==========================================
-const char* DEVICE_NAME = "uwb_anchor_1";
+// ANCHOR_ID is set per environment in platformio.ini (pio run -e anchorN).
+#ifndef ANCHOR_ID
+#error "ANCHOR_ID not defined: build with e.g. `pio run -e anchor1`"
+#endif
+#if ANCHOR_ID < 1 || ANCHOR_ID > 99
+#error "ANCHOR_ID must be in 1..99"
+#endif
+#define ANCHOR_STR_(x) #x
+#define ANCHOR_STR(x) ANCHOR_STR_(x)
 
-// Unique Anchor UWB Address (8-byte EUI-64)
-char ANCHOR_ADDR[] = "82:17:5B:D5:A9:9A:E2:9C";
+const char* DEVICE_NAME = "uwb_anchor_" ANCHOR_STR(ANCHOR_ID);
+const char* OTA_HOSTNAME = "uwb-anchor" ANCHOR_STR(ANCHOR_ID);
+
+// Unique Anchor UWB Address (8-byte EUI-64); last byte = 0x9B + ANCHOR_ID
+// (anchor1 = ...:E2:9C, anchor5 = ...:E2:A0). Filled in at the start of setup().
+char ANCHOR_ADDR[] = "82:17:5B:D5:A9:9A:E2:00";
 
 // ==========================================
 // REPORTING CADENCE
@@ -87,6 +99,7 @@ uwbproto::UwbProto proto;
 
 void newRange() {
   lastUwbPacketUs = micros();   // UWB activity (non-blocking)
+  if (millis() - lastRangeMs < 500) return;  // throttle serial to avoid blocking loop()
   lastRangeMs = millis();
   Serial.print("Anchor: Ranging active with Tag 0x");
   Serial.print(DW1000Ranging.getDistantDevice()->getShortAddress(), HEX);
@@ -114,6 +127,7 @@ void setupWiFi() {
   Serial.println(WIFI_SSID);
   WiFi.mode(WIFI_STA);
   WiFi.begin(WIFI_SSID, WIFI_PASS);
+  WiFi.setSleepMode(WIFI_NONE_SLEEP);
   int attempts = 0;
   while (WiFi.status() != WL_CONNECTED && attempts < 30) {
     delay(500);
@@ -130,13 +144,15 @@ void setupWiFi() {
 void setup() {
   Serial.begin(115200);
   delay(1000);
+  snprintf(ANCHOR_ADDR + 21, 3, "%02X", 0x9B + ANCHOR_ID);
   Serial.println("\n=== ESP8266 + DWM1000 UWB Anchor Responder (UDP) ===");
+  Serial.printf("Anchor %d: %s  addr %s\n", ANCHOR_ID, DEVICE_NAME, ANCHOR_ADDR);
 
   // LED indicator pins
   pinMode(PIN_LED1, OUTPUT);
   pinMode(PIN_LED2, OUTPUT);
   setupWiFi();
-  setupOTA("uwb-anchor1");
+  setupOTA(OTA_HOSTNAME);
 
   // UDP reporter (random port), announce + identify immediately.
   uint8_t mac8[8];
