@@ -102,6 +102,27 @@ fn hex_short(v: u16) -> String {
     format!("0x{v:04X}")
 }
 
+/// DW1000 short address of a device with this 8-byte EUI: the library uses the
+/// last two EUI bytes, little-endian (…:E2:9C -> 0x9CE2), which is also what the
+/// tag reports in `DW1000TagEvent.anchor`.
+fn uwb_short_from_mac(mac: &[u8]) -> Option<u16> {
+    if mac.len() == 8 {
+        Some(((mac[7] as u16) << 8) | mac[6] as u16)
+    } else {
+        None
+    }
+}
+
+/// Natural ordering so "uwb_anchor_2" sorts before "uwb_anchor_10".
+fn natural_cmp(a: &str, b: &str) -> std::cmp::Ordering {
+    let split = |s: &str| {
+        let digits = s.len() - s.trim_end_matches(|c: char| c.is_ascii_digit()).len();
+        let (head, tail) = s.split_at(s.len() - digits);
+        (head.to_lowercase(), tail.parse::<u64>().ok())
+    };
+    split(a).cmp(&split(b)).then_with(|| a.cmp(b))
+}
+
 /// Local IPv4 for the interface that reaches `peer` (set-broker reply).
 fn local_ipv4_for(peer: SocketAddr) -> Option<[u8; 4]> {
     let s = UdpSocket::bind("0.0.0.0:0").ok()?;
@@ -127,6 +148,7 @@ struct Device {
     ip: Option<[u8; 4]>,
     msg_types: Vec<u32>,
     uwb_mac: Option<String>,
+    uwb_short: Option<u16>,
     uptime: u64,
     last_seen: Instant,
 }
@@ -139,6 +161,7 @@ impl Device {
             ip: None,
             msg_types: Vec::new(),
             uwb_mac: None,
+            uwb_short: None,
             uptime: 0,
             last_seen: Instant::now(),
         }
@@ -154,7 +177,7 @@ struct Range {
 struct UwbApp {
     rx: mpsc::Receiver<Event>,
     devices: HashMap<u32, Device>,
-    ranges: HashMap<u32, HashMap<String, Range>>,
+    ranges: HashMap<u32, HashMap<u16, Range>>,
     listening: bool,
     listen_addr: String,
     last_error: Option<String>,
@@ -218,6 +241,7 @@ impl UwbApp {
                     .entry(src)
                     .or_insert_with(|| Device::new(format!("dev_{src:08X}")));
                 d.uwb_mac = Some(hex_bytes(&uwb_mac));
+                d.uwb_short = uwb_short_from_mac(&uwb_mac);
                 d.kind = DeviceKind::Anchor;
                 d.last_seen = now;
             }
@@ -234,9 +258,8 @@ impl UwbApp {
                 }
                 d.last_seen = now;
 
-                let key = hex_short(anchor);
                 self.ranges.entry(src).or_default().insert(
-                    key,
+                    anchor,
                     Range {
                         distance_m,
                         rx_power_db,
@@ -251,6 +274,15 @@ impl UwbApp {
                 ));
             }
         }
+    }
+
+    /// Name of the anchor whose UWB short address is `short` (learned from its
+    /// DW1000AnchorEvent, sent at boot and every 30 s).
+    fn anchor_name(&self, short: u16) -> Option<&str> {
+        self.devices
+            .values()
+            .find(|d| d.uwb_short == Some(short))
+            .map(|d| d.name.as_str())
     }
 
     fn device_label(&self, src: u32) -> String {
@@ -455,23 +487,36 @@ impl eframe::App for UwbApp {
                     for tag in tags {
                         ui.strong(format!("tag {}", self.device_label(tag)));
                         let anchors = &self.ranges[&tag];
-                        let mut keys: Vec<&String> = anchors.keys().collect();
-                        keys.sort();
+                        // (name, short address, range); unnamed anchors sort last
+                        let mut rows: Vec<(Option<&str>, u16, &Range)> = anchors
+                            .iter()
+                            .map(|(&short, r)| (self.anchor_name(short), short, r))
+                            .collect();
+                        rows.sort_by(|a, b| match (a.0, b.0) {
+                            (Some(x), Some(y)) => natural_cmp(x, y).then(a.1.cmp(&b.1)),
+                            (Some(_), None) => std::cmp::Ordering::Less,
+                            (None, Some(_)) => std::cmp::Ordering::Greater,
+                            (None, None) => a.1.cmp(&b.1),
+                        });
 
                         egui::Grid::new(egui::Id::new(("tag_grid", tag)))
                             .striped(true)
-                            .num_columns(4)
+                            .num_columns(5)
                             .show(ui, |ui| {
+                                ui.strong("Name");
                                 ui.strong("Anchor");
                                 ui.strong("Distance");
                                 ui.strong("RX power");
                                 ui.strong("Age");
                                 ui.end_row();
 
-                                for key in keys {
-                                    let r = &anchors[key];
+                                for (name, short, r) in rows {
                                     let age_s = now.duration_since(r.last_seen).as_secs_f32();
-                                    ui.monospace(key.as_str());
+                                    match name {
+                                        Some(n) => ui.monospace(n),
+                                        None => ui.label(egui::RichText::new("?").weak()),
+                                    };
+                                    ui.monospace(hex_short(short));
                                     ui.monospace(format!("{:.2} m", r.distance_m));
                                     ui.monospace(format!("{:.1} dBm", r.rx_power_db));
                                     ui.monospace(format!("{:.1} s", age_s));
@@ -532,6 +577,21 @@ mod tests {
             dev.event_types,
             Some(vec![SysEvent::MSG_ID, DW1000AnchorEvent::MSG_ID])
         );
+    }
+
+    #[test]
+    fn anchor_short_address_matches_tag_report() {
+        // anchor1 EUI 82:17:5B:D5:A9:9A:E2:9C is reported by the tag as 0x9CE2
+        let mac = [0x82, 0x17, 0x5B, 0xD5, 0xA9, 0x9A, 0xE2, 0x9C];
+        assert_eq!(uwb_short_from_mac(&mac), Some(0x9CE2));
+        assert_eq!(uwb_short_from_mac(&mac[..6]), None);
+    }
+
+    #[test]
+    fn natural_name_order() {
+        let mut v = vec!["uwb_anchor_10", "uwb_anchor_2", "uwb_anchor_1"];
+        v.sort_by(|a, b| natural_cmp(a, b));
+        assert_eq!(v, ["uwb_anchor_1", "uwb_anchor_2", "uwb_anchor_10"]);
     }
 
     #[test]
