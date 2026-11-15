@@ -75,13 +75,16 @@ uint32_t  DW1000RangingClass::_resetPeriod;
 // reply times (same on both sides for symm. ranging)
 uint32_t  DW1000RangingClass::_replyDelayTimeUS;
 
-// TAG: if the last device's POLL_ACK is lost, still send RANGE to the devices
-// that did answer once the last reply slot has passed (0 = no deadline armed).
-static uint32_t _rangeDeadlineMs = 0;
+// TAG: index of the next anchor to poll (round robin)
+static uint8_t _rrIndex = 0;
+
+DW1000Time DW1000RangingClass::usToTime(uint32_t us) {
+	// 1 us = 128 * 499.2 = 63897.6 ticks (exact integer math, no float rounding)
+	return DW1000Time((int64_t)us * 638976LL / 10);
+}
 
 #ifdef DW1000_CYCLE_DEBUG
 static uint8_t dbgReportMask = 0;
-static bool    dbgRangeSent  = false;
 #endif
 
 static_assert(SHORT_MAC_LEN + 2 + 17 * MAX_DEVICES <= LEN_DATA, "RANGE frame for MAX_DEVICES does not fit LEN_DATA");
@@ -385,20 +388,6 @@ int16_t DW1000RangingClass::detectMessageType(byte datas[]) {
 }
 
 void DW1000RangingClass::loop() {
-	// TAG: last POLL_ACK missing -> range with the devices that did answer
-	if(_type == TAG && _rangeDeadlineMs != 0 && _expectedMsgId == POLL_ACK
-	   && (int32_t)(millis() - _rangeDeadlineMs) >= 0) {
-		_rangeDeadlineMs = 0;
-		bool anyAcked = false;
-		for(uint8_t i = 0; i < _networkDevicesNumber; i++) anyAcked |= _networkDevices[i].isAcked();
-		if(anyAcked) {
-			_expectedMsgId = RANGE_REPORT;
-#ifdef DW1000_CYCLE_DEBUG
-			dbgRangeSent = true;
-#endif
-			transmitRange(nullptr);
-		}
-	}
 	//we check if needed to reset !
 	checkForReset();
 	uint32_t time = millis(); // TODO other name - too close to "timer"
@@ -672,14 +661,11 @@ void DW1000RangingClass::loop() {
 					myDistantDevice->noteActivity();
 					myDistantDevice->setAcked(true);
 					
-					//in the case the message come from our last device:
-					if(myDistantDevice->getIndex() == _networkDevicesNumber-1) {
+					// unicast: the anchor we just polled answered -> RANGE to it
+					byte* sa = myDistantDevice->getByteShortAddress();
+					if(sa[0] == _lastSentToShortAddress[0] && sa[1] == _lastSentToShortAddress[1]) {
 						_expectedMsgId = RANGE_REPORT;
-#ifdef DW1000_CYCLE_DEBUG
-						dbgRangeSent = true;
-#endif
-						//and transmit the next message (range) of the ranging protocole (in broadcast)
-						transmitRange(nullptr);
+						transmitRange(myDistantDevice);
 					}
 				}
 				else if(messageType == RANGE_REPORT) {
@@ -768,9 +754,25 @@ void DW1000RangingClass::resetInactive() {
 void DW1000RangingClass::timerTick() {
 	if(_networkDevicesNumber > 0 && counterForBlink != 0) {
 		if(_type == TAG) {
+			// unicast round robin: one anchor per tick
+			if(_rrIndex >= _networkDevicesNumber) {
+				_rrIndex = 0;
+			}
+			if(_rrIndex == 0) {
+#ifdef DW1000_CYCLE_DEBUG
+				// summary of the previous round: A = POLL_ACK, R = RANGE_REPORT
+				Serial.printf("CYC n=%u", _networkDevicesNumber);
+				for(uint8_t i = 0; i < _networkDevicesNumber; i++)
+					Serial.printf(" %04X:%c%c", _networkDevices[i].getShortAddress(),
+						_networkDevices[i].isAcked() ? 'A' : '-', (dbgReportMask>>i)&1 ? 'R' : '-');
+				Serial.println();
+				dbgReportMask = 0;
+#endif
+				for(uint8_t i = 0; i < _networkDevicesNumber; i++) _networkDevices[i].setAcked(false);
+			}
 			_expectedMsgId = POLL_ACK;
-			//send a prodcast poll
-			transmitPoll(nullptr);
+			transmitPoll(&_networkDevices[_rrIndex]);
+			_rrIndex++;
 		}
 	}
 	else if(counterForBlink == 0) {
@@ -785,7 +787,6 @@ void DW1000RangingClass::timerTick() {
 		counterForBlink = 0;
 	}
 }
-
 
 void DW1000RangingClass::copyShortAddress(byte address1[], byte address2[]) {
 	*address1     = *address2;
@@ -837,138 +838,61 @@ void DW1000RangingClass::transmitRangingInit(DW1000Device* myDistantDevice, uint
 }
 
 void DW1000RangingClass::transmitPoll(DW1000Device* myDistantDevice) {
-	
 	transmitInit();
-	
-	if(myDistantDevice == nullptr) {
-#ifdef DW1000_CYCLE_DEBUG
-		{
-			uint8_t ack = 0;
-			for(uint8_t i = 0; i < _networkDevicesNumber; i++) if(_networkDevices[i].isAcked()) ack |= 1 << i;
-			Serial.printf("CYC n=%u range=%u", _networkDevicesNumber, dbgRangeSent);
-			for(uint8_t i = 0; i < _networkDevicesNumber; i++)
-				Serial.printf(" %04X:%c%c", _networkDevices[i].getShortAddress(), (ack>>i)&1 ? 'A' : '-', (dbgReportMask>>i)&1 ? 'R' : '-');
-			Serial.println();
-			dbgReportMask = 0; dbgRangeSent = false;
-		}
-#endif
-		for(uint8_t i = 0; i < _networkDevicesNumber; i++) _networkDevices[i].setAcked(false);
-		//we need to set our timerDelay:
-		_timerDelay = DEFAULT_TIMER_DELAY+(uint16_t)(_networkDevicesNumber*3*DEFAULT_REPLY_DELAY_TIME/1000);
-		
-		byte shortBroadcast[2] = {0xFF, 0xFF};
-		_globalMac.generateShortMACFrame(data, _currentShortAddress, shortBroadcast);
-		data[SHORT_MAC_LEN]   = POLL;
-		//we enter the number of devices
-		data[SHORT_MAC_LEN+1] = _networkDevicesNumber;
-		
-		for(uint8_t i = 0; i < _networkDevicesNumber; i++) {
-			//each devices have a different reply delay time.
-			_networkDevices[i].setReplyTime((uint32_t)(i+1)*DEFAULT_REPLY_DELAY_TIME);
-			//we write the short address of our device:
-			memcpy(data+SHORT_MAC_LEN+2+4*i, _networkDevices[i].getByteShortAddress(), 2);
-			
-			//we add the replyTime
-			uint16_t replyTime = _networkDevices[i].getReplyTime() / REPLY_TIME_UNIT_US;
-			memcpy(data+SHORT_MAC_LEN+2+2+4*i, &replyTime, 2);
-			
-		}
-		
-		copyShortAddress(_lastSentToShortAddress, shortBroadcast);
-		// last slot = N*DEFAULT_REPLY_DELAY_TIME, + ~4 ms air time + margin
-		_rangeDeadlineMs = millis() + (uint32_t)_networkDevicesNumber*DEFAULT_REPLY_DELAY_TIME/1000 + 10;
-		if(_rangeDeadlineMs == 0) _rangeDeadlineMs = 1;
-		
-	}
-	else {
-		//we redefine our default_timer_delay for just 1 device;
-		_timerDelay = DEFAULT_TIMER_DELAY;
-		
-		_globalMac.generateShortMACFrame(data, _currentShortAddress, myDistantDevice->getByteShortAddress());
-		
-		data[SHORT_MAC_LEN]   = POLL;
-		data[SHORT_MAC_LEN+1] = 1;
-		uint16_t replyTime = myDistantDevice->getReplyTime() / REPLY_TIME_UNIT_US;
-		memcpy(data+SHORT_MAC_LEN+2, &replyTime, sizeof(uint16_t)); // todo is code correct?
-		
-		copyShortAddress(_lastSentToShortAddress, myDistantDevice->getByteShortAddress());
-	}
-	
-	transmit(data, SHORT_MAC_LEN+2+4*data[SHORT_MAC_LEN+1]);
+	_timerDelay = RANGING_TICK_MS;
+	// unicast POLL, in the (count, {short address, reply time}) layout the
+	// anchor parses, with a single entry
+	_globalMac.generateShortMACFrame(data, _currentShortAddress, myDistantDevice->getByteShortAddress());
+	data[SHORT_MAC_LEN]   = POLL;
+	data[SHORT_MAC_LEN+1] = 1;
+	myDistantDevice->setReplyTime(UNICAST_REPLY_US);
+	memcpy(data+SHORT_MAC_LEN+2, myDistantDevice->getByteShortAddress(), 2);
+	uint16_t replyTime = UNICAST_REPLY_US / REPLY_TIME_UNIT_US;
+	memcpy(data+SHORT_MAC_LEN+4, &replyTime, 2);
+	copyShortAddress(_lastSentToShortAddress, myDistantDevice->getByteShortAddress());
+	transmit(data, SHORT_MAC_LEN+6);
 }
-
 
 void DW1000RangingClass::transmitPollAck(DW1000Device* myDistantDevice) {
 	transmitInit();
 	_globalMac.generateShortMACFrame(data, _currentShortAddress, myDistantDevice->getByteShortAddress());
 	data[SHORT_MAC_LEN] = POLL_ACK;
-	// delay the same amount as ranging tag
-	DW1000Time deltaTime = DW1000Time((int32_t)_replyDelayTimeUS, DW1000Time::MICROSECONDS);
+	// reply exactly _replyDelayTimeUS after the POLL arrived (chip time), so the
+	// reply interval does not depend on how late the MCU handled the POLL
+	DW1000Time expected;
+	if(!DW1000.setDelayAt(myDistantDevice->timePollReceived + usToTime(_replyDelayTimeUS), expected)) {
+		// too late for our slot: skip this round
+		_expectedMsgId = POLL;
+		receiver();
+		return;
+	}
 	copyShortAddress(_lastSentToShortAddress, myDistantDevice->getByteShortAddress());
-	transmit(data, deltaTime, SHORT_MAC_LEN+1);
+	transmit(data, SHORT_MAC_LEN+1);
 }
 
 void DW1000RangingClass::transmitRange(DW1000Device* myDistantDevice) {
-	//transmit range need to accept broadcast for multiple anchor
 	transmitInit();
-	
-	
-	if(myDistantDevice == nullptr) {
-		_rangeDeadlineMs = 0;
-		//we need to set our timerDelay:
-		_timerDelay = DEFAULT_TIMER_DELAY+(uint16_t)(_networkDevicesNumber*3*DEFAULT_REPLY_DELAY_TIME/1000);
-		
-		byte shortBroadcast[2] = {0xFF, 0xFF};
-		_globalMac.generateShortMACFrame(data, _currentShortAddress, shortBroadcast);
-		data[SHORT_MAC_LEN]   = RANGE;
-		//we enter the number of devices
-		data[SHORT_MAC_LEN+1] = _networkDevicesNumber;
-		
-		// delay sending the message and remember expected future sent timestamp
-		DW1000Time deltaTime     = DW1000Time(DEFAULT_REPLY_DELAY_TIME, DW1000Time::MICROSECONDS);
-		DW1000Time timeRangeSent = DW1000.setDelay(deltaTime);
-		
-		for(uint8_t i = 0; i < _networkDevicesNumber; i++) {
-			if(_networkDevices[i].isAcked()) {
-			//we write the short address of our device:
-			memcpy(data+SHORT_MAC_LEN+2+17*i, _networkDevices[i].getByteShortAddress(), 2);
-			
-			
-			//we get the device which correspond to the message which was sent (need to be filtered by MAC address)
-			_networkDevices[i].timeRangeSent = timeRangeSent;
-			_networkDevices[i].timePollSent.getTimestamp(data+SHORT_MAC_LEN+4+17*i);
-			_networkDevices[i].timePollAckReceived.getTimestamp(data+SHORT_MAC_LEN+9+17*i);
-			_networkDevices[i].timeRangeSent.getTimestamp(data+SHORT_MAC_LEN+14+17*i);
-			
-			}
-			else {
-				byte zero[2] = {0x00, 0x00};
-				memcpy(data+SHORT_MAC_LEN+2+17*i, zero, 2);
-			}
-		}
-		
-		copyShortAddress(_lastSentToShortAddress, shortBroadcast);
-		
-	}
-	else {
-		_globalMac.generateShortMACFrame(data, _currentShortAddress, myDistantDevice->getByteShortAddress());
-		data[SHORT_MAC_LEN] = RANGE;
-		// delay sending the message and remember expected future sent timestamp
-		DW1000Time deltaTime = DW1000Time((int32_t)_replyDelayTimeUS, DW1000Time::MICROSECONDS);
-		//we get the device which correspond to the message which was sent (need to be filtered by MAC address)
-		myDistantDevice->timeRangeSent = DW1000.setDelay(deltaTime);
-		myDistantDevice->timePollSent.getTimestamp(data+1+SHORT_MAC_LEN);
-		myDistantDevice->timePollAckReceived.getTimestamp(data+6+SHORT_MAC_LEN);
-		myDistantDevice->timeRangeSent.getTimestamp(data+11+SHORT_MAC_LEN);
-		copyShortAddress(_lastSentToShortAddress, myDistantDevice->getByteShortAddress());
-		transmit(data, SHORT_MAC_LEN+16);
+	// send UNICAST_REPLY_US after the POLL_ACK arrived (chip time); skip the
+	// exchange if the MCU handled the POLL_ACK too late for that
+	DW1000Time timeRangeSent;
+	if(!DW1000.setDelayAt(myDistantDevice->timePollAckReceived + usToTime(UNICAST_REPLY_US), timeRangeSent)) {
+		_expectedMsgId = POLL_ACK;
+		receiver();
 		return;
 	}
-	
-	
-	transmit(data, SHORT_MAC_LEN+2+17*_networkDevicesNumber);
+	// unicast RANGE, in the (count, 17-byte entry) layout the anchor parses,
+	// with a single entry
+	_globalMac.generateShortMACFrame(data, _currentShortAddress, myDistantDevice->getByteShortAddress());
+	data[SHORT_MAC_LEN]   = RANGE;
+	data[SHORT_MAC_LEN+1] = 1;
+	memcpy(data+SHORT_MAC_LEN+2, myDistantDevice->getByteShortAddress(), 2);
+	myDistantDevice->timeRangeSent = timeRangeSent;
+	myDistantDevice->timePollSent.getTimestamp(data+SHORT_MAC_LEN+4);
+	myDistantDevice->timePollAckReceived.getTimestamp(data+SHORT_MAC_LEN+9);
+	myDistantDevice->timeRangeSent.getTimestamp(data+SHORT_MAC_LEN+14);
+	copyShortAddress(_lastSentToShortAddress, myDistantDevice->getByteShortAddress());
+	transmit(data, SHORT_MAC_LEN+19);
 }
-
 
 void DW1000RangingClass::transmitRangeReport(DW1000Device* myDistantDevice) {
 	transmitInit();
@@ -1014,7 +938,24 @@ void DW1000RangingClass::computeRangeAsymmetric(DW1000Device* myDistantDevice, D
 	DW1000Time round2 = (myDistantDevice->timeRangeReceived-myDistantDevice->timePollAckSent).wrap();
 	DW1000Time reply2 = (myDistantDevice->timeRangeSent-myDistantDevice->timePollAckReceived).wrap();
 	
-	myTOF->setTimestamp((round1*round2-reply1*reply2)/(round1+round2+reply1+reply2));
+	// ToF = (Ra*Rb - Da*Db) / (Ra+Rb+Da+Db). With reply times of tens of ms the
+	// products reach ~1e19 and overflow int64 (UB). Use the identical form
+	// Ra*Rb - Da*Db = Ra*(Rb-Db) + Db*(Ra-Da), whose factors (Rb-Db), (Ra-Da) are
+	// only 2*ToF + clock drift (< ~1e5 ticks), so nothing overflows and it is exact.
+	{
+		int64_t Ra = round1.getTimestamp(), Da = reply1.getTimestamp();
+		int64_t Rb = round2.getTimestamp(), Db = reply2.getTimestamp();
+		int64_t num = Ra * (Rb - Db) + Db * (Ra - Da);
+		int64_t den = Ra + Rb + Da + Db;
+		myTOF->setTimestamp(den != 0 ? num / den : 0);
+	}
+#ifdef DW1000_TWR_DEBUG
+	// raw intervals in DW1000 ticks (15.65 ps): tag round/reply, anchor round/reply
+	Serial.printf("TWR r1=%.0f d1=%.0f r2=%.0f d2=%.0f tof=%.0f\n",
+		(double)round1.getTimestamp(), (double)reply1.getTimestamp(),
+		(double)round2.getTimestamp(), (double)reply2.getTimestamp(),
+		(double)myTOF->getTimestamp());
+#endif
 	/*
 	Serial.print("timePollAckReceived ");myDistantDevice->timePollAckReceived.print();
 	Serial.print("timePollSent ");myDistantDevice->timePollSent.print();

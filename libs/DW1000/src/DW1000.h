@@ -248,6 +248,11 @@ public:
 	
 	/* transmit and receive configuration. */
 	static DW1000Time   setDelay(const DW1000Time& delay);
+	// Delayed TX at an absolute chip time (e.g. RX timestamp + reply time), so the
+	// reply interval does not depend on MCU latency. Returns false (nothing armed)
+	// if `when` is less than 1 ms ahead or already past; `expected` gets the TX
+	// timestamp the frame will carry (9 low bits dropped, + antenna delay).
+	static boolean      setDelayAt(const DW1000Time& when, DW1000Time& expected);
 	static void         receivePermanently(boolean val);
 	static void         setData(byte data[], uint16_t n);
 	static void         setData(const String& data);

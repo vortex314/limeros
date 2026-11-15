@@ -75,6 +75,11 @@ void setupOTA(const char* hostname) {
 #if ANCHOR_ID < 1 || ANCHOR_ID > 99
 #error "ANCHOR_ID must be in 1..99"
 #endif
+// Antenna delay (DW1000 time units, 15.65 ps). Calibrated per anchor in
+// platformio.ini: +1 unit shortens this anchor's measured range by ~4.7 mm.
+#ifndef ANTENNA_DELAY
+#define ANTENNA_DELAY 16456
+#endif
 #define ANCHOR_STR_(x) #x
 #define ANCHOR_STR(x) ANCHOR_STR_(x)
 
@@ -171,7 +176,7 @@ void setup() {
   DW1000Ranging.attachInactiveDevice(inactiveDevice);
 
   // Antenna delay calibration
-  DW1000.setAntennaDelay(16456);  // reads ~1.82m at 1.75m (was 16422 @10cm)
+  DW1000.setAntennaDelay(ANTENNA_DELAY);  // per anchor, see platformio.ini
 
   // Start as Anchor in high-accuracy mode
   DW1000Ranging.startAsAnchor(ANCHOR_ADDR, DW1000.MODE_LONGDATA_RANGE_ACCURACY, false);

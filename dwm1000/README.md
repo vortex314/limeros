@@ -180,31 +180,41 @@ build_flags = -DCONFIG_DISABLE_HAL_LOCKS
    `_fastSPI` to `SPISettings(8000000L, MSBFIRST, SPI_MODE0)`. This gives a
    clean `DECA` device-ID read.
 
-### Patch 7 — multi-anchor ranging (`DW1000Ranging.*`, `DW1000Device.h`)
+### Patch 7 — unicast multi-anchor ranging (`DW1000*.{h,cpp}`)
 
-With 3+ anchors the stock protocol kept dropping anchors (the tag's list
-oscillated between 2 and 4). Fixes — tag and anchors must run the same version:
+The stock protocol ranges with all anchors at once: one broadcast POLL, each
+anchor replies in its own time slot, one broadcast RANGE. With 3+ anchors this
+kept dropping anchors, and it also turned out to give each anchor a range
+**bias of ±20–30 cm that depended on its slot** (the slot follows the tag's
+discovery order, which changes on every reboot), so per-anchor antenna-delay
+calibration was impossible. The tag now ranges with **one anchor at a time**
+(tag and anchors must run the same version):
 
-- **Reply-slot overflow.** The POLL gave anchor *i* a reply delay of
-  `(2i+1)*15000 us` in a `uint16_t`, which wraps from the 3rd anchor on
-  (75000 → 9464 us), so the "last" anchor replied first and the tag sent RANGE
-  before the others answered. Slots are now `(i+1)*DEFAULT_REPLY_DELAY_TIME`
-  (15, 30, 45 … ms), sent on the wire in `REPLY_TIME_UNIT_US` (10 us) units and
-  held as `uint32_t`.
-- **RANGE frame overflow.** RANGE needs `9 + 2 + 17*N` bytes but `LEN_DATA` was
-  90 (N=5 → 96: buffer overrun, truncated frame). `LEN_DATA` is now 120,
-  `MAX_DEVICES` 6, guarded by `static_assert`s.
-- **Variable frame length.** Every frame used to be sent as `LEN_DATA` bytes
-  (~10 ms air time); each is now sent with its real length (POLL_ACK ~3.5 ms).
-- **RANGE deadline.** The tag only sent RANGE after the *last* device's
-  POLL_ACK, so one lost ack cancelled the round for every anchor. If it has not
-  arrived by the end of the last reply slot (+10 ms), RANGE goes out to the
-  anchors that did answer.
-- **Activity.** Any frame from a known anchor (also a late POLL_ACK) counts as
-  activity, and `INACTIVITY_TIME` is 3000 ms (was 1000) on both sides.
-- **Debug.** Build the tag with `-DDW1000_CYCLE_DEBUG` to print one line per
-  ranging cycle, e.g. `CYC n=5 range=1 9DE2:AR 9CE2:-- …` (`A` = POLL_ACK
-  received, `R` = RANGE_REPORT received):
+- **Unicast round robin.** Every `RANGING_TICK_MS` (50 ms) the tag polls the
+  next anchor in its list: POLL → POLL_ACK → RANGE → RANGE_REPORT with that
+  anchor only. With 5 anchors each gets ~4–5 ranges/s, plenty for a slow
+  lawnmower. The frames keep the old (count, entries) layout with one entry,
+  so other anchors ignore exchanges that are not for them.
+- **Fixed, symmetric reply times.** Both sides reply exactly
+  `UNICAST_REPLY_US` (8 ms) after the frame they answer was *received*, using
+  the new `DW1000.setDelayAt(rxTimestamp + delay)` (absolute chip time) instead
+  of `setDelay()` relative to whenever the MCU handled the frame. Every exchange
+  therefore has identical intervals, so each anchor's bias is constant and can
+  be calibrated. If the MCU is too late (< 1 ms left), the exchange is skipped.
+- **Overflow-free ToF.** `(Ra*Rb - Da*Db)` overflowed `int64` for reply times of
+  tens of ms; it is computed as `Ra*(Rb-Db) + Db*(Ra-Da)` (identical, exact).
+- **Reply-time encoding.** The reply time in POLL is a `uint16_t` in
+  `REPLY_TIME_UNIT_US` (10 us) units (the old raw-us value wrapped above 65 ms).
+- **Buffers.** `LEN_DATA` is 120 and `MAX_DEVICES` 6 (`static_assert`s); every
+  frame is sent with its real length instead of always `LEN_DATA` bytes.
+- **Discovery.** Anchors answer every tag blink (also when they think they still
+  know the tag) in one of 16 random 4 ms slots via a delayed TX, so anchors
+  that were dropped rejoin within a blink (~1 s).
+- **Activity.** Any frame from a known anchor counts as activity, and
+  `INACTIVITY_TIME` is 3000 ms (was 1000) on both sides.
+- **Debug.** `-DDW1000_CYCLE_DEBUG` on the tag prints one line per round, e.g.
+  `CYC n=5 9DE2:AR 9CE2:-- …` (`A` = POLL_ACK, `R` = RANGE_REPORT received);
+  `-DDW1000_TWR_DEBUG` on an anchor prints the raw intervals of every exchange:
   `PLATFORMIO_BUILD_FLAGS=-DDW1000_CYCLE_DEBUG pio run -t upload`
 
 ### Build flag (`platformio.ini`)
@@ -231,13 +241,23 @@ cp -r DW1000 ../libs/
 
 ## Antenna delay calibration
 
-All sketches call `DW1000.setAntennaDelay(16422)`. This value is
-hardware-specific and was calibrated for these boards: the stock EVK1000 default
-(16436) read about 13 cm too short at a true 10 cm separation.
+The tags use `DW1000.setAntennaDelay(16456)`. Each anchor has its own value,
+`-DANTENNA_DELAY=<units>` in its env in `anchor/platformio.ini`, calibrated with
+the tag 1.75 m from every anchor (2026-11-15):
 
-To re-calibrate: place a tag and anchor exactly 1 m apart, read the reported
-distance, and adjust the value (empirically ≈9 mm per unit) until it reads
-1.00 m. Apply the same value to every sketch and reflash.
+| anchor | ANTENNA_DELAY | before (9 min median) | after (6 min median) |
+|--------|---------------|-----------------------|----------------------|
+| 1      | 16488         | 1.90 m                | 1.74 m               |
+| 2      | 16454         | 1.74 m                | 1.75 m               |
+| 3      | 16475         | 1.84 m                | 1.77 m               |
+| 4      | 16465         | 1.79 m                | 1.75 m               |
+| 5      | 16531         | 2.10 m                | 1.71 m               |
+
+To re-calibrate an anchor: place the tag at a known distance, take the median
+of a few minutes of `Distance:` readings on the anchor's serial port, and add
+`(measured - true) / 0.0047 m` units to its `ANTENNA_DELAY` (+1 unit shortens
+that anchor's range by ~4.7 mm; changing the delay on *both* ends gives ~9 mm).
+Opening a NodeMCU serial port can reset the board; let it settle ~30 s first.
 
 ## Build & flash
 

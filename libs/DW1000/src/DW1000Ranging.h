@@ -62,6 +62,12 @@
 // POLL carries each anchor's reply delay as uint16 in units of REPLY_TIME_UNIT_US
 // (was raw us, which overflowed from the 3rd anchor on: 75000 us -> 9464 us).
 #define REPLY_TIME_UNIT_US 10
+// Unicast ranging: the tag polls one anchor per tick (round robin). Both sides
+// reply UNICAST_REPLY_US after the frame they answer arrived (chip time), so the
+// reply intervals are identical for every anchor and every exchange.
+#define UNICAST_REPLY_US 8000
+// one exchange (~POLL + 8 ms + RANGE + 8 ms + RANGE_REPORT) per tick
+#define RANGING_TICK_MS  50
 // ANCHOR reply to a tag BLINK: delayed TX in one of BLINK_REPLY_SLOTS random slots
 #define BLINK_REPLY_BASE_US 2000
 #define BLINK_REPLY_SLOT_US 4000
@@ -205,6 +211,7 @@ private:
 	static void transmitRangeReport(DW1000Device* myDistantDevice);
 	static void transmitRangeFailed(DW1000Device* myDistantDevice);
 	static void receiver();
+	static DW1000Time usToTime(uint32_t us);
 	
 	//for ranging protocole (TAG)
 	static void transmitPoll(DW1000Device* myDistantDevice);

@@ -1118,6 +1118,29 @@ void DW1000Class::useSmartPower(boolean smartPower) {
 	setBit(_syscfg, LEN_SYS_CFG, DIS_STXP_BIT, !smartPower);
 }
 
+boolean DW1000Class::setDelayAt(const DW1000Time& when, DW1000Time& expected) {
+	if(_deviceMode != TX_MODE) {
+		return false;
+	}
+	const int64_t MASK40 = (1LL << 40) - 1;
+	DW1000Time now;
+	getSystemTimestamp(now);
+	int64_t ahead = (when.getTimestamp() - now.getTimestamp()) & MASK40;
+	if(ahead < 63897600LL /* 1 ms */ || ahead > (1LL << 39)) {
+		return false;
+	}
+	setBit(_sysctrl, LEN_SYS_CTRL, TXDLYS_BIT, true);
+	byte delayBytes[5];
+	DW1000Time target(when.getTimestamp() & MASK40);
+	target.getTimestamp(delayBytes);
+	delayBytes[0] = 0;
+	delayBytes[1] &= 0xFE;
+	writeBytes(DX_TIME, NO_SUB, delayBytes, LEN_DX_TIME);
+	expected.setTimestamp(delayBytes);
+	expected += _antennaDelay;
+	return true;
+}
+
 DW1000Time DW1000Class::setDelay(const DW1000Time& delay) {
 	if(_deviceMode == TX_MODE) {
 		setBit(_sysctrl, LEN_SYS_CTRL, TXDLYS_BIT, true);
