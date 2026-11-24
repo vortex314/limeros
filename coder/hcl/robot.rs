@@ -1,29 +1,37 @@
 // Converted from hcl/robot.hcl.
 // Non-repeated fields are `Option<T>`; repeated (`repeated = true`) and `T[]` fields are `Vec<T>`.
 
-struct DeviceEvent {
-    device_name: Option<String>, // Device Name
-    request_types: Vec<u32>,     // Requests supported
-    event_types: Vec<u32>,       // Requests supported
+struct DeviceAnnounceEvent {
+    device_id: u32,          // device Id , fnv hash of name
+    device_name: String,     // Device Name - must be unique in broadcast
+    request_types: Vec<u32>, // Requests supported
+    event_types: Vec<u32>,   // Requests supported
+    address: String,         // example udp:192.168.0.4:2345 , tcp:192.168.0.235:2222
 }
 
-struct DeviceRequest {
+struct DeviceSetRequest {
+    protocol: Option<String> , // Serial/TCP/UDP/...
     ip_address: Option<Vec<u8>>, // Broker Ip Address
     port: Option<u32>,           // Broker UDP port
     device_name: Option<String>, // Device Name
 }
 
+
+struct DeviceSetReply {
+    return_code: u32 , // return code
+    message : String, // human readable error message
+}
+
 enum LogLevel {
-    Debug=0,
+    Debug = 0,
     INFO,
     WARN,
     ERROR,
-} 
-
+}
 
 struct LogEvent {
-    message : String,
-    level :  LogLevel,
+    message: String,
+    level: LogLevel,
 }
 
 struct DW1000TagEvent {
@@ -69,42 +77,42 @@ struct HoverboardEvent {
     fi_weak_max: Option<i32>,       // Field weak max current A (FOC only)
     phase_adv_max_deg: Option<i32>, // Max Phase Adv angle Deg (SIN only)
     input1_raw: Option<i32>,        // Input1 raw value
-    input1_typ: Option<i32>,        // Input1 type 0:Disabled, 1:Normal Pot, 2:Middle Resting Pot, 3:Auto-detect
-    input1_min: Option<i32>,        // Input1 minimum value
-    input1_mid: Option<i32>,        // Input1 middle value
-    input1_max: Option<i32>,        // Input1 maximum value
-    input1_cmd: Option<i32>,        // Input1 command value
-    input2_raw: Option<i32>,        // Input2 raw value
-    input2_typ: Option<i32>,        // Input2 type 0:Disabled, 1:Normal Pot, 2:Middle Resting Pot, 3:Auto-detect
-    input2_min: Option<i32>,        // Input2 minimum value
-    input2_mid: Option<i32>,        // Input2 middle value
-    input2_max: Option<i32>,        // Input2 maximum value
-    input2_cmd: Option<i32>,        // Input2 command value
-    aux_input1_raw: Option<i32>,    // Input1 raw value
-    aux_input1_typ: Option<i32>,    // Input1 type 0:Disabled, 1:Normal Pot, 2:Middle Resting Pot, 3:Auto-detect
-    aux_input1_min: Option<i32>,    // Input1 minimum value
-    aux_input1_mid: Option<i32>,    // Input1 middle value
-    aux_input1_max: Option<i32>,    // Input1 maximum value
-    aux_input1_cmd: Option<i32>,    // Input1 command value
-    aux_input2_raw: Option<i32>,    // Input2 raw value
-    aux_input2_typ: Option<i32>,    // Input2 type 0:Disabled, 1:Normal Pot, 2:Middle Resting Pot, 3:Auto-detect
-    aux_input2_min: Option<i32>,    // Input2 minimum value
-    aux_input2_mid: Option<i32>,    // Input2 middle value
-    aux_input2_max: Option<i32>,    // Input2 maximum value
-    aux_input2_cmd: Option<i32>,    // Input2 command value
-    dc_curr: Option<i32>,           // Total DC Link current A *100
-    rdc_curr: Option<i32>,          // Right DC Link current A *100
-    ldc_curr: Option<i32>,          // Left DC Link current A *100
-    cmdl: Option<i32>,              // Left Motor Command RPM
-    cmdr: Option<i32>,              // Right Motor Command RPM
-    spd_avg: Option<i32>,           // Motor Measured Avg RPM
-    spdl: Option<i32>,              // Left Motor Measured RPM
-    spdr: Option<i32>,              // Right Motor Measured RPM
-    filter_rate: Option<i32>,       // Rate *10
-    spd_coef: Option<i32>,          // Speed Coefficient *10
-    str_coef: Option<i32>,          // Steer Coefficient *10
-    batv: Option<i32>,              // Calibrated Battery Voltage *100
-    temp: Option<i32>,              // Calibrated Temperature C *10
+    input1_typ: Option<i32>, // Input1 type 0:Disabled, 1:Normal Pot, 2:Middle Resting Pot, 3:Auto-detect
+    input1_min: Option<i32>, // Input1 minimum value
+    input1_mid: Option<i32>, // Input1 middle value
+    input1_max: Option<i32>, // Input1 maximum value
+    input1_cmd: Option<i32>, // Input1 command value
+    input2_raw: Option<i32>, // Input2 raw value
+    input2_typ: Option<i32>, // Input2 type 0:Disabled, 1:Normal Pot, 2:Middle Resting Pot, 3:Auto-detect
+    input2_min: Option<i32>, // Input2 minimum value
+    input2_mid: Option<i32>, // Input2 middle value
+    input2_max: Option<i32>, // Input2 maximum value
+    input2_cmd: Option<i32>, // Input2 command value
+    aux_input1_raw: Option<i32>, // Input1 raw value
+    aux_input1_typ: Option<i32>, // Input1 type 0:Disabled, 1:Normal Pot, 2:Middle Resting Pot, 3:Auto-detect
+    aux_input1_min: Option<i32>, // Input1 minimum value
+    aux_input1_mid: Option<i32>, // Input1 middle value
+    aux_input1_max: Option<i32>, // Input1 maximum value
+    aux_input1_cmd: Option<i32>, // Input1 command value
+    aux_input2_raw: Option<i32>, // Input2 raw value
+    aux_input2_typ: Option<i32>, // Input2 type 0:Disabled, 1:Normal Pot, 2:Middle Resting Pot, 3:Auto-detect
+    aux_input2_min: Option<i32>, // Input2 minimum value
+    aux_input2_mid: Option<i32>, // Input2 middle value
+    aux_input2_max: Option<i32>, // Input2 maximum value
+    aux_input2_cmd: Option<i32>, // Input2 command value
+    dc_curr: Option<i32>,        // Total DC Link current A *100
+    rdc_curr: Option<i32>,       // Right DC Link current A *100
+    ldc_curr: Option<i32>,       // Left DC Link current A *100
+    cmdl: Option<i32>,           // Left Motor Command RPM
+    cmdr: Option<i32>,           // Right Motor Command RPM
+    spd_avg: Option<i32>,        // Motor Measured Avg RPM
+    spdl: Option<i32>,           // Left Motor Measured RPM
+    spdr: Option<i32>,           // Right Motor Measured RPM
+    filter_rate: Option<i32>,    // Rate *10
+    spd_coef: Option<i32>,       // Speed Coefficient *10
+    str_coef: Option<i32>,       // Steer Coefficient *10
+    batv: Option<i32>,           // Calibrated Battery Voltage *100
+    temp: Option<i32>,           // Calibrated Temperature C *10
 }
 
 // Request command for cutter
@@ -205,7 +213,7 @@ struct Ps4Event {
 
 // PS4 controller output command
 struct Ps4Request {
-    req_id: Option<u32>,        // For request/reply matching, 0 if not a request/reply
+    req_id: Option<u32>, // For request/reply matching, 0 if not a request/reply
     rumble_small: Option<i32>,
     rumble_large: Option<i32>,
     led_red: Option<i32>,
@@ -217,7 +225,7 @@ struct Ps4Request {
 
 // System request message
 struct SysRequest {
-    req_id: Option<u32>,    // For request/reply matching, 0 if not a request/reply
+    req_id: Option<u32>, // For request/reply matching, 0 if not a request/reply
     set_time: Option<u64>,
     reboot: Option<bool>,
     console: Option<String>,
@@ -225,7 +233,7 @@ struct SysRequest {
 
 // System reply message
 struct SysReply {
-    req_id: Option<u32>,    // For request/reply matching, 0 if not a request/reply
+    req_id: Option<u32>, // For request/reply matching, 0 if not a request/reply
     rc: Option<i32>,
     message: Option<String>,
 }
@@ -310,23 +318,23 @@ struct HeatingRequest {
 
 // Envelope message for encapsulating other messages
 struct Envelope {
-    src: Option<u32>,          // Source endpoint name
-    dst: Option<u32>,          // Destination endpoint name
-    msg_type: Option<u32>,     // Message type name
-    sequence: Option<u32>,     // Request ID for matching request/reply
-    instance_id: Option<u32>,  // Instance ID for matching request/reply
-    payload: Option<Vec<u8>>,  // Serialized payload of the message
+    src: Option<u32>,         // Source endpoint name
+    dst: Option<u32>,         // Destination endpoint name
+    msg_type: Option<u32>,    // Message type name
+    sequence: Option<u32>,    // Request ID for matching request/reply
+    instance_id: Option<u32>, // Instance ID for matching request/reply
+    payload: Option<Vec<u8>>, // Serialized payload of the message
 }
 
 // Endpoint announce message for service discovery
 struct EndpointAnnounce {
-    id: Option<u32>,            // Unique identifier for the announcing endpoint
-    name: Option<String>,       // Name of the announcing endpoint
+    id: Option<u32>,             // Unique identifier for the announcing endpoint
+    name: Option<String>,        // Name of the announcing endpoint
     description: Option<String>, // Description of the announcing endpoint
-    services: Vec<u32>,         // List of services provided by the endpoint
-    events: Vec<u32>,           // List of events emitted by the endpoint
-    replies: Vec<u32>,          // List of replies supported by the endpoint
-    subscribes: Vec<u32>,       // List of subscriptions for the endpoint
+    services: Vec<u32>,          // List of services provided by the endpoint
+    events: Vec<u32>,            // List of events emitted by the endpoint
+    replies: Vec<u32>,           // List of replies supported by the endpoint
+    subscribes: Vec<u32>,        // List of subscriptions for the endpoint
 }
 
 // Endpoint announce reply message for service discovery

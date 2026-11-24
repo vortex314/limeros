@@ -210,11 +210,13 @@ impl CompassApp {
                 if let Some(v) = ev.heading {
                     self.tele.heading = v;
                 }
+                // The sensor reports pitch/roll inverted relative to the
+                // display convention, so negate them here (visual + numeric).
                 if let Some(v) = ev.pitch {
-                    self.tele.pitch = v;
+                    self.tele.pitch = -v;
                 }
                 if let Some(v) = ev.roll {
-                    self.tele.roll = v;
+                    self.tele.roll = -v;
                 }
                 if let (Some(x), Some(y), Some(z)) = (ev.mag_x, ev.mag_y, ev.mag_z) {
                     self.tele.mag = [x, y, z];

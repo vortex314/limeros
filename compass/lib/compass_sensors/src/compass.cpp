@@ -77,8 +77,10 @@ void CompassSensor::read()
     int16_t raz = (int16_t)((raw[4] << 8) | raw[5]);
 
     // Tilt angles from the accelerometer (radians -> degrees).
+    // Roll sign is negated so the tilt compensation cancels roll instead of
+    // adding to it; pitch keeps the standard sign.
     _pitchDeg = atan2f((float)-rax, sqrtf((float)raz * raz + (float)ray * ray)) * kRadToDeg;
-    _rollDeg  = atan2f((float)ray,  sqrtf((float)raz * raz + (float)rax * rax)) * kRadToDeg;
+    _rollDeg  = atan2f((float)-ray, sqrtf((float)raz * raz + (float)rax * rax)) * kRadToDeg;
 
     // Low-pass the tilt angles used for tilt compensation so motion / vibration
     // does not make the heading wander.
@@ -92,7 +94,8 @@ void CompassSensor::read()
     _fpitch = _pfilter.filter(pitchSimple, _gy);
     _froll  = _rfilter.filter(rollSimple, -_gx);
 
-    // Board-remapped, filtered magnetometer axes (akkaEsp32: mag_x = Y, mag_y = -X).
+    // Magnetometer axes remapped to the board frame: the HMC5883L is mounted
+    // 90° rotated relative to the MPU6050 on this module.
     float mx = _magFilt.y;
     float my = -_magFilt.x;
     float mz = _magFilt.z;

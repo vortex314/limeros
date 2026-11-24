@@ -7,3 +7,6 @@ create a C++ interface for UEXT1 and UEXT2
 the compass data shopuld combine with the IMU to make compass orientation tilt independent
 Use also Arduino
 ask if in doubt
+write a gui that shows the different measurements collected from IMU and Magnetometer
+show in the GUI a grahical compass indicating the direction 
+show in the GUI a representation of a plane having a tilt and azimuth Magnetometer
